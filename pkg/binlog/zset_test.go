@@ -158,9 +158,9 @@ func TestZRestore(t *testing.T) {
 	for i := 0; i < len(ms); i += 2 {
 		ms[i], ms[i+1] = strconv.Itoa(rand.Int()), rand.Int()
 	}
-	zrestore(t, 0, "zset", 10, ms...)
+	zrestore(t, 0, "zset", 500, ms...)
 	zcard(t, 0, "zset", 32)
-	sleepms(20)
+	sleepms(1000)
 	kpttl(t, 0, "zset", -2)
 	zdel(t, 0, "zset", 0)
 	checkempty(t)

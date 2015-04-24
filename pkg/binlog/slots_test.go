@@ -162,6 +162,7 @@ func checkslotsmgrt(t *testing.T, r *bufio.Reader, w *bufio.Writer, c chan error
 			v := m[string(key)]
 			checkerror(t, nil, v != nil)
 			checkerror(t, nil, string(key) == v.key)
+
 			b, err := rdb.DecodeDump(value)
 			checkerror(t, err, string(b.(rdb.String)) == v.value)
 			x, err := strconv.Atoi(string(ttlms))
@@ -170,7 +171,7 @@ func checkslotsmgrt(t *testing.T, r *bufio.Reader, w *bufio.Writer, c chan error
 				checkerror(t, nil, x == 0)
 			} else {
 				checkerror(t, nil, x != 0)
-				checkerror(t, nil, math.Abs(float64(x)-float64(v.ttlms)) < 500)
+				checkerror(t, nil, math.Abs(float64(x)-float64(v.ttlms)) < 1000)
 			}
 		}
 
