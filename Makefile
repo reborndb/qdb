@@ -1,8 +1,8 @@
 all: build
 
 build:
-	@mkdir -p bin; rm -rf var/*
-	go build -o bin/redis-binlog ./cmd && ./bin/redis-binlog -c conf/config.toml -n 4 --create
+	@mkdir -p bin
+	go build -o bin/redis-binlog ./cmd && ./bin/redis-binlog -c conf/config.toml -n 4 
 
 clean:
 	rm -rf bin/* var/*

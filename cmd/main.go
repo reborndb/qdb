@@ -59,12 +59,11 @@ func (c *Config) String() string {
 func main() {
 	usage := `
 Usage:
-	redis-binlog [--config=CONF] [--create|--repair] [--ncpu=N]
+	redis-binlog [--config=CONF] [--repair] [--ncpu=N]
 
 Options:
 	-n N, --ncpu=N                    set runtime.GOMAXPROCS to N
 	-c CONF, --config=CONF            specify the config file
-	--create                          create if not exists
 	--repair                          repair database
 `
 	d, err := docopt.Parse(usage, nil, true, "", false)
@@ -82,7 +81,6 @@ Options:
 	}
 
 	args.config, _ = d["--config"].(string)
-	args.create, _ = d["--create"].(bool)
 	args.repair, _ = d["--repair"].(bool)
 
 	conf := &Config{
@@ -106,9 +104,9 @@ Options:
 	default:
 		log.Panicf("unknown db type = '%s'", conf.DBType)
 	case "leveldb":
-		db, err = leveldb.Open(conf.DBPath, conf.LevelDB, args.create, args.repair)
+		db, err = leveldb.Open(conf.DBPath, conf.LevelDB, args.repair)
 	case "rocksdb":
-		db, err = rocksdb.Open(conf.DBPath, conf.RocksDB, args.create, args.repair)
+		db, err = rocksdb.Open(conf.DBPath, conf.RocksDB, args.repair)
 	}
 
 	if err != nil {

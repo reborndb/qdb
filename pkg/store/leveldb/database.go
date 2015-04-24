@@ -23,27 +23,28 @@ type LevelDB struct {
 	bloom *levigo.FilterPolicy
 }
 
-func Open(path string, conf *Config, create, repair bool) (*LevelDB, error) {
+func Open(path string, conf *Config, repair bool) (*LevelDB, error) {
 	db := &LevelDB{}
-	if err := db.init(path, conf, create, repair); err != nil {
+	if err := db.init(path, conf, repair); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return db, nil
 }
 
-func (db *LevelDB) init(path string, conf *Config, create, repair bool) error {
+func (db *LevelDB) init(path string, conf *Config, repair bool) error {
 	if conf == nil {
 		conf = NewDefaultConfig()
 	}
-	opts := levigo.NewOptions()
-	if create {
-		opts.SetCreateIfMissing(true)
-		opts.SetErrorIfExists(true)
-	} else {
-		opts.SetCreateIfMissing(false)
-		opts.SetErrorIfExists(false)
+
+	// Create path if not exists first
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return errors.Trace(err)
 	}
+
+	opts := levigo.NewOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetErrorIfExists(false)
 
 	opts.SetCompression(levigo.SnappyCompression)
 	opts.SetBlockSize(conf.BlockSize)
@@ -63,11 +64,7 @@ func (db *LevelDB) init(path string, conf *Config, create, repair bool) error {
 	db.cache = cache
 	db.bloom = bloom
 
-	if create {
-		if err := os.MkdirAll(db.path, 0700); err != nil {
-			return errors.Trace(err)
-		}
-	} else if repair {
+	if repair {
 		if err := levigo.RepairDatabase(db.path, db.opts); err != nil {
 			return errors.Trace(err)
 		}

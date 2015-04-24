@@ -47,12 +47,12 @@ func reinit() {
 		testbl.Close()
 		testbl = nil
 	}
-	const path = "/tmp/testdb-rocksdb"
+	const path = "/tmp/test_qdb/service/testdb-rocksdb"
 	if err := os.RemoveAll(path); err != nil {
 		log.PanicErrorf(err, "remove '%s' failed", path)
 	} else {
 		conf := rocksdb.NewDefaultConfig()
-		if testdb, err := rocksdb.Open(path, conf, true, false); err != nil {
+		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
 			log.PanicError(err, "open rocksdb failed")
 		} else {
 			testbl = binlog.New(testdb)

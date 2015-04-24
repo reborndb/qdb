@@ -27,27 +27,28 @@ type RocksDB struct {
 	snapshotFillCache bool
 }
 
-func Open(path string, conf *Config, create, repair bool) (*RocksDB, error) {
+func Open(path string, conf *Config, repair bool) (*RocksDB, error) {
 	db := &RocksDB{}
-	if err := db.init(path, conf, create, repair); err != nil {
+	if err := db.init(path, conf, repair); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return db, nil
 }
 
-func (db *RocksDB) init(path string, conf *Config, create, repair bool) error {
+func (db *RocksDB) init(path string, conf *Config, repair bool) error {
 	if conf == nil {
 		conf = NewDefaultConfig()
 	}
-	opts := gorocks.NewOptions()
-	if create {
-		opts.SetCreateIfMissing(true)
-		opts.SetErrorIfExists(true)
-	} else {
-		opts.SetCreateIfMissing(false)
-		opts.SetErrorIfExists(false)
+
+	// Create path if not exists first
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return errors.Trace(err)
 	}
+
+	opts := gorocks.NewOptions()
+	opts.SetCreateIfMissing(true)
+	opts.SetErrorIfExists(false)
 
 	opts.SetCompression(gorocks.Lz4Compression)
 	opts.SetBlockSize(conf.BlockSize)
@@ -95,11 +96,7 @@ func (db *RocksDB) init(path string, conf *Config, create, repair bool) error {
 	db.cache = cache
 	db.snapshotFillCache = conf.SnapshotFillCache
 
-	if create {
-		if err := os.MkdirAll(db.path, 0700); err != nil {
-			return errors.Trace(err)
-		}
-	} else if repair {
+	if repair {
 		if err := gorocks.RepairDatabase(db.path, db.opts); err != nil {
 			return errors.Trace(err)
 		}

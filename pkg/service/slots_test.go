@@ -43,7 +43,7 @@ func init() {
 		log.PanicErrorf(err, "remove '%s' failed", path)
 	} else {
 		conf := rocksdb.NewDefaultConfig()
-		if testdb, err := rocksdb.Open(path, conf, true, false); err != nil {
+		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
 			log.PanicError(err, "open rocksdb failed")
 		} else {
 			testbl2 = binlog.New(testdb)
