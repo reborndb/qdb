@@ -26,7 +26,7 @@ func NewDefaultConfig() *Config {
 		DumpPath:    "dump.rdb",
 		ConnTimeout: 900,
 
-		SyncFilePath: "sync.pipe",
+		SyncFilePath: "./var/sync.pipe",
 		SyncFileSize: bytesize.GB * 32,
 		SyncBuffSize: bytesize.MB * 32,
 	}

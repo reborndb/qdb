@@ -87,7 +87,7 @@ Options:
 
 	conf := &Config{
 		DBType:  "rocksdb",
-		DBPath:  "testdb-rocksdb",
+		DBPath:  "./var/testdb-rocksdb",
 		LevelDB: leveldb.NewDefaultConfig(),
 		RocksDB: rocksdb.NewDefaultConfig(),
 		Service: service.NewDefaultConfig(),

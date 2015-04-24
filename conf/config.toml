@@ -1,15 +1,15 @@
 # This is a TOML document. Boom.
 
 dbtype = "rocksdb"
-dbpath = "testdb-rocksdb"
+dbpath = "./var/testdb-rocksdb"
 
 [service]
 
 listen_address = "0.0.0.0:6380"
-dump_filepath = "dump.rdb"
+dump_filepath = "./var/dump.rdb"
 conn_timeout = 900
 
-sync_filepath = "sync.pipe"
+sync_filepath = "./var/sync.pipe"
 sync_filesize = 34359738368
 sync_memory_buffer = 8388608
 
