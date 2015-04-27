@@ -19,10 +19,12 @@ type Snapshot struct {
 
 func newSnapshot(db *GoLevelDB) *Snapshot {
 	snap, _ := db.lvdb.GetSnapshot()
+	ropt := &opt.ReadOptions{}
+	ropt.DontFillCache = true
 	return &Snapshot{
 		db:   db,
 		snap: snap,
-		ropt: nil,
+		ropt: ropt,
 	}
 }
 
