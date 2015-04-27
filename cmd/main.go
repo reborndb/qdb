@@ -86,8 +86,8 @@ Options:
 	args.repair, _ = d["--repair"].(bool)
 
 	conf := &Config{
-		DBType:    "rocksdb",
-		DBPath:    "./var/testdb-rocksdb",
+		DBType:    "goleveldb",
+		DBPath:    "./var/testdb-goleveldb",
 		LevelDB:   leveldb.NewDefaultConfig(),
 		RocksDB:   rocksdb.NewDefaultConfig(),
 		GoLevelDB: goleveldb.NewDefaultConfig(),
@@ -103,16 +103,19 @@ Options:
 	log.Infof("load config\n%s\n\n", conf)
 
 	var db store.Database
+	var dbConf interface{}
 	switch t := strings.ToLower(conf.DBType); t {
 	default:
 		log.Panicf("unknown db type = '%s'", conf.DBType)
 	case "leveldb":
-		db, err = leveldb.Open(conf.DBPath, conf.LevelDB, args.repair)
+		dbConf = conf.LevelDB
 	case "rocksdb":
-		db, err = rocksdb.Open(conf.DBPath, conf.RocksDB, args.repair)
+		dbConf = conf.RocksDB
 	case "goleveldb":
-		db, err = goleveldb.Open(conf.DBPath, conf.GoLevelDB, args.repair)
+		dbConf = conf.GoLevelDB
 	}
+
+	db, err = store.Open(conf.DBType, conf.DBPath, dbConf, args.repair)
 
 	if err != nil {
 		log.PanicErrorf(err, "open database failed")
