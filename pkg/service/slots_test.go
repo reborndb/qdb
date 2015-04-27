@@ -38,7 +38,7 @@ func (s *fakeSession2) Binlog() *binlog.Binlog {
 }
 
 func init() {
-	const path = "/tmp/testdb2-rocksdb"
+	const path = "/tmp/test_qdb/service/testdb2-rocksdb"
 	if err := os.RemoveAll(path); err != nil {
 		log.PanicErrorf(err, "remove '%s' failed", path)
 	} else {
