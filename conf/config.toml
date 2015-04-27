@@ -51,3 +51,11 @@ disable_data_sync = false
 use_fsync = false
 snapshot_fillcache = true
 allow_os_buffer = true
+
+[goleveldb]
+
+block_size = 65536
+cache_size = 4294967296
+write_buffer_size = 67108864
+bloom_filter_size = 24
+max_open_files = 4096

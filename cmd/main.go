@@ -18,6 +18,7 @@ import (
 	"github.com/reborndb/qdb/pkg/binlog"
 	"github.com/reborndb/qdb/pkg/service"
 	"github.com/reborndb/qdb/pkg/store"
+	"github.com/reborndb/qdb/pkg/store/goleveldb"
 	"github.com/reborndb/qdb/pkg/store/leveldb"
 	"github.com/reborndb/qdb/pkg/store/rocksdb"
 )
@@ -38,9 +39,10 @@ type Config struct {
 	DBType string `toml:"dbtype"`
 	DBPath string `toml:"dbpath"`
 
-	Service *service.Config `toml:"service"`
-	LevelDB *leveldb.Config `toml:"leveldb"`
-	RocksDB *rocksdb.Config `toml:"rocksdb"`
+	Service   *service.Config   `toml:"service"`
+	LevelDB   *leveldb.Config   `toml:"leveldb"`
+	RocksDB   *rocksdb.Config   `toml:"rocksdb"`
+	GoLevelDB *goleveldb.Config `toml:"goleveldb"`
 }
 
 func (c *Config) LoadFromFile(path string) error {
@@ -84,11 +86,12 @@ Options:
 	args.repair, _ = d["--repair"].(bool)
 
 	conf := &Config{
-		DBType:  "rocksdb",
-		DBPath:  "./var/testdb-rocksdb",
-		LevelDB: leveldb.NewDefaultConfig(),
-		RocksDB: rocksdb.NewDefaultConfig(),
-		Service: service.NewDefaultConfig(),
+		DBType:    "rocksdb",
+		DBPath:    "./var/testdb-rocksdb",
+		LevelDB:   leveldb.NewDefaultConfig(),
+		RocksDB:   rocksdb.NewDefaultConfig(),
+		GoLevelDB: goleveldb.NewDefaultConfig(),
+		Service:   service.NewDefaultConfig(),
 	}
 
 	if args.config != "" {
@@ -107,6 +110,8 @@ Options:
 		db, err = leveldb.Open(conf.DBPath, conf.LevelDB, args.repair)
 	case "rocksdb":
 		db, err = rocksdb.Open(conf.DBPath, conf.RocksDB, args.repair)
+	case "goleveldb":
+		db, err = goleveldb.Open(conf.DBPath, conf.GoLevelDB, args.repair)
 	}
 
 	if err != nil {
