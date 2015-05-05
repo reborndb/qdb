@@ -61,12 +61,14 @@ func (c *Config) String() string {
 func main() {
 	usage := `
 Usage:
-	redis-binlog [--config=CONF] [--repair] [--ncpu=N]
+	redis-binlog [--config=CONF] [--repair] [--ncpu=N] [--addr=ADDR] [--dbpath=PATH]
 
 Options:
 	-n N, --ncpu=N                    set runtime.GOMAXPROCS to N
 	-c CONF, --config=CONF            specify the config file
 	--repair                          repair database
+	--addr=ADDR                       service listening address		
+	--dbpath=PATH                     database store path						
 `
 	d, err := docopt.Parse(usage, nil, true, "", false)
 	if err != nil {
@@ -98,6 +100,14 @@ Options:
 		if err := conf.LoadFromFile(args.config); err != nil {
 			log.PanicErrorf(err, "load config failed")
 		}
+	}
+
+	if s, ok := d["--addr"].(string); ok && len(s) != 0 {
+		conf.Service.Listen = s
+	}
+
+	if s, ok := d["--dbpath"].(string); ok && len(s) != 0 {
+		conf.DBPath = s
 	}
 
 	log.Infof("load config\n%s\n\n", conf)
