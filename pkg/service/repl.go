@@ -31,7 +31,7 @@ func (h *Handler) initReplication(bl *binlog.Binlog) error {
 
 	h.repl.fullSyncSema = sync2.NewSemaphore(1)
 
-	bl.RegAfterCommitHandler(h.replicationFeedSlaves)
+	bl.RegPostCommitHandler(h.replicationFeedSlaves)
 
 	go func() {
 		for {

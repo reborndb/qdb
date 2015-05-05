@@ -24,15 +24,15 @@ type Binlog struct {
 	itlist list.List
 	serial uint64
 
-	beforeCommitHandlers []ForwardHandler
-	afterCommitHandlers  []ForwardHandler
+	preCommitHandlers  []ForwardHandler
+	postCommitHandlers []ForwardHandler
 }
 
 func New(db store.Database) *Binlog {
 	b := &Binlog{db: db}
 
-	b.beforeCommitHandlers = make([]ForwardHandler, 0)
-	b.afterCommitHandlers = make([]ForwardHandler, 0)
+	b.preCommitHandlers = make([]ForwardHandler, 0)
+	b.postCommitHandlers = make([]ForwardHandler, 0)
 
 	return b
 }
@@ -63,7 +63,7 @@ func (b *Binlog) commit(bt *store.Batch, fw *Forward) error {
 		return nil
 	}
 
-	b.travelBeforeCommitHandlers(fw)
+	b.travelPreCommitHandlers(fw)
 
 	if err := b.db.Commit(bt); err != nil {
 		log.WarnErrorf(err, "binlog commit failed")
@@ -75,7 +75,7 @@ func (b *Binlog) commit(bt *store.Batch, fw *Forward) error {
 	}
 	b.serial++
 
-	b.travelAfterCommitHandlers(fw)
+	b.travelPostCommitHandlers(fw)
 
 	return nil
 }
