@@ -40,7 +40,7 @@ func (h *Handler) Bgsave(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	defer h.counters.bgsave.Sub(1)
 
 	if bg != 1 {
-		return toRespErrorf("bgsave is busy: %d, should be 1")
+		return toRespErrorf("bgsave is busy: %d, should be 1", bg)
 	}
 
 	sp, err := s.Binlog().NewSnapshot()
@@ -245,6 +245,7 @@ func (h *Handler) doSyncTo(c *conn) error {
 				pr.CloseWithError(err)
 				return
 			}
+
 			h.counters.syncTotalBytes.Add(int64(n))
 			s := p[:n]
 			for len(s) != 0 {

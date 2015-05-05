@@ -4,14 +4,18 @@
 package service
 
 import (
+	"crypto/rand"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/reborndb/go/atomic2"
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
+	"github.com/reborndb/go/ring"
+	"github.com/reborndb/go/sync2"
 	"github.com/reborndb/qdb/pkg/binlog"
 )
 
@@ -25,11 +29,20 @@ func Serve(config *Config, bl *binlog.Binlog) error {
 		close(h.signal)
 	}()
 
+	h.runID = make([]byte, 40)
+	getRandomHex(h.runID)
+	log.Infof("server runid is %s", h.runID)
+
 	l, err := net.Listen("tcp", config.Listen)
 	if err != nil {
 		return errors.Trace(err)
 	}
 	defer l.Close()
+
+	if err = h.initReplication(bl); err != nil {
+		return errors.Trace(err)
+	}
+	defer h.closeReplication()
 
 	if h.htable, err = handler.NewHandlerTable(h); err != nil {
 		return err
@@ -89,6 +102,31 @@ type Handler struct {
 		syncRdbRemains  atomic2.Int64
 		syncCacheBytes  atomic2.Int64
 		syncTotalBytes  atomic2.Int64
+		syncFull        atomic2.Int64
+		syncPartialOK   atomic2.Int64
+		syncPartialErr  atomic2.Int64
+	}
+
+	// 40 bytes, hex random run id for different server
+	runID []byte
+
+	repl struct {
+		sync.RWMutex
+
+		// replication backlog buffer
+		backlogBuf *ring.Ring
+
+		// global master replication offset
+		masterOffset int64
+
+		// replication offset of first byte in the backlog buffer
+		backlogOffset int64
+
+		lastSelectDB atomic2.Int64
+
+		slaves map[*conn]chan struct{}
+
+		fullSyncSema *sync2.Semaphore
 	}
 }
 
@@ -120,4 +158,16 @@ func iconvert(args [][]byte) []interface{} {
 		iargs[i] = v
 	}
 	return iargs
+}
+
+func getRandomHex(buf []byte) []byte {
+	charsets := "0123456789abcdef"
+
+	rand.Read(buf)
+
+	for i := range buf {
+		buf[i] = charsets[buf[i]&0x0F]
+	}
+
+	return buf
 }

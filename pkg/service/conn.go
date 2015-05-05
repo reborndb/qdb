@@ -7,11 +7,14 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/reborndb/go/atomic2"
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
@@ -22,12 +25,26 @@ type conn struct {
 	r *bufio.Reader
 	w *bufio.Writer
 
+	wLock sync.Mutex
+
 	db uint32
 	nc net.Conn
 	bl *binlog.Binlog
 
 	summ    string
 	timeout time.Duration
+
+	// replication backlog offset
+	syncOffset atomic2.Int64
+
+	// replication backlog ACK offset
+	backlogACKOffset atomic2.Int64
+
+	// slave listening port
+	listeningPort atomic2.Int64
+
+	// replication ACK time, using unix time
+	backlogACKTime atomic2.Int64
 }
 
 func newConn(nc net.Conn, bl *binlog.Binlog, timeout int) *conn {
@@ -43,6 +60,8 @@ func newConn(nc net.Conn, bl *binlog.Binlog, timeout int) *conn {
 }
 
 func (c *conn) serve(h *Handler) error {
+	defer h.removeSlave(c)
+
 	for {
 		if c.timeout != 0 {
 			deadline := time.Now().Add(c.timeout)
@@ -50,9 +69,9 @@ func (c *conn) serve(h *Handler) error {
 				return errors.Trace(err)
 			}
 		}
-		request, err := redis.Decode(c.r)
+		request, err := redis.DecodeRequest(c.r)
 		if err != nil {
-			return err
+			return errors.Trace(err)
 		}
 		h.counters.commands.Add(1)
 		response, err := c.dispatch(h, request)
@@ -70,11 +89,9 @@ func (c *conn) serve(h *Handler) error {
 				return errors.Trace(err)
 			}
 		}
-		if err := redis.Encode(c.w, response); err != nil {
-			return err
-		}
-		if err := errors.Trace(c.w.Flush()); err != nil {
-			return err
+
+		if err = c.writeReply(response); err != nil {
+			return errors.Trace(err)
 		}
 	}
 }
@@ -159,6 +176,41 @@ func (c *conn) presync() (int64, error) {
 		return 0, errors.Errorf("invalid sync response = '%s', error = '%s', n = %d", rsp, err, n)
 	}
 	return int64(n), nil
+}
+
+func (c *conn) writeReply(resp redis.Resp) error {
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
+
+	if err := redis.Encode(c.w, resp); err != nil {
+		return err
+	}
+
+	return errors.Trace(c.w.Flush())
+}
+
+func (c *conn) writeRDBFrom(size int64, r io.Reader) error {
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
+
+	c.w.WriteString(fmt.Sprintf("$%d\r\n", size))
+
+	if n, err := io.CopyN(c.w, r, size); err != nil {
+		return err
+	} else if n != size {
+		return io.ErrShortWrite
+	}
+
+	return errors.Trace(c.w.Flush())
+}
+
+func (c *conn) writeRaw(buf []byte) error {
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
+
+	c.w.Write(buf)
+
+	return errors.Trace(c.w.Flush())
 }
 
 func (c *conn) Close() {
