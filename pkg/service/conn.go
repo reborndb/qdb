@@ -31,6 +31,7 @@ type conn struct {
 	nc net.Conn
 	bl *binlog.Binlog
 
+	// summary for this connection
 	summ    string
 	timeout time.Duration
 
@@ -59,6 +60,10 @@ func newConn(nc net.Conn, bl *binlog.Binlog, timeout int) *conn {
 	return c
 }
 
+func (c *conn) String() string {
+	return c.summ
+}
+
 func (c *conn) serve(h *Handler) error {
 	defer h.removeSlave(c)
 
@@ -83,7 +88,7 @@ func (c *conn) serve(h *Handler) error {
 		if err != nil {
 			h.counters.commandsFailed.Add(1)
 			b, _ := redis.EncodeToBytes(request)
-			log.WarnErrorf(err, "handle commands failed, conn = %s, request = '%s'", c.summ, base64.StdEncoding.EncodeToString(b))
+			log.WarnErrorf(err, "handle commands failed, conn = %s, request = '%s'", c, base64.StdEncoding.EncodeToString(b))
 		}
 		if response == nil {
 			continue

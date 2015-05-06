@@ -190,7 +190,7 @@ func (h *Handler) daemonSyncMaster() {
 				}()
 				defer c.Close()
 				err := h.doSyncTo(c)
-				log.InfoErrorf(err, "stop sync: %s", c.summ)
+				log.InfoErrorf(err, "stop sync: %s", c)
 			}()
 			h.syncto = c.nc.RemoteAddr().String()
 			h.syncto_since = time.Now().UnixNano() / int64(time.Millisecond)

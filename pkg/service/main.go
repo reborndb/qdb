@@ -62,15 +62,15 @@ func Serve(config *Config, bl *binlog.Binlog) error {
 				defer h.counters.clients.Sub(1)
 				c := newConn(nc, bl, h.config.ConnTimeout)
 				defer c.Close()
-				log.Infof("new connection: %s", c.summ)
+				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {
 					if errors.Equal(err, io.EOF) {
-						log.Infof("connection lost: %s [io.EOF]", c.summ)
+						log.Infof("connection lost: %s [io.EOF]", c)
 					} else {
-						log.InfoErrorf(err, "connection lost: %s", c.summ)
+						log.InfoErrorf(err, "connection lost: %s", c)
 					}
 				} else {
-					log.Infof("connection exit: %s", c.summ)
+					log.Infof("connection exit: %s", c)
 				}
 			}()
 		}
