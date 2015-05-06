@@ -34,7 +34,7 @@ type conn struct {
 	summ    string
 	timeout time.Duration
 
-	// replication backlog offset
+	// replication sync offset
 	syncOffset atomic2.Int64
 
 	// replication backlog ACK offset
@@ -73,6 +73,11 @@ func (c *conn) serve(h *Handler) error {
 		if err != nil {
 			return errors.Trace(err)
 		}
+
+		if request.Type() == redis.TypePing {
+			continue
+		}
+
 		h.counters.commands.Add(1)
 		response, err := c.dispatch(h, request)
 		if err != nil {
@@ -83,6 +88,7 @@ func (c *conn) serve(h *Handler) error {
 		if response == nil {
 			continue
 		}
+
 		if c.timeout != 0 {
 			deadline := time.Now().Add(c.timeout)
 			if err := c.nc.SetWriteDeadline(deadline); err != nil {

@@ -265,28 +265,87 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 	}
 
 	if opt == "psync" {
-		// not supported now
-		return toRespErrorf("psync is not supported now")
+		// first try whether full resync or not
+		need, syncOffset := h.needFullReSync(c, args)
+		if !need {
+			// write CONTINUE and resume replication
+
+			if err := c.writeReply(redis.NewString("CONTINUE")); err != nil {
+				log.ErrorErrorf(err, "reply slave %s psync CONTINUE err", c.summ)
+				c.Close()
+				return nil, err
+			}
+
+			h.counters.syncPartialOK.Add(1)
+
+			h.startSlaveReplication(c, syncOffset)
+			return nil, nil
+		}
+
+		// we must handle full resync
+		if err := h.replicationReplyFullReSync(c); err != nil {
+			return nil, err
+		}
+
+		// slave will use ? to force resync, this is not error
+		if !bytes.Equal(args[0], []byte{'?'}) {
+			h.counters.syncPartialErr.Add(1)
+		}
 	}
 
-	if ok := h.repl.fullSyncSema.AcquireTimeout(time.Second); !ok {
-		return toRespErrorf("wait other slave full sync bgsave timeout")
+	offset, resp, err := h.replicationSlaveFullSync(c)
+	if err != nil {
+		return resp, err
+	}
+
+	h.startSlaveReplication(c, offset)
+
+	return nil, nil
+}
+
+func (h *Handler) replicationReplyFullReSync(c *conn) error {
+	// lock all to get the current master replication offset
+	if err := c.Binlog().Acquire(); err != nil {
+		return err
+	}
+	syncOffset := h.repl.masterOffset
+	if h.repl.backlogBuf == nil {
+		// we will increment the master offset by one when backlog buffer created
+		syncOffset++
+	}
+	c.Binlog().Release()
+
+	if err := c.writeReply(redis.NewString(fmt.Sprintf("FULLRESYNC %s %d", h.runID, syncOffset))); err != nil {
+		log.ErrorErrorf(err, "reply slave %s psync FULLRESYNC err", c.summ)
+		c.Close()
+		return err
+	}
+	return nil
+}
+
+// if full sync ok, return sync offset for later backlog syncing
+func (h *Handler) replicationSlaveFullSync(c *conn) (syncOffset int64, resp redis.Resp, err error) {
+	if ok := h.repl.fullSyncSema.AcquireTimeout(time.Minute); !ok {
+		resp, err = toRespErrorf("wait other slave full sync bgsave timeout")
+		return
 	}
 	defer h.repl.fullSyncSema.Release()
 
 	// now begin full sync
 	h.counters.syncFull.Add(1)
 
-	rdb, offset, err := h.replicationBgSave(c.Binlog())
+	var rdb *os.File
+	rdb, syncOffset, err = h.replicationBgSave(c.Binlog())
 	if err != nil {
-		return toRespError(err)
+		resp, err = toRespError(err)
+		return
 	}
 	defer rdb.Close()
 
 	// send rdb to slave
 	st, err := rdb.Stat()
 	if err != nil {
-		return toRespErrorf("get rdb stat err %v", err)
+		resp, err = toRespErrorf("get rdb stat err %v", err)
 	}
 
 	rdbSize := st.Size()
@@ -295,26 +354,63 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 		// close this connection here???
 		log.ErrorErrorf(err, "slave %s sync rdb err", c.summ)
 		c.Close()
-		return nil, err
+		return 0, nil, err
 	}
 
-	c.syncOffset.Set(offset)
+	return syncOffset, nil, nil
+}
+
+// if no need full resync, returns false and sync offset
+func (h *Handler) needFullReSync(c *conn, args [][]byte) (bool, int64) {
+	masterRunID := args[0]
+
+	if !bytes.EqualFold(masterRunID, h.runID) {
+		if !bytes.Equal(masterRunID, []byte{'?'}) {
+			log.Infof("Partial resynchronization not accepted, runid mismatch, server is %s, but client is %s", h.runID, masterRunID)
+		} else {
+			log.Info("Full resync requested by slave.")
+		}
+		return true, 0
+	}
+
+	syncOffset, err := strconv.ParseInt(string(args[1]), 10, 64)
+	if err != nil {
+		log.ErrorError(err, "PSYNC parse sync offset err, try full resync")
+		return true, 0
+	}
+
+	r := &h.repl
+
+	h.repl.RLock()
+	defer h.repl.RUnlock()
+
+	if r.backlogBuf == nil || syncOffset < r.backlogOffset ||
+		syncOffset > (r.backlogOffset+int64(r.backlogBuf.Len())) {
+		log.Infof("unable to partial resync with the slave for lack of backlog, slave offset %d", syncOffset)
+		if syncOffset > r.masterOffset {
+			log.Infof("slave tried to PSYNC with an offset %d larger than master offset %d", syncOffset, r.masterOffset)
+		}
+
+		return true, 0
+	}
+
+	return false, syncOffset
+}
+
+func (h *Handler) startSlaveReplication(c *conn, syncOffset int64) {
+	c.syncOffset.Set(syncOffset)
 
 	// we may not receive any data, so ignore timeout
 	c.timeout = 0
 
-	h.startSlaveReplication(c)
-
-	return nil, nil
-}
-
-func (h *Handler) startSlaveReplication(c *conn) {
-	h.repl.Lock()
-	defer h.repl.Unlock()
+	c.backlogACKTime.Set(time.Now().Unix())
 
 	ch := make(chan struct{}, 1)
 	ch <- struct{}{}
+
+	h.repl.Lock()
 	h.repl.slaves[c] = ch
+	h.repl.Unlock()
 
 	go func(c *conn, ch chan struct{}) {
 		defer func() {
@@ -382,7 +478,7 @@ func (h *Handler) replicationSlaveSyncBacklog(c *conn, buf []byte) (int, error) 
 		return 0, nil
 	}
 
-	// use write timeout here, now 5s
+	// use write timeout here, now 5s, later, use config
 	c.nc.SetWriteDeadline(time.Now().Add(5 * time.Second))
 
 	if err = c.writeRaw(buf[0:n]); err != nil {
@@ -395,32 +491,34 @@ func (h *Handler) replicationSlaveSyncBacklog(c *conn, buf []byte) (int, error) 
 }
 
 func (h *Handler) isSlave(c *conn) bool {
-	h.repl.Lock()
-	defer h.repl.Unlock()
-
+	h.repl.RLock()
 	_, ok := h.repl.slaves[c]
+	h.repl.RUnlock()
+
 	return ok
 }
 
 func (h *Handler) removeSlave(c *conn) {
 	h.repl.Lock()
-	defer h.repl.Unlock()
 
 	ch, ok := h.repl.slaves[c]
 	if ok {
 		delete(h.repl.slaves, c)
 		close(ch)
 	}
+
+	h.repl.Unlock()
 }
 
 func (h *Handler) removeAllSlaves() {
 	h.repl.Lock()
-	defer h.repl.Unlock()
 
 	for c, ch := range h.repl.slaves {
 		delete(h.repl.slaves, c)
 		close(ch)
 	}
+
+	h.repl.Unlock()
 }
 
 func (h *Handler) replicationBgSave(bl *binlog.Binlog) (*os.File, int64, error) {
