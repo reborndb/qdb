@@ -269,11 +269,10 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 		need, syncOffset := h.needFullReSync(c, args)
 		if !need {
 			// write CONTINUE and resume replication
-
 			if err := c.writeReply(redis.NewString("CONTINUE")); err != nil {
 				log.ErrorErrorf(err, "reply slave %s psync CONTINUE err", c.summ)
 				c.Close()
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 
 			h.counters.syncPartialOK.Add(1)
@@ -284,7 +283,7 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 
 		// we must handle full resync
 		if err := h.replicationReplyFullReSync(c); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 
 		// slave will use ? to force resync, this is not error
@@ -295,7 +294,7 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 
 	offset, resp, err := h.replicationSlaveFullSync(c)
 	if err != nil {
-		return resp, err
+		return resp, errors.Trace(err)
 	}
 
 	h.startSlaveReplication(c, offset)
@@ -306,7 +305,7 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 func (h *Handler) replicationReplyFullReSync(c *conn) error {
 	// lock all to get the current master replication offset
 	if err := c.Binlog().Acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	syncOffset := h.repl.masterOffset
 	if h.repl.backlogBuf == nil {
@@ -318,7 +317,7 @@ func (h *Handler) replicationReplyFullReSync(c *conn) error {
 	if err := c.writeReply(redis.NewString(fmt.Sprintf("FULLRESYNC %s %d", h.runID, syncOffset))); err != nil {
 		log.ErrorErrorf(err, "reply slave %s psync FULLRESYNC err", c.summ)
 		c.Close()
-		return err
+		return errors.Trace(err)
 	}
 	return nil
 }
@@ -343,10 +342,7 @@ func (h *Handler) replicationSlaveFullSync(c *conn) (syncOffset int64, resp redi
 	defer rdb.Close()
 
 	// send rdb to slave
-	st, err := rdb.Stat()
-	if err != nil {
-		resp, err = toRespErrorf("get rdb stat err %v", err)
-	}
+	st, _ := rdb.Stat()
 
 	rdbSize := st.Size()
 
@@ -354,7 +350,7 @@ func (h *Handler) replicationSlaveFullSync(c *conn) (syncOffset int64, resp redi
 		// close this connection here???
 		log.ErrorErrorf(err, "slave %s sync rdb err", c.summ)
 		c.Close()
-		return 0, nil, err
+		return
 	}
 
 	return syncOffset, nil, nil
@@ -492,33 +488,31 @@ func (h *Handler) replicationSlaveSyncBacklog(c *conn, buf []byte) (int, error) 
 
 func (h *Handler) isSlave(c *conn) bool {
 	h.repl.RLock()
+	defer h.repl.RUnlock()
 	_, ok := h.repl.slaves[c]
-	h.repl.RUnlock()
 
 	return ok
 }
 
 func (h *Handler) removeSlave(c *conn) {
 	h.repl.Lock()
+	defer h.repl.Unlock()
 
 	ch, ok := h.repl.slaves[c]
 	if ok {
 		delete(h.repl.slaves, c)
 		close(ch)
 	}
-
-	h.repl.Unlock()
 }
 
 func (h *Handler) removeAllSlaves() {
 	h.repl.Lock()
+	defer h.repl.Unlock()
 
 	for c, ch := range h.repl.slaves {
 		delete(h.repl.slaves, c)
 		close(ch)
 	}
-
-	h.repl.Unlock()
 }
 
 func (h *Handler) replicationBgSave(bl *binlog.Binlog) (*os.File, int64, error) {

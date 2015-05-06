@@ -63,7 +63,7 @@ func (c *conn) serve(h *Handler) error {
 	defer h.removeSlave(c)
 
 	for {
-		if c.timeout != 0 {
+		if c.timeout > 0 {
 			deadline := time.Now().Add(c.timeout)
 			if err := c.nc.SetReadDeadline(deadline); err != nil {
 				return errors.Trace(err)
@@ -89,7 +89,7 @@ func (c *conn) serve(h *Handler) error {
 			continue
 		}
 
-		if c.timeout != 0 {
+		if c.timeout > 0 {
 			deadline := time.Now().Add(c.timeout)
 			if err := c.nc.SetWriteDeadline(deadline); err != nil {
 				return errors.Trace(err)
@@ -189,7 +189,7 @@ func (c *conn) writeReply(resp redis.Resp) error {
 	defer c.wLock.Unlock()
 
 	if err := redis.Encode(c.w, resp); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	return errors.Trace(c.w.Flush())
@@ -202,9 +202,9 @@ func (c *conn) writeRDBFrom(size int64, r io.Reader) error {
 	c.w.WriteString(fmt.Sprintf("$%d\r\n", size))
 
 	if n, err := io.CopyN(c.w, r, size); err != nil {
-		return err
+		return errors.Trace(err)
 	} else if n != size {
-		return io.ErrShortWrite
+		return errors.Trace(io.ErrShortWrite)
 	}
 
 	return errors.Trace(c.w.Flush())
