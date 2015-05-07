@@ -119,70 +119,65 @@ func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
 	}
 }
 
+// read a RESP line, return buffer ignoring \r\n
+// sometimes, only \n is a valid RESP line, we will ignore this
+func (c *conn) readLine() (line []byte, err error) {
+	// if we read too many \n only, maybe something is wrong.
+	for i := 0; i < 100; i++ {
+		line, err = c.r.ReadSlice('\n')
+		if err != nil {
+			return nil, errors.Trace(err)
+		} else if line[0] == '\n' {
+			// only \n one line, try again
+			continue
+		}
+	}
+
+	i := len(line) - 2
+	if i < 0 || line[i] != '\r' {
+		return nil, errors.New("bad resp line terminator")
+	}
+	return line[:i], nil
+}
+
 func (c *conn) ping() error {
 	deadline := time.Now().Add(time.Second * 5)
 	if err := c.nc.SetDeadline(deadline); err != nil {
 		return errors.Trace(err)
 	}
-	if _, err := c.w.WriteString("*1\r\n$4\r\nping\r\n"); err != nil {
+	if err := c.writeRawString("*1\r\n$4\r\nping\r\n"); err != nil {
 		return errors.Trace(err)
 	}
-	if err := c.w.Flush(); err != nil {
-		return errors.Trace(err)
-	}
-	var rsp string
-	for !strings.HasSuffix(rsp, "\r\n") {
-		b := []byte{0}
-		if _, err := c.r.Read(b); err != nil {
-			return errors.Trace(err)
-		}
-		if len(rsp) == 0 && b[0] == '\n' {
-			continue
-		}
-		rsp += string(b)
-	}
-	rsp = rsp[:len(rsp)-2]
 
-	if strings.ToLower(rsp) != "+pong" {
+	if rsp, err := c.readLine(); err != nil {
+		return errors.Trace(err)
+	} else if strings.ToLower(string(rsp)) != "+pong" {
 		return errors.Errorf("invalid response of command ping: %s", rsp)
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 func (c *conn) presync() (int64, error) {
-	deadline := time.Now().Add(time.Second * 15)
+	deadline := time.Now().Add(time.Second * 5)
 	if err := c.nc.SetDeadline(deadline); err != nil {
 		return 0, errors.Trace(err)
 	}
-	if _, err := c.w.WriteString("*1\r\n$4\r\nsync\r\n"); err != nil {
+
+	if err := c.writeRawString("*1\r\n$4\r\nsync\r\n"); err != nil {
 		return 0, errors.Trace(err)
 	}
-	if err := c.w.Flush(); err != nil {
+
+	rsp, err := c.readLine()
+	if err != nil {
 		return 0, errors.Trace(err)
 	}
-	var rsp string
-	for !strings.HasSuffix(rsp, "\r\n") {
-		deadline := time.Now().Add(time.Second * 15)
-		if err := c.nc.SetDeadline(deadline); err != nil {
-			return 0, errors.Trace(err)
-		}
-		b := []byte{0}
-		if _, err := c.r.Read(b); err != nil {
-			return 0, errors.Trace(err)
-		}
-		if len(rsp) == 0 && b[0] == '\n' {
-			continue
-		}
-		rsp += string(b)
-	}
-	rsp = rsp[:len(rsp)-2]
 
 	if rsp[0] != '$' {
 		return 0, errors.Errorf("invalid sync response, rsp = '%s'", rsp)
 	}
 
-	n, err := strconv.Atoi(rsp[1:])
+	n, err := strconv.Atoi(string(rsp[1:]))
 	if err != nil || n <= 0 {
 		return 0, errors.Errorf("invalid sync response = '%s', error = '%s', n = %d", rsp, err, n)
 	}
@@ -220,6 +215,15 @@ func (c *conn) writeRaw(buf []byte) error {
 	defer c.wLock.Unlock()
 
 	c.w.Write(buf)
+
+	return errors.Trace(c.w.Flush())
+}
+
+func (c *conn) writeRawString(str string) error {
+	c.wLock.Lock()
+	defer c.wLock.Unlock()
+
+	c.w.WriteString(str)
 
 	return errors.Trace(c.w.Flush())
 }
