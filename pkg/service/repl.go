@@ -58,6 +58,14 @@ func (h *Handler) closeReplication() error {
 	h.repl.Lock()
 	defer h.repl.Unlock()
 
+	// notice all slave to quit replication
+	for c, ch := range h.repl.slaves {
+		delete(h.repl.slaves, c)
+		close(ch)
+	}
+
+	// need wait all slave replication done later???
+
 	return h.destoryReplicationBacklog()
 }
 
@@ -500,16 +508,6 @@ func (h *Handler) removeSlave(c *conn) {
 
 	ch, ok := h.repl.slaves[c]
 	if ok {
-		delete(h.repl.slaves, c)
-		close(ch)
-	}
-}
-
-func (h *Handler) removeAllSlaves() {
-	h.repl.Lock()
-	defer h.repl.Unlock()
-
-	for c, ch := range h.repl.slaves {
 		delete(h.repl.slaves, c)
 		close(ch)
 	}
