@@ -145,7 +145,8 @@ func (c *conn) ping() error {
 	if err := c.nc.SetDeadline(deadline); err != nil {
 		return errors.Trace(err)
 	}
-	if err := c.writeRawString("*1\r\n$4\r\nping\r\n"); err != nil {
+
+	if err := c.writeRESP(redis.NewRequest("PING")); err != nil {
 		return errors.Trace(err)
 	}
 
@@ -164,7 +165,7 @@ func (c *conn) presync() (int64, error) {
 		return 0, errors.Trace(err)
 	}
 
-	if err := c.writeRawString("*1\r\n$4\r\nsync\r\n"); err != nil {
+	if err := c.writeRESP(redis.NewRequest("SYNC")); err != nil {
 		return 0, errors.Trace(err)
 	}
 
@@ -215,15 +216,6 @@ func (c *conn) writeRaw(buf []byte) error {
 	defer c.wLock.Unlock()
 
 	c.w.Write(buf)
-
-	return errors.Trace(c.w.Flush())
-}
-
-func (c *conn) writeRawString(str string) error {
-	c.wLock.Lock()
-	defer c.wLock.Unlock()
-
-	c.w.WriteString(str)
 
 	return errors.Trace(c.w.Flush())
 }

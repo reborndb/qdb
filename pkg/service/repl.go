@@ -167,11 +167,10 @@ func (h *Handler) replicationFeedSlaves(f *binlog.Forward) error {
 	}
 
 	if r.lastSelectDB.Get() != int64(f.DB) {
-		dbStr := fmt.Sprintf("%d", f.DB)
-		selectCmd := fmt.Sprintf("*2\r\n$6\r\nSELECT\r\n$%d\r\n%s\r\n", len(dbStr), dbStr)
+		selectCmd, _ := redis.EncodeToBytes(redis.NewRequest("SELECT", f.DB))
 
 		// write SELECT into backlog
-		if err := h.feedReplicationBacklog([]byte(selectCmd)); err != nil {
+		if err := h.feedReplicationBacklog(selectCmd); err != nil {
 			return errors.Trace(err)
 		}
 
