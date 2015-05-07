@@ -101,7 +101,7 @@ func (c *conn) serve(h *Handler) error {
 			}
 		}
 
-		if err = c.writeReply(response); err != nil {
+		if err = c.writeRESP(response); err != nil {
 			return errors.Trace(err)
 		}
 	}
@@ -184,7 +184,7 @@ func (c *conn) presync() (int64, error) {
 	return int64(n), nil
 }
 
-func (c *conn) writeReply(resp redis.Resp) error {
+func (c *conn) writeRESP(resp redis.Resp) error {
 	c.wLock.Lock()
 	defer c.wLock.Unlock()
 

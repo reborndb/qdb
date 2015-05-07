@@ -277,7 +277,7 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 		need, syncOffset := h.needFullReSync(c, args)
 		if !need {
 			// write CONTINUE and resume replication
-			if err := c.writeReply(redis.NewString("CONTINUE")); err != nil {
+			if err := c.writeRESP(redis.NewString("CONTINUE")); err != nil {
 				log.ErrorErrorf(err, "reply slave %s psync CONTINUE err", c)
 				c.Close()
 				return nil, errors.Trace(err)
@@ -322,7 +322,7 @@ func (h *Handler) replicationReplyFullReSync(c *conn) error {
 	}
 	c.Binlog().Release()
 
-	if err := c.writeReply(redis.NewString(fmt.Sprintf("FULLRESYNC %s %d", h.runID, syncOffset))); err != nil {
+	if err := c.writeRESP(redis.NewString(fmt.Sprintf("FULLRESYNC %s %d", h.runID, syncOffset))); err != nil {
 		log.ErrorErrorf(err, "reply slave %s psync FULLRESYNC err", c)
 		c.Close()
 		return errors.Trace(err)
