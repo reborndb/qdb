@@ -341,7 +341,7 @@ func (h *Handler) replicationSlaveFullSync(c *conn) (syncOffset int64, resp redi
 	h.counters.syncFull.Add(1)
 
 	var rdb *os.File
-	rdb, syncOffset, err = h.replicationBgSave(c.Binlog())
+	rdb, syncOffset, err = h.replicationBgSave()
 	if err != nil {
 		resp, err = toRespError(err)
 		return
@@ -512,7 +512,7 @@ func (h *Handler) removeSlave(c *conn) {
 	}
 }
 
-func (h *Handler) replicationBgSave(bl *binlog.Binlog) (*os.File, int64, error) {
+func (h *Handler) replicationBgSave() (*os.File, int64, error) {
 	// need to improve later
 
 	bg := h.counters.bgsave.Add(1)
@@ -525,7 +525,7 @@ func (h *Handler) replicationBgSave(bl *binlog.Binlog) (*os.File, int64, error) 
 	}
 
 	syncOffset := new(int64)
-	sp, err := bl.NewSnapshotFunc(func() {
+	sp, err := h.bl.NewSnapshotFunc(func() {
 		offset := h.repl.masterOffset
 		// we will sync from masterOffset + 1
 		*syncOffset = offset + 1
@@ -539,7 +539,7 @@ func (h *Handler) replicationBgSave(bl *binlog.Binlog) (*os.File, int64, error) 
 	if err != nil {
 		return nil, 0, errors.Trace(err)
 	}
-	defer bl.ReleaseSnapshot(sp)
+	defer h.bl.ReleaseSnapshot(sp)
 
 	path := h.config.DumpPath
 	if err := h.bgsaveTo(sp, path); err != nil {

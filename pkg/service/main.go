@@ -24,6 +24,7 @@ func Serve(config *Config, bl *binlog.Binlog) error {
 		config: config,
 		master: make(chan *conn, 0),
 		signal: make(chan int, 0),
+		bl:     bl,
 	}
 	defer func() {
 		close(h.signal)
@@ -87,10 +88,19 @@ type Handler struct {
 	config *Config
 	htable handler.HandlerTable
 
-	syncto       string
-	syncto_since int64
+	bl *binlog.Binlog
 
+	// replication sync master address
+	masterAddr string
+	// replication sync from time
+	syncSince int64
+	// replication sync offset
+	syncOffset int64
+	// replication sync master run ID
+	masterRunID string
+	// replication master connection
 	master chan *conn
+
 	signal chan int
 
 	counters struct {

@@ -122,8 +122,8 @@ func (h *Handler) Info(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		fmt.Fprintf(&b, "sync_rdb_remains:%d\n", h.counters.syncRdbRemains.Get())
 		fmt.Fprintf(&b, "sync_cache_bytes:%d\n", h.counters.syncCacheBytes.Get())
 		fmt.Fprintf(&b, "sync_total_bytes:%d\n", h.counters.syncTotalBytes.Get())
-		fmt.Fprintf(&b, "slaveof:%s\n", h.syncto)
-		fmt.Fprintf(&b, "slaveof_since:%d\n", h.syncto_since)
+		fmt.Fprintf(&b, "slaveof:%s\n", h.masterAddr)
+		fmt.Fprintf(&b, "slaveof_since:%d\n", h.syncSince)
 		fmt.Fprintf(&b, "\n")
 		return redis.NewString(b.String()), nil
 	}

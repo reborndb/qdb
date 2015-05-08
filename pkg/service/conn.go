@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,29 +67,10 @@ func (c *conn) serve(h *Handler) error {
 	defer h.removeSlave(c)
 
 	for {
-		if c.timeout > 0 {
-			deadline := time.Now().Add(c.timeout)
-			if err := c.nc.SetReadDeadline(deadline); err != nil {
-				return errors.Trace(err)
-			}
-		}
-		request, err := redis.DecodeRequest(c.r)
+		response, err := c.handleRequest(h)
 		if err != nil {
 			return errors.Trace(err)
-		}
-
-		if request.Type() == redis.TypePing {
-			continue
-		}
-
-		h.counters.commands.Add(1)
-		response, err := c.dispatch(h, request)
-		if err != nil {
-			h.counters.commandsFailed.Add(1)
-			b, _ := redis.EncodeToBytes(request)
-			log.WarnErrorf(err, "handle commands failed, conn = %s, request = '%s'", c, base64.StdEncoding.EncodeToString(b))
-		}
-		if response == nil {
+		} else if response == nil {
 			continue
 		}
 
@@ -105,6 +85,33 @@ func (c *conn) serve(h *Handler) error {
 			return errors.Trace(err)
 		}
 	}
+}
+
+func (c *conn) handleRequest(h *Handler) (redis.Resp, error) {
+	if c.timeout > 0 {
+		deadline := time.Now().Add(c.timeout)
+		if err := c.nc.SetReadDeadline(deadline); err != nil {
+			return nil, errors.Trace(err)
+		}
+	}
+	request, err := redis.DecodeRequest(c.r)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	if request.Type() == redis.TypePing {
+		return nil, nil
+	}
+
+	h.counters.commands.Add(1)
+	response, err := c.dispatch(h, request)
+	if err != nil {
+		h.counters.commandsFailed.Add(1)
+		b, _ := redis.EncodeToBytes(request)
+		log.WarnErrorf(err, "handle commands failed, conn = %s, request = '%s'", c, base64.StdEncoding.EncodeToString(b))
+	}
+
+	return response, nil
 }
 
 func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
@@ -131,6 +138,7 @@ func (c *conn) readLine() (line []byte, err error) {
 			// only \n one line, try again
 			continue
 		}
+		break
 	}
 
 	i := len(line) - 2
@@ -159,30 +167,53 @@ func (c *conn) ping() error {
 	return nil
 }
 
-func (c *conn) presync() (int64, error) {
+// send PSYNC command and return the first reply line from master
+func (c *conn) prePSync(masterRunID string, syncOffset int64) (string, error) {
 	deadline := time.Now().Add(time.Second * 5)
 	if err := c.nc.SetDeadline(deadline); err != nil {
-		return 0, errors.Trace(err)
+		return "", errors.Trace(err)
 	}
 
-	if err := c.writeRESP(redis.NewRequest("SYNC")); err != nil {
-		return 0, errors.Trace(err)
+	if err := c.writeRESP(redis.NewRequest("PSYNC", masterRunID, syncOffset)); err != nil {
+		return "", errors.Trace(err)
 	}
 
 	rsp, err := c.readLine()
 	if err != nil {
-		return 0, errors.Trace(err)
+		return "", errors.Trace(err)
+	}
+	return string(rsp), nil
+}
+
+func (c *conn) sendCommand(cmd string, args ...interface{}) error {
+	deadline := time.Now().Add(time.Second * 5)
+	if err := c.nc.SetWriteDeadline(deadline); err != nil {
+		return errors.Trace(err)
 	}
 
-	if rsp[0] != '$' {
-		return 0, errors.Errorf("invalid sync response, rsp = '%s'", rsp)
+	return c.writeRESP(redis.NewRequest(cmd, args...))
+}
+
+func (c *conn) doMustOK(cmd string, args ...interface{}) error {
+	deadline := time.Now().Add(time.Second * 5)
+	if err := c.nc.SetDeadline(deadline); err != nil {
+		return errors.Trace(err)
 	}
 
-	n, err := strconv.Atoi(string(rsp[1:]))
-	if err != nil || n <= 0 {
-		return 0, errors.Errorf("invalid sync response = '%s', error = '%s', n = %d", rsp, err, n)
+	if err := c.sendCommand(cmd, args...); err != nil {
+		return errors.Trace(err)
 	}
-	return int64(n), nil
+
+	rsp, err := c.readLine()
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	if strings.ToLower(string(rsp)) != "+ok" {
+		return errors.Errorf("response is not ok but %s", rsp)
+	}
+
+	return nil
 }
 
 func (c *conn) writeRESP(resp redis.Resp) error {
