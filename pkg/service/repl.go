@@ -17,7 +17,6 @@ import (
 	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
-	"github.com/reborndb/go/sync2"
 	"github.com/reborndb/qdb/pkg/binlog"
 )
 
@@ -28,8 +27,6 @@ func (h *Handler) initReplication(bl *binlog.Binlog) error {
 	h.repl.slaves = make(map[*conn]chan struct{})
 
 	h.repl.lastSelectDB.Set(int64(math.MaxUint32))
-
-	h.repl.fullSyncSema = sync2.NewSemaphore(1)
 
 	bl.RegPostCommitHandler(h.replicationFeedSlaves)
 
@@ -331,11 +328,13 @@ func (h *Handler) replicationReplyFullReSync(c *conn) error {
 
 // if full sync ok, return sync offset for later backlog syncing
 func (h *Handler) replicationSlaveFullSync(c *conn) (syncOffset int64, resp redis.Resp, err error) {
-	if ok := h.repl.fullSyncSema.AcquireTimeout(time.Minute); !ok {
-		resp, err = toRespErrorf("wait other slave full sync bgsave timeout")
+	// after bgsave, we must send this RDB to slave,
+	// so we don't allow others do bgsave before full sync done.
+	if ok := h.bgSaveSem.AcquireTimeout(time.Minute); !ok {
+		resp, err = toRespErrorf("wait others do bgsave timeout")
 		return
 	}
-	defer h.repl.fullSyncSema.Release()
+	defer h.bgSaveSem.Release()
 
 	// now begin full sync
 	h.counters.syncFull.Add(1)
@@ -514,16 +513,6 @@ func (h *Handler) removeSlave(c *conn) {
 
 func (h *Handler) replicationBgSave() (*os.File, int64, error) {
 	// need to improve later
-
-	bg := h.counters.bgsave.Add(1)
-	defer h.counters.bgsave.Sub(1)
-
-	if bg != 1 {
-		// unlike Redis, we don't wait bgsave now
-		// will improve laster
-		return nil, 0, fmt.Errorf("bgsave is busy: %d, should be 1", bg)
-	}
-
 	syncOffset := new(int64)
 	sp, err := h.bl.NewSnapshotFunc(func() {
 		offset := h.repl.masterOffset

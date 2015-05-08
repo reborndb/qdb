@@ -21,10 +21,11 @@ import (
 
 func Serve(config *Config, bl *binlog.Binlog) error {
 	h := &Handler{
-		config: config,
-		master: make(chan *conn, 0),
-		signal: make(chan int, 0),
-		bl:     bl,
+		config:    config,
+		master:    make(chan *conn, 0),
+		signal:    make(chan int, 0),
+		bl:        bl,
+		bgSaveSem: sync2.NewSemaphore(1),
 	}
 	defer func() {
 		close(h.signal)
@@ -120,6 +121,8 @@ type Handler struct {
 	// 40 bytes, hex random run id for different server
 	runID []byte
 
+	bgSaveSem *sync2.Semaphore
+
 	repl struct {
 		sync.RWMutex
 
@@ -135,8 +138,6 @@ type Handler struct {
 		lastSelectDB atomic2.Int64
 
 		slaves map[*conn]chan struct{}
-
-		fullSyncSema *sync2.Semaphore
 	}
 }
 

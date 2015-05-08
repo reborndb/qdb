@@ -36,12 +36,10 @@ func (h *Handler) Bgsave(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	bg := h.counters.bgsave.Add(1)
-	defer h.counters.bgsave.Sub(1)
-
-	if bg != 1 {
-		return toRespErrorf("bgsave is busy: %d, should be 1", bg)
+	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+		return toRespErrorf("wait others do bgsave timeout")
 	}
+	defer h.bgSaveSem.Release()
 
 	sp, err := s.Binlog().NewSnapshot()
 	if err != nil {
@@ -67,12 +65,10 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 		return toRespError(err)
 	}
 
-	bg := h.counters.bgsave.Add(1)
-	defer h.counters.bgsave.Sub(1)
-
-	if bg != 1 {
-		return toRespErrorf("bgsave is busy: %d, should be 1", bg)
+	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+		return toRespErrorf("wait others do bgsave timeout")
 	}
+	defer h.bgSaveSem.Release()
 
 	sp, err := s.Binlog().NewSnapshot()
 	if err != nil {
@@ -88,6 +84,9 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 }
 
 func (h *Handler) bgsaveTo(sp *binlog.BinlogSnapshot, path string) error {
+	h.counters.bgsave.Add(1)
+	defer h.counters.bgsave.Sub(1)
+
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return errors.Trace(err)
@@ -340,7 +339,6 @@ func (h *Handler) psync(c *conn, masterRunID string, syncOffset int64) error {
 		}
 	}
 
-	// we can not go here
 	return h.startSyncFromMaster(c, rdbSize)
 }
 
