@@ -20,63 +20,15 @@ import (
 )
 
 func Serve(config *Config, bl *binlog.Binlog) error {
-	h := &Handler{
-		config:    config,
-		master:    make(chan *conn, 0),
-		signal:    make(chan int, 0),
-		bl:        bl,
-		bgSaveSem: sync2.NewSemaphore(1),
-	}
-	defer func() {
-		close(h.signal)
-	}()
-
-	h.runID = make([]byte, 40)
-	getRandomHex(h.runID)
-	log.Infof("server runid is %s", h.runID)
-
-	l, err := net.Listen("tcp", config.Listen)
+	h, err := newHandler(config, bl)
 	if err != nil {
 		return errors.Trace(err)
 	}
-	defer l.Close()
 
-	if err = h.initReplication(bl); err != nil {
-		return errors.Trace(err)
-	}
-	defer h.closeReplication()
+	defer h.close()
 
-	if h.htable, err = handler.NewHandlerTable(h); err != nil {
-		return err
-	} else {
-		go h.daemonSyncMaster()
-	}
-
-	log.Infof("open listen address '%s' and start service", l.Addr())
-
-	for {
-		if nc, err := l.Accept(); err != nil {
-			return errors.Trace(err)
-		} else {
-			h.counters.clientsAccepted.Add(1)
-			go func() {
-				h.counters.clients.Add(1)
-				defer h.counters.clients.Sub(1)
-				c := newConn(nc, bl, h.config.ConnTimeout)
-				defer c.Close()
-				log.Infof("new connection: %s", c)
-				if err := c.serve(h); err != nil {
-					if errors.Equal(err, io.EOF) {
-						log.Infof("connection lost: %s [io.EOF]", c)
-					} else {
-						log.InfoErrorf(err, "connection lost: %s", c)
-					}
-				} else {
-					log.Infof("connection exit: %s", c)
-				}
-			}()
-		}
-	}
+	err = h.run()
+	return errors.Trace(err)
 }
 
 type Session interface {
@@ -90,6 +42,8 @@ type Handler struct {
 	htable handler.HandlerTable
 
 	bl *binlog.Binlog
+
+	l net.Listener
 
 	// replication sync master address
 	masterAddr string
@@ -139,6 +93,80 @@ type Handler struct {
 
 		slaves map[*conn]chan struct{}
 	}
+}
+
+func newHandler(config *Config, bl *binlog.Binlog) (*Handler, error) {
+	h := &Handler{
+		config:    config,
+		master:    make(chan *conn, 0),
+		signal:    make(chan int, 0),
+		bl:        bl,
+		bgSaveSem: sync2.NewSemaphore(1),
+	}
+
+	h.runID = make([]byte, 40)
+	getRandomHex(h.runID)
+	log.Infof("server runid is %s", h.runID)
+
+	l, err := net.Listen("tcp", config.Listen)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	h.l = l
+
+	if err = h.initReplication(bl); err != nil {
+		h.close()
+		return nil, errors.Trace(err)
+	}
+
+	if h.htable, err = handler.NewHandlerTable(h); err != nil {
+		h.close()
+		return nil, errors.Trace(err)
+	} else {
+		go h.daemonSyncMaster()
+	}
+
+	return h, nil
+}
+
+func (h *Handler) close() {
+	if h.l != nil {
+		h.l.Close()
+		h.l = nil
+	}
+
+	h.closeReplication()
+
+	close(h.signal)
+}
+
+func (h *Handler) run() error {
+	log.Infof("open listen address '%s' and start service", h.l.Addr())
+
+	for {
+		if nc, err := h.l.Accept(); err != nil {
+			return errors.Trace(err)
+		} else {
+			h.counters.clientsAccepted.Add(1)
+			go func() {
+				h.counters.clients.Add(1)
+				defer h.counters.clients.Sub(1)
+				c := newConn(nc, h.bl, h.config.ConnTimeout)
+				defer c.Close()
+				log.Infof("new connection: %s", c)
+				if err := c.serve(h); err != nil {
+					if errors.Equal(err, io.EOF) {
+						log.Infof("connection lost: %s [io.EOF]", c)
+					} else {
+						log.InfoErrorf(err, "connection lost: %s", c)
+					}
+				} else {
+					log.Infof("connection exit: %s", c)
+				}
+			}()
+		}
+	}
+	return nil
 }
 
 func toRespError(err error) (redis.Resp, error) {
