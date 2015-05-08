@@ -210,7 +210,7 @@ LOOP:
 			last = nil
 			h.syncSince = 0
 
-			log.Infof("replication connection from master %s was broken ,try reconnect 1s later", h.masterAddr)
+			log.Infof("replication connection from master %s was broken, try reconnect 1s later", h.masterAddr)
 			retryTimer.Reset(time.Second)
 			continue LOOP
 		case <-h.signal:
