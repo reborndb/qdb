@@ -86,6 +86,10 @@ func (c *conn) DoMustOK(cmd *redis.Array, timeout time.Duration) error {
 	}
 }
 
+func (c *conn) String() string {
+	return c.summ
+}
+
 func init() {
 	poolmap.m = make(map[string]*list.List)
 	go func() {
@@ -99,7 +103,7 @@ func init() {
 						pool.PushBack(c)
 					} else {
 						c.sock.Close()
-						log.Infof("close connection %s : %s", addr, c.summ)
+						log.Infof("close connection %s : %s", addr, c)
 					}
 				}
 				if pool.Len() != 0 {
@@ -131,14 +135,14 @@ func getSockConn(addr string, timeout time.Duration) (*conn, error) {
 		r:    bufio.NewReader(sock),
 		w:    bufio.NewWriter(sock),
 	}
-	log.Infof("create connection %s : %s", addr, c.summ)
+	log.Infof("create connection %s : %s", addr, c)
 	return c, nil
 }
 
 func putSockConn(addr string, c *conn) {
 	if c.err != nil {
 		c.sock.Close()
-		log.InfoErrorf(c.err, "close error connection %s : %s", addr, c.summ)
+		log.InfoErrorf(c.err, "close error connection %s : %s", addr, c)
 	} else {
 		poolmap.Lock()
 		pool := poolmap.m[addr]
