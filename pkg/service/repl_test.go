@@ -265,7 +265,6 @@ func (s *testReplSuite) waitAndCheckSyncOffset(c *C, node testReplNode, lastSync
 }
 
 func (s *testReplSuite) testReplication(c *C, master testReplNode, slave testReplNode) {
-	// redis is master, and svr1 is slave
 	// first let both stop replication
 	s.doCmdMustOK(c, master.Port(), "SLAVEOF", "NO", "ONE")
 	s.doCmdMustOK(c, slave.Port(), "SLAVEOF", "NO", "ONE")
@@ -317,5 +316,6 @@ func (s *testReplSuite) TestRedisSlave(c *C) {
 }
 
 func (s *testReplSuite) TestReplication(c *C) {
+	// svr1 is master, svr2 is slave
 	s.testReplication(c, s.srv1, s.srv2)
 }
