@@ -212,6 +212,7 @@ func checkConn(arg0 interface{}, args [][]byte) (*conn, error) {
 	return s, nil
 }
 
+// REPLCONF listening-port port / ack sync-offset
 func (h *Handler) ReplConf(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
@@ -245,10 +246,12 @@ func (h *Handler) ReplConf(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 	return redis.NewString("OK"), nil
 }
 
+// SYNC
 func (h *Handler) Sync(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	return h.handleSyncCommand("sync", arg0, args)
 }
 
+// PSYNC run-id sync-offset
 func (h *Handler) PSync(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
