@@ -23,10 +23,26 @@ type Binlog struct {
 	splist list.List
 	itlist list.List
 	serial uint64
+
+	preCommitHandlers  []ForwardHandler
+	postCommitHandlers []ForwardHandler
 }
 
 func New(db store.Database) *Binlog {
-	return &Binlog{db: db}
+	b := &Binlog{db: db}
+
+	b.preCommitHandlers = make([]ForwardHandler, 0)
+	b.postCommitHandlers = make([]ForwardHandler, 0)
+
+	return b
+}
+
+func (b *Binlog) Acquire() error {
+	return b.acquire()
+}
+
+func (b *Binlog) Release() {
+	b.release()
 }
 
 func (b *Binlog) acquire() error {
@@ -46,6 +62,9 @@ func (b *Binlog) commit(bt *store.Batch, fw *Forward) error {
 	if bt.Len() == 0 {
 		return nil
 	}
+
+	b.travelPreCommitHandlers(fw)
+
 	if err := b.db.Commit(bt); err != nil {
 		log.WarnErrorf(err, "binlog commit failed")
 		return err
@@ -55,6 +74,9 @@ func (b *Binlog) commit(bt *store.Batch, fw *Forward) error {
 		v.Close()
 	}
 	b.serial++
+
+	b.travelPostCommitHandlers(fw)
+
 	return nil
 }
 
@@ -102,6 +124,11 @@ func (b *Binlog) Close() {
 }
 
 func (b *Binlog) NewSnapshot() (*BinlogSnapshot, error) {
+	return b.NewSnapshotFunc(nil)
+}
+
+// New a snapshot and then call f if not nil
+func (b *Binlog) NewSnapshotFunc(f func()) (*BinlogSnapshot, error) {
 	if err := b.acquire(); err != nil {
 		return nil, err
 	}
@@ -109,6 +136,11 @@ func (b *Binlog) NewSnapshot() (*BinlogSnapshot, error) {
 	sp := &BinlogSnapshot{sp: b.db.NewSnapshot()}
 	b.splist.PushBack(sp)
 	log.Infof("binlog create new snapshot, address = %p", sp)
+
+	if f != nil {
+		f()
+	}
+
 	return sp, nil
 }
 

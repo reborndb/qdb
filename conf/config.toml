@@ -13,6 +13,10 @@ sync_filepath = "./var/sync.pipe"
 sync_filesize = 34359738368
 sync_memory_buffer = 8388608
 
+repl_ping_slave_period = 10
+repl_backlog_file_path = "./var/repl_backlog"
+repl_backlog_size = 10737418240
+
 [leveldb]
 
 block_size = 65536

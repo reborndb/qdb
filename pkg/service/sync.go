@@ -7,10 +7,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,12 +36,10 @@ func (h *Handler) Bgsave(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	bg := h.counters.bgsave.Add(1)
-	defer h.counters.bgsave.Sub(1)
-
-	if bg != 1 {
-		return toRespErrorf("bgsave is busy: %d, should be 1")
+	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+		return toRespErrorf("wait others do bgsave timeout")
 	}
+	defer h.bgSaveSem.Release()
 
 	sp, err := s.Binlog().NewSnapshot()
 	if err != nil {
@@ -67,12 +65,10 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 		return toRespError(err)
 	}
 
-	bg := h.counters.bgsave.Add(1)
-	defer h.counters.bgsave.Sub(1)
-
-	if bg != 1 {
-		return toRespErrorf("bgsave is busy: %d, should be 1", bg)
+	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+		return toRespErrorf("wait others do bgsave timeout")
 	}
+	defer h.bgSaveSem.Release()
 
 	sp, err := s.Binlog().NewSnapshot()
 	if err != nil {
@@ -88,6 +84,9 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 }
 
 func (h *Handler) bgsaveTo(sp *binlog.BinlogSnapshot, path string) error {
+	h.counters.bgsave.Add(1)
+	defer h.counters.bgsave.Sub(1)
+
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return errors.Trace(err)
@@ -135,7 +134,7 @@ func (h *Handler) SlaveOf(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	s, err := session(arg0, args)
+	_, err := session(arg0, args)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -145,14 +144,8 @@ func (h *Handler) SlaveOf(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 
 	var c *conn
 	if strings.ToLower(addr) != "no:one" {
-		if nc, err := net.DialTimeout("tcp", addr, time.Second); err != nil {
+		if c, err = h.replicationConnectMaster(addr); err != nil {
 			return toRespError(errors.Trace(err))
-		} else {
-			c = newConn(nc, s.Binlog(), 0)
-			if err := c.ping(); err != nil {
-				c.Close()
-				return toRespError(err)
-			}
 		}
 	}
 	select {
@@ -166,49 +159,195 @@ func (h *Handler) SlaveOf(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	}
 }
 
+func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
+	h.masterConnState.Set(masterConnConnecting)
+	nc, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	// maybe do AUTH later here.
+
+	c := newConn(nc, h.bl, 0)
+	if err := c.ping(); err != nil {
+		c.Close()
+		return nil, errors.Trace(err)
+	}
+
+	log.Infof("ping master %s ok", addr)
+
+	seps := strings.Split(h.config.Listen, ":")
+	if len(seps) == 2 {
+		if err := c.doMustOK("REPLCONF", "listening-port", seps[1]); err != nil {
+			c.Close()
+			return nil, errors.Trace(err)
+		}
+	} else {
+		log.Errorf("server listening addr %s has invalid port", h.config.Listen)
+	}
+	h.masterConnState.Set(masterConnConnected)
+	return c, nil
+}
+
+const infinityDelay = 10 * 365 * 24 * 3600 * time.Second
+
 func (h *Handler) daemonSyncMaster() {
 	var last *conn
 	lost := make(chan int, 0)
-	for exit := false; !exit; {
+
+	h.masterRunID = "?"
+	h.syncOffset.Set(-1)
+	h.masterConnState.Set(masterConnNone)
+
+	retryTimer := time.NewTimer(infinityDelay)
+	defer retryTimer.Stop()
+
+	var err error
+LOOP:
+	for exists := false; !exists; {
 		var c *conn
 		select {
 		case <-lost:
+			h.masterConnState.Set(masterConnConnect)
+			// here means replication conn was broken, we will reconnect it
 			last = nil
+			h.syncSince.Set(0)
+
+			log.Infof("replication connection from master %s was broken, try reconnect 1s later", h.masterAddr.Get())
+			retryTimer.Reset(time.Second)
+			continue LOOP
 		case <-h.signal:
-			exit = true
+			exists = true
 		case c = <-h.master:
+		case <-retryTimer.C:
+			log.Infof("retry connect to master %s", h.masterAddr.Get())
+			c, err = h.replicationConnectMaster(h.masterAddr.Get())
+			if err != nil {
+				log.ErrorErrorf(err, "repliaction retry connect master %s err, try 1s later again", h.masterAddr.Get())
+				retryTimer.Reset(time.Second)
+				continue LOOP
+			}
 		}
+
+		retryTimer.Reset(infinityDelay)
+
 		if last != nil {
 			last.Close()
 			<-lost
 		}
 		last = c
 		if c != nil {
-			go func() {
+			masterAddr := c.nc.RemoteAddr().String()
+
+			syncOffset := h.syncOffset.Get()
+			if masterAddr == h.masterAddr.Get() && h.masterRunID != "?" {
+				// sync same master with last synchronization
+				syncOffset++
+			} else {
+				// last sync master is not same
+				h.masterRunID = "?"
+				h.syncOffset.Set(-1)
+				syncOffset = -1
+			}
+
+			h.masterAddr.Set(masterAddr)
+
+			go func(syncOffset int64) {
 				defer func() {
 					lost <- 0
 				}()
 				defer c.Close()
-				err := h.doSyncTo(c)
-				log.InfoErrorf(err, "stop sync: %s", c.summ)
-			}()
-			h.syncto = c.nc.RemoteAddr().String()
-			h.syncto_since = time.Now().UnixNano() / int64(time.Millisecond)
-			log.Infof("sync to %s", h.syncto)
+				err := h.psync(c, h.masterRunID, syncOffset)
+				log.InfoErrorf(err, "slave %s do psync err", c)
+			}(syncOffset)
+
+			h.syncSince.Set(time.Now().UnixNano() / int64(time.Millisecond))
+			log.Infof("slaveof %s", h.masterAddr.Get())
 		} else {
-			h.syncto = ""
-			h.syncto_since = 0
-			log.Infof("sync to no one")
+			h.masterAddr.Set("")
+			h.syncOffset.Set(-1)
+			h.masterRunID = "?"
+			h.syncSince.Set(0)
+			log.Infof("slaveof no one")
 		}
 	}
 }
 
-func (h *Handler) doSyncTo(c *conn) error {
-	defer func() {
-		h.counters.syncTotalBytes.Set(0)
-		h.counters.syncCacheBytes.Set(0)
-	}()
+func (h *Handler) parseFullResyncReply(resp string) (string, int64) {
+	seps := strings.Split(resp, " ")
+	if len(seps) != 3 || len(seps[1]) != 40 {
+		log.Errorf("master %s returns invalid fullresync format %s", h.masterAddr, resp)
+	}
 
+	masterRunID := seps[1]
+	initailSyncOffset, err := strconv.ParseInt(seps[2], 10, 64)
+	if err != nil {
+		log.Errorf("master %s returns invalid fullresync offset, err: %v", h.masterAddr, err)
+		initailSyncOffset = -1
+	}
+	return masterRunID, initailSyncOffset
+}
+
+func (h *Handler) readSyncRDBSize(c *conn) (int64, error) {
+	// wait rdb size line
+	line, err := c.readLine()
+	if err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if line[0] != '$' {
+		return 0, errors.Errorf("invalid full sync response, rsp = '%s'", line)
+	}
+
+	n, err := strconv.ParseInt(string(line[1:]), 10, 64)
+	if err != nil || n <= 0 {
+		return 0, errors.Errorf("invalid full sync response = '%s', error = '%s', n = %d", line, err, n)
+	}
+
+	return n, nil
+}
+
+func (h *Handler) psync(c *conn, masterRunID string, syncOffset int64) error {
+	// first, we send PSYNC command
+	resp, err := c.prePSync(masterRunID, syncOffset)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	resp = strings.ToLower(resp)
+	rdbSize := int64(0)
+
+	if resp == "+continue" {
+		// do parital Resynchronization
+		log.Infof("master %s support psync, start from %d now", h.masterAddr.Get(), syncOffset)
+	} else {
+		initialSyncOffset := int64(-1)
+		h.syncOffset.Set(-1)
+
+		if strings.HasPrefix(resp, "+fullresync") {
+			// go here we need full resync
+			h.masterRunID, initialSyncOffset = h.parseFullResyncReply(resp)
+			log.Infof("start fullresync from %d", initialSyncOffset)
+			h.syncOffset.Set(initialSyncOffset)
+		} else {
+			// here master does not support PSYNC, we use SYNC instead
+			log.Errorf("master %s doesn't support PSYNC, reply is %s, try SYNC", h.masterAddr.Get(), resp)
+
+			if err = c.sendCommand("SYNC"); err != nil {
+				return errors.Trace(err)
+			}
+		}
+
+		rdbSize, err = h.readSyncRDBSize(c)
+		if err != nil {
+			return errors.Trace(err)
+		}
+	}
+
+	return h.startSyncFromMaster(c, rdbSize)
+}
+
+func (h *Handler) openSyncPipe() (pipe.Reader, pipe.Writer) {
 	filePath := h.config.SyncFilePath
 	fileSize := h.config.SyncFileSize
 	buffSize := h.config.SyncBuffSize
@@ -224,6 +363,17 @@ func (h *Handler) doSyncTo(c *conn) error {
 	}
 
 	pr, pw := pipe.PipeFile(buffSize, fileSize, file)
+
+	return pr, pw
+}
+
+func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
+	defer func() {
+		h.counters.syncTotalBytes.Set(0)
+		h.counters.syncCacheBytes.Set(0)
+	}()
+
+	pr, pw := h.openSyncPipe()
 	defer pr.Close()
 
 	wg := &sync.WaitGroup{}
@@ -242,15 +392,16 @@ func (h *Handler) doSyncTo(c *conn) error {
 			}
 			n, err := r.Read(p)
 			if err != nil {
-				pr.CloseWithError(err)
+				pr.CloseWithError(errors.Trace(err))
 				return
 			}
+
 			h.counters.syncTotalBytes.Add(int64(n))
 			s := p[:n]
 			for len(s) != 0 {
 				n, err := pw.Write(s)
 				if err != nil {
-					pr.CloseWithError(err)
+					pr.CloseWithError(errors.Trace(err))
 					return
 				}
 				s = s[n:]
@@ -271,26 +422,51 @@ func (h *Handler) doSyncTo(c *conn) error {
 		}
 	}()
 
-	c.r = bufio.NewReader(pr)
+	var counter atomic2.Int64
+	c.r = bufio.NewReader(ioutils.NewCountReader(pr, &counter))
 
-	size, err := c.presync()
-	if err != nil {
-		return err
+	if size > 0 {
+		// we need full sync first
+		if err := c.Binlog().Reset(); err != nil {
+			return errors.Trace(err)
+		}
+
+		h.masterConnState.Set(masterConnSync)
+		log.Infof("sync rdb file size = %d bytes\n", size)
+		if err := h.doSyncRDB(c, size); err != nil {
+			return errors.Trace(err)
+		}
+		log.Infof("sync rdb done")
 	}
-	log.Infof("sync rdb file size = %d bytes\n", size)
 
-	c.w = bufio.NewWriter(ioutil.Discard)
+	h.masterConnState.Set(masterConnConnected)
+	return h.doSyncFromMater(c, &counter)
+}
 
-	if err := c.Binlog().Reset(); err != nil {
-		return err
+func (h *Handler) doSyncFromMater(c *conn, counter *atomic2.Int64) error {
+	lastACKTime := time.Now()
+	for {
+		readTotalSize := counter.Get()
+
+		if _, err := c.handleRequest(h); err != nil {
+			return errors.Trace(err)
+		}
+
+		if h.syncOffset.Get() != -1 {
+			h.syncOffset.Add(counter.Get() - readTotalSize)
+
+			n := time.Now()
+			if n.Sub(lastACKTime) > time.Second {
+				lastACKTime = n
+				// this command has no reply
+				if err := c.sendCommand("REPLCONF", "ACK", h.syncOffset.Get()); err != nil {
+					log.ErrorErrorf(err, "send REPLCONF ACK %d err", h.syncOffset.Get())
+				}
+			}
+		}
 	}
 
-	if err := h.doSyncRDB(c, size); err != nil {
-		return err
-	}
-	log.Infof("sync rdb done")
-
-	return c.serve(h)
+	return nil
 }
 
 func (h *Handler) doSyncRDB(c *conn, size int64) error {

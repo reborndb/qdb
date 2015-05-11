@@ -18,6 +18,14 @@ type Config struct {
 	SyncFilePath string `toml:"sync_file_path"`
 	SyncFileSize int    `toml:"sync_file_size"`
 	SyncBuffSize int    `toml:"sync_memory_buffer"`
+
+	ReplPingSlavePeriod int `toml:"repl_ping_slave_period"`
+	// If empty, we will use memory for replication backlog
+	ReplBacklogFilePath string `toml:"repl_backlog_file_path"`
+	ReplBacklogSize     int    `toml:"repl_backlog_size"`
+	// If no slaves after time, backlog will be released.
+	// 0 means to no release at all.
+	ReplBacklogTTL int `toml:"repl_backlog_ttl"`
 }
 
 func NewDefaultConfig() *Config {
@@ -29,6 +37,9 @@ func NewDefaultConfig() *Config {
 		SyncFilePath: "./var/sync.pipe",
 		SyncFileSize: bytesize.GB * 32,
 		SyncBuffSize: bytesize.MB * 32,
+
+		ReplPingSlavePeriod: 10,
+		ReplBacklogSize:     bytesize.MB * 1,
 	}
 }
 

@@ -16,6 +16,7 @@ clean:
 	rm -rf bin/* var/*
 
 run:
+	go build -tags 'all' -o bin/redis-binlog ./cmd  
 	./bin/redis-binlog -c conf/config.toml -n 4
 
 gotest:

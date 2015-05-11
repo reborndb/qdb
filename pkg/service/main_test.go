@@ -15,14 +15,23 @@ import (
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
+	"github.com/reborndb/go/sync2"
 	"github.com/reborndb/go/testing/assert"
 	"github.com/reborndb/qdb/pkg/binlog"
 	"github.com/reborndb/qdb/pkg/store/rocksdb"
+	. "gopkg.in/check.v1"
 )
 
+func TestT(t *testing.T) {
+	TestingT(t)
+}
+
 var (
-	testbl *binlog.Binlog
-	server = handler.MustServer(&Handler{})
+	testbl      *binlog.Binlog
+	testHandler = &Handler{
+		bgSaveSem: sync2.NewSemaphore(1),
+	}
+	server = handler.MustServer(testHandler)
 	keymap = make(map[string]bool)
 )
 
@@ -58,6 +67,8 @@ func reinit() {
 			testbl = binlog.New(testdb)
 		}
 	}
+
+	testHandler.bl = testbl
 }
 
 func init() {

@@ -4,64 +4,31 @@
 package service
 
 import (
+	"crypto/rand"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/reborndb/go/atomic2"
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
+	"github.com/reborndb/go/ring"
+	"github.com/reborndb/go/sync2"
 	"github.com/reborndb/qdb/pkg/binlog"
 )
 
 func Serve(config *Config, bl *binlog.Binlog) error {
-	h := &Handler{
-		config: config,
-		master: make(chan *conn, 0),
-		signal: make(chan int, 0),
-	}
-	defer func() {
-		close(h.signal)
-	}()
-
-	l, err := net.Listen("tcp", config.Listen)
+	h, err := newHandler(config, bl)
 	if err != nil {
 		return errors.Trace(err)
 	}
-	defer l.Close()
 
-	if h.htable, err = handler.NewHandlerTable(h); err != nil {
-		return err
-	} else {
-		go h.daemonSyncMaster()
-	}
+	defer h.close()
 
-	log.Infof("open listen address '%s' and start service", l.Addr())
-
-	for {
-		if nc, err := l.Accept(); err != nil {
-			return errors.Trace(err)
-		} else {
-			h.counters.clientsAccepted.Add(1)
-			go func() {
-				h.counters.clients.Add(1)
-				defer h.counters.clients.Sub(1)
-				c := newConn(nc, bl, h.config.ConnTimeout)
-				defer c.Close()
-				log.Infof("new connection: %s", c.summ)
-				if err := c.serve(h); err != nil {
-					if errors.Equal(err, io.EOF) {
-						log.Infof("connection lost: %s [io.EOF]", c.summ)
-					} else {
-						log.InfoErrorf(err, "connection lost: %s", c.summ)
-					}
-				} else {
-					log.Infof("connection exit: %s", c.summ)
-				}
-			}()
-		}
-	}
+	err = h.run()
+	return errors.Trace(err)
 }
 
 type Session interface {
@@ -74,10 +41,23 @@ type Handler struct {
 	config *Config
 	htable handler.HandlerTable
 
-	syncto       string
-	syncto_since int64
+	bl *binlog.Binlog
 
+	l net.Listener
+
+	// replication sync master address
+	masterAddr atomic2.String
+	// replication sync from time
+	syncSince atomic2.Int64
+	// replication sync offset
+	syncOffset atomic2.Int64
+	// replication sync master run ID
+	masterRunID string
+	// replication master connection
 	master chan *conn
+	// replication master connection state
+	masterConnState atomic2.String
+
 	signal chan int
 
 	counters struct {
@@ -89,7 +69,106 @@ type Handler struct {
 		syncRdbRemains  atomic2.Int64
 		syncCacheBytes  atomic2.Int64
 		syncTotalBytes  atomic2.Int64
+		syncFull        atomic2.Int64
+		syncPartialOK   atomic2.Int64
+		syncPartialErr  atomic2.Int64
 	}
+
+	// 40 bytes, hex random run id for different server
+	runID []byte
+
+	bgSaveSem *sync2.Semaphore
+
+	repl struct {
+		sync.RWMutex
+
+		// replication backlog buffer
+		backlogBuf *ring.Ring
+
+		// global master replication offset
+		masterOffset int64
+
+		// replication offset of first byte in the backlog buffer
+		backlogOffset int64
+
+		lastSelectDB atomic2.Int64
+
+		slaves map[*conn]chan struct{}
+	}
+}
+
+func newHandler(config *Config, bl *binlog.Binlog) (*Handler, error) {
+	h := &Handler{
+		config:    config,
+		master:    make(chan *conn, 0),
+		signal:    make(chan int, 0),
+		bl:        bl,
+		bgSaveSem: sync2.NewSemaphore(1),
+	}
+
+	h.runID = make([]byte, 40)
+	getRandomHex(h.runID)
+	log.Infof("server runid is %s", h.runID)
+
+	l, err := net.Listen("tcp", config.Listen)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	h.l = l
+
+	if err = h.initReplication(bl); err != nil {
+		h.close()
+		return nil, errors.Trace(err)
+	}
+
+	if h.htable, err = handler.NewHandlerTable(h); err != nil {
+		h.close()
+		return nil, errors.Trace(err)
+	} else {
+		go h.daemonSyncMaster()
+	}
+
+	return h, nil
+}
+
+func (h *Handler) close() {
+	if h.l != nil {
+		h.l.Close()
+		h.l = nil
+	}
+
+	h.closeReplication()
+
+	close(h.signal)
+}
+
+func (h *Handler) run() error {
+	log.Infof("open listen address '%s' and start service", h.l.Addr())
+
+	for {
+		if nc, err := h.l.Accept(); err != nil {
+			return errors.Trace(err)
+		} else {
+			h.counters.clientsAccepted.Add(1)
+			go func() {
+				h.counters.clients.Add(1)
+				defer h.counters.clients.Sub(1)
+				c := newConn(nc, h.bl, h.config.ConnTimeout)
+				defer c.Close()
+				log.Infof("new connection: %s", c)
+				if err := c.serve(h); err != nil {
+					if errors.Equal(err, io.EOF) {
+						log.Infof("connection lost: %s [io.EOF]", c)
+					} else {
+						log.InfoErrorf(err, "connection lost: %s", c)
+					}
+				} else {
+					log.Infof("connection exit: %s", c)
+				}
+			}()
+		}
+	}
+	return nil
 }
 
 func toRespError(err error) (redis.Resp, error) {
@@ -120,4 +199,16 @@ func iconvert(args [][]byte) []interface{} {
 		iargs[i] = v
 	}
 	return iargs
+}
+
+func getRandomHex(buf []byte) []byte {
+	charsets := "0123456789abcdef"
+
+	rand.Read(buf)
+
+	for i := range buf {
+		buf[i] = charsets[buf[i]&0x0F]
+	}
+
+	return buf
 }
