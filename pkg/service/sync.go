@@ -160,6 +160,7 @@ func (h *Handler) SlaveOf(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
+	h.masterConnState.Set(masterConnConnecting)
 	nc, err := net.DialTimeout("tcp", addr, time.Second)
 	if err != nil {
 		return nil, errors.Trace(err)
@@ -184,7 +185,7 @@ func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
 	} else {
 		log.Errorf("server listening addr %s has invalid port", h.config.Listen)
 	}
-
+	h.masterConnState.Set(masterConnConnected)
 	return c, nil
 }
 
@@ -196,6 +197,7 @@ func (h *Handler) daemonSyncMaster() {
 
 	h.masterRunID = "?"
 	h.syncOffset.Set(-1)
+	h.masterConnState.Set(masterConnNone)
 
 	retryTimer := time.NewTimer(infinityDelay)
 	defer retryTimer.Stop()
@@ -206,6 +208,7 @@ LOOP:
 		var c *conn
 		select {
 		case <-lost:
+			h.masterConnState.Set(masterConnConnect)
 			// here means replication conn was broken, we will reconnect it
 			last = nil
 			h.syncSince.Set(0)
@@ -428,6 +431,7 @@ func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
 			return errors.Trace(err)
 		}
 
+		h.masterConnState.Set(masterConnSync)
 		log.Infof("sync rdb file size = %d bytes\n", size)
 		if err := h.doSyncRDB(c, size); err != nil {
 			return errors.Trace(err)
@@ -435,6 +439,7 @@ func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
 		log.Infof("sync rdb done")
 	}
 
+	h.masterConnState.Set(masterConnConnected)
 	return h.doSyncFromMater(c, &counter)
 }
 

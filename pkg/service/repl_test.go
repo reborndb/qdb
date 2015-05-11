@@ -297,6 +297,9 @@ func (s *testReplSuite) testReplication(c *C, master testReplNode, slave testRep
 
 	resp = s.doCmd(c, slave.Port(), "GET", "b")
 	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString("1000"))
+
+	s.doCmd(c, master.Port(), "ROLE")
+	s.doCmd(c, slave.Port(), "ROLE")
 }
 
 func (s *testReplSuite) TestRedisMaster(c *C) {

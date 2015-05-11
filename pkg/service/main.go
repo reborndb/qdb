@@ -55,6 +55,8 @@ type Handler struct {
 	masterRunID string
 	// replication master connection
 	master chan *conn
+	// replication master connection state
+	masterConnState atomic2.String
 
 	signal chan int
 

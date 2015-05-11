@@ -545,3 +545,58 @@ func (h *Handler) replicationBgSave() (*os.File, int64, error) {
 
 	return f, *syncOffset, nil
 }
+
+const (
+	masterConnNone       = "none"       // no replication
+	masterConnConnect    = "connect"    // must connect master
+	masterConnConnecting = "connecting" // connecting to master
+	masterConnSync       = "sync"       // rdb syncing
+	masterConnConnected  = "connected"  // connected to master
+)
+
+// ROLE
+func (h *Handler) Role(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 0 {
+		return toRespErrorf("len(args) = %d, expect = 0", len(args))
+	}
+
+	ay := redis.NewArray()
+	if masterAddr := h.masterAddr.Get(); masterAddr == "" {
+		// master
+		ay.Append(redis.NewBulkBytesWithString("master"))
+		h.repl.RLock()
+		defer h.repl.RUnlock()
+		ay.Append(redis.NewInt(h.repl.masterOffset))
+		slaves := redis.NewArray()
+		for slave, _ := range h.repl.slaves {
+			a := redis.NewArray()
+			if addr := slave.nc.RemoteAddr(); addr == nil {
+				continue
+			} else {
+				a.Append(redis.NewBulkBytesWithString(strings.Split(addr.String(), ":")[0]))
+			}
+			a.Append(redis.NewBulkBytesWithString(fmt.Sprintf("%d", slave.listeningPort.Get())))
+			a.Append(redis.NewBulkBytesWithString(fmt.Sprintf("%d", slave.syncOffset.Get())))
+			slaves.Append(a)
+		}
+
+		ay.Append(slaves)
+	} else {
+		// slave
+		ay.Append(redis.NewBulkBytesWithString("slave"))
+		seps := strings.Split(masterAddr, ":")
+		if len(seps) == 2 {
+			port, err := strconv.ParseInt(seps[1], 10, 16)
+			if err != nil {
+				return toRespError(err)
+			}
+			ay.Append(redis.NewBulkBytesWithString(seps[0]))
+			ay.Append(redis.NewInt(int64(port)))
+		} else {
+			return toRespErrorf("invalid master addr, must ip:port, but %s", masterAddr)
+		}
+		ay.Append(redis.NewBulkBytesWithString(h.masterConnState.Get()))
+		ay.Append(redis.NewInt(h.syncOffset.Get()))
+	}
+	return ay, nil
+}
