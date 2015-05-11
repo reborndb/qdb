@@ -75,14 +75,18 @@ func (h *Handler) createReplicationBacklog() error {
 		bufSize = bytesize.MB
 	}
 
+	start := time.Now()
 	if path := h.config.ReplBacklogFilePath; len(path) == 0 {
 		h.repl.backlogBuf, err = ring.NewMemRing(bufSize)
 	} else {
 		h.repl.backlogBuf, err = ring.NewFileRing(path, bufSize)
 	}
+
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	log.Infof("create backlog buf with size %d cost %s", bufSize, time.Now().Sub(start).String())
 
 	h.repl.backlogBuf.Reset()
 
