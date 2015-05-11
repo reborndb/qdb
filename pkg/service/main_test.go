@@ -17,8 +17,8 @@ import (
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/sync2"
 	"github.com/reborndb/go/testing/assert"
-	"github.com/reborndb/qdb/pkg/binlog"
-	"github.com/reborndb/qdb/pkg/store/rocksdb"
+	"github.com/reborndb/qdb/pkg/engine/rocksdb"
+	"github.com/reborndb/qdb/pkg/store"
 	. "gopkg.in/check.v1"
 )
 
@@ -27,7 +27,7 @@ func TestT(t *testing.T) {
 }
 
 var (
-	testbl      *binlog.Binlog
+	testbl      *store.Binlog
 	testHandler = &Handler{
 		bgSaveSem: sync2.NewSemaphore(1),
 	}
@@ -47,7 +47,7 @@ func (s *fakeSession) SetDB(db uint32) {
 	s.db = db
 }
 
-func (s *fakeSession) Binlog() *binlog.Binlog {
+func (s *fakeSession) Binlog() *store.Binlog {
 	return testbl
 }
 
@@ -64,7 +64,7 @@ func reinit() {
 		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
 			log.PanicError(err, "open rocksdb failed")
 		} else {
-			testbl = binlog.New(testdb)
+			testbl = store.New(testdb)
 		}
 	}
 

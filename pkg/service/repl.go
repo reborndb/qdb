@@ -17,10 +17,10 @@ import (
 	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
-func (h *Handler) initReplication(bl *binlog.Binlog) error {
+func (h *Handler) initReplication(bl *store.Binlog) error {
 	h.repl.Lock()
 	defer h.repl.Unlock()
 
@@ -37,7 +37,7 @@ func (h *Handler) initReplication(bl *binlog.Binlog) error {
 			case <-h.signal:
 				return
 			case <-time.After(pingPeriod):
-				f := &binlog.Forward{Op: "PING",
+				f := &store.Forward{Op: "PING",
 					DB:   uint32(h.repl.lastSelectDB.Get()),
 					Args: nil}
 				if err := h.replicationFeedSlaves(f); err != nil {
@@ -126,7 +126,7 @@ func (h *Handler) feedReplicationBacklog(buf []byte) error {
 	return nil
 }
 
-func respEncodeBinlogForward(f *binlog.Forward) ([]byte, error) {
+func respEncodeBinlogForward(f *store.Forward) ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.WriteString(fmt.Sprintf("*%d\r\n", len(f.Args)+1))
@@ -152,7 +152,7 @@ func respEncodeBinlogForward(f *binlog.Forward) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (h *Handler) replicationFeedSlaves(f *binlog.Forward) error {
+func (h *Handler) replicationFeedSlaves(f *store.Forward) error {
 	h.repl.Lock()
 	defer h.repl.Unlock()
 

@@ -17,7 +17,7 @@ import (
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 type conn struct {
@@ -28,7 +28,7 @@ type conn struct {
 
 	db uint32
 	nc net.Conn
-	bl *binlog.Binlog
+	bl *store.Binlog
 
 	// summary for this connection
 	summ    string
@@ -47,7 +47,7 @@ type conn struct {
 	backlogACKTime atomic2.Int64
 }
 
-func newConn(nc net.Conn, bl *binlog.Binlog, timeout int) *conn {
+func newConn(nc net.Conn, bl *store.Binlog, timeout int) *conn {
 	c := &conn{
 		nc: nc,
 		bl: bl,
@@ -263,6 +263,6 @@ func (c *conn) SetDB(db uint32) {
 	c.db = db
 }
 
-func (c *conn) Binlog() *binlog.Binlog {
+func (c *conn) Binlog() *store.Binlog {
 	return c.bl
 }

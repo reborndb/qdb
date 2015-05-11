@@ -15,12 +15,12 @@ import (
 	"github.com/docopt/docopt-go"
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/engine"
+	"github.com/reborndb/qdb/pkg/engine/goleveldb"
+	"github.com/reborndb/qdb/pkg/engine/leveldb"
+	"github.com/reborndb/qdb/pkg/engine/rocksdb"
 	"github.com/reborndb/qdb/pkg/service"
 	"github.com/reborndb/qdb/pkg/store"
-	"github.com/reborndb/qdb/pkg/store/goleveldb"
-	"github.com/reborndb/qdb/pkg/store/leveldb"
-	"github.com/reborndb/qdb/pkg/store/rocksdb"
 )
 
 var args struct {
@@ -112,7 +112,7 @@ Options:
 
 	log.Infof("load config\n%s\n\n", conf)
 
-	var db store.Database
+	var db engine.Database
 	var dbConf interface{}
 	switch t := strings.ToLower(conf.DBType); t {
 	default:
@@ -125,13 +125,13 @@ Options:
 		dbConf = conf.GoLevelDB
 	}
 
-	db, err = store.Open(conf.DBType, conf.DBPath, dbConf, args.repair)
+	db, err = engine.Open(conf.DBType, conf.DBPath, dbConf, args.repair)
 
 	if err != nil {
 		log.PanicErrorf(err, "open database failed")
 	}
 
-	bl := binlog.New(db)
+	bl := store.New(db)
 	defer bl.Close()
 
 	if args.repair {

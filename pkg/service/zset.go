@@ -5,7 +5,7 @@ package service
 
 import (
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 // ZGETALL key
@@ -100,7 +100,7 @@ func (h *Handler) ZScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	} else if !ok {
 		return redis.NewBulkBytes(nil), nil
 	} else {
-		return redis.NewString(binlog.FormatFloatString(v)), nil
+		return redis.NewString(store.FormatFloatString(v)), nil
 	}
 }
 
@@ -118,6 +118,6 @@ func (h *Handler) ZIncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if v, err := s.Binlog().ZIncrBy(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
-		return redis.NewString(binlog.FormatFloatString(v)), nil
+		return redis.NewString(store.FormatFloatString(v)), nil
 	}
 }

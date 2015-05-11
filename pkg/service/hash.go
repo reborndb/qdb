@@ -5,7 +5,7 @@ package service
 
 import (
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 // HGETALL key
@@ -134,7 +134,7 @@ func (h *Handler) HIncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, err
 	if v, err := s.Binlog().HIncrByFloat(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
-		return redis.NewString(binlog.FormatFloatString(v)), nil
+		return redis.NewString(store.FormatFloatString(v)), nil
 	}
 }
 

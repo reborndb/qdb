@@ -16,10 +16,10 @@ import (
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
 	"github.com/reborndb/go/sync2"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
-func Serve(config *Config, bl *binlog.Binlog) error {
+func Serve(config *Config, bl *store.Binlog) error {
 	h, err := newHandler(config, bl)
 	if err != nil {
 		return errors.Trace(err)
@@ -34,14 +34,14 @@ func Serve(config *Config, bl *binlog.Binlog) error {
 type Session interface {
 	DB() uint32
 	SetDB(db uint32)
-	Binlog() *binlog.Binlog
+	Binlog() *store.Binlog
 }
 
 type Handler struct {
 	config *Config
 	htable handler.HandlerTable
 
-	bl *binlog.Binlog
+	bl *store.Binlog
 
 	l net.Listener
 
@@ -97,7 +97,7 @@ type Handler struct {
 	}
 }
 
-func newHandler(config *Config, bl *binlog.Binlog) (*Handler, error) {
+func newHandler(config *Config, bl *store.Binlog) (*Handler, error) {
 	h := &Handler{
 		config:    config,
 		master:    make(chan *conn, 0),

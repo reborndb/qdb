@@ -5,7 +5,7 @@ package service
 
 import (
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 // SLOTSRESTORE key ttlms value [key ttlms value ...]
@@ -127,7 +127,7 @@ func (h *Handler) SlotsInfo(arg0 interface{}, args [][]byte) (redis.Resp, error)
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
-		for i := uint32(0); i < binlog.MaxSlotNum; i++ {
+		for i := uint32(0); i < store.MaxSlotNum; i++ {
 			v, ok := m[i]
 			if ok {
 				s := redis.NewArray()
@@ -153,7 +153,7 @@ func (h *Handler) SlotsHashKey(arg0 interface{}, args [][]byte) (redis.Resp, err
 
 	resp := redis.NewArray()
 	for _, key := range args {
-		_, slot := binlog.HashKeyToSlot(key)
+		_, slot := store.HashKeyToSlot(key)
 		resp.AppendInt(int64(slot))
 	}
 	return resp, nil

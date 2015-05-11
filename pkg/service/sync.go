@@ -22,7 +22,7 @@ import (
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 // BGSAVE
@@ -83,7 +83,7 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 	}
 }
 
-func (h *Handler) bgsaveTo(sp *binlog.BinlogSnapshot, path string) error {
+func (h *Handler) bgsaveTo(sp *store.BinlogSnapshot, path string) error {
 	h.counters.bgsave.Add(1)
 	defer h.counters.bgsave.Sub(1)
 
@@ -510,7 +510,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 				db, key, value := entry.DB, entry.Key, entry.Value
 				ttlms := int64(0)
 				if entry.ExpireAt != 0 {
-					if v, ok := binlog.ExpireAtToTTLms(entry.ExpireAt); ok && v > 0 {
+					if v, ok := store.ExpireAtToTTLms(entry.ExpireAt); ok && v > 0 {
 						ttlms = v
 					} else {
 						ttlms = 1

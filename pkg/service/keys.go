@@ -8,7 +8,7 @@ import (
 
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 // SELECT db
@@ -22,7 +22,7 @@ func (h *Handler) Select(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if db, err := binlog.ParseUint(args[0]); err != nil {
+	if db, err := store.ParseUint(args[0]); err != nil {
 		return toRespError(err)
 	} else if db > math.MaxUint32 {
 		return toRespErrorf("parse db = %d", db)
