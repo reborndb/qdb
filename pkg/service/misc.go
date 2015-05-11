@@ -191,11 +191,11 @@ func (h *Handler) infoReplication(w io.Writer) {
 		fmt.Fprintf(w, "sync_total_bytes:%d\r\n", h.counters.syncTotalBytes.Get())
 		fmt.Fprintf(w, "slaveof:%s\r\n", h.masterAddr.Get())
 		fmt.Fprintf(w, "slaveof_since:%d\r\n", h.syncSince.Get())
-		status := "up"
+		masterLinkstatus := "up"
 		if h.masterConnState.Get() != masterConnConnected {
-			status = "down"
+			masterLinkstatus = "down"
 		}
-		fmt.Fprintf(w, "master_link_status:%s\r\n", status)
+		fmt.Fprintf(w, "master_link_status:%s\r\n", masterLinkstatus)
 		// now all slaves have same priority
 		fmt.Fprintf(w, "slave_priority:100\r\n")
 		fmt.Fprintf(w, "slave_repl_offset:%d\r\n", h.syncOffset.Get())
