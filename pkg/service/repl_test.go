@@ -37,7 +37,7 @@ func (s *testReplSuite) createServer(c *C, port int) *Handler {
 	err := os.RemoveAll(base)
 	c.Assert(err, IsNil)
 
-	err = os.Mkdir(base, 0700)
+	err = os.MkdirAll(base, 0700)
 	c.Assert(err, IsNil)
 
 	conf := rocksdb.NewDefaultConfig()
@@ -252,7 +252,7 @@ func (n *testReplSrvNode) Slaveof(c *C, port int) testReplConn {
 }
 
 func (n *testReplSrvNode) Port() int             { return n.port }
-func (n *testReplSrvNode) SyncOffset(c *C) int64 { return n.h.syncOffset }
+func (n *testReplSrvNode) SyncOffset(c *C) int64 { return n.h.syncOffset.Get() }
 
 func (s *testReplSuite) waitAndCheckSyncOffset(c *C, node testReplNode, lastSyncOffset int64) {
 	for i := 0; i < 10; i++ {

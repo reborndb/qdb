@@ -195,7 +195,7 @@ func (h *Handler) daemonSyncMaster() {
 	lost := make(chan int, 0)
 
 	h.masterRunID = "?"
-	h.syncOffset = -1
+	h.syncOffset.Set(-1)
 
 	retryTimer := time.NewTimer(infinityDelay)
 	defer retryTimer.Stop()
@@ -208,19 +208,19 @@ LOOP:
 		case <-lost:
 			// here means replication conn was broken, we will reconnect it
 			last = nil
-			h.syncSince = 0
+			h.syncSince.Set(0)
 
-			log.Infof("replication connection from master %s was broken, try reconnect 1s later", h.masterAddr)
+			log.Infof("replication connection from master %s was broken, try reconnect 1s later", h.masterAddr.Get())
 			retryTimer.Reset(time.Second)
 			continue LOOP
 		case <-h.signal:
 			exists = true
 		case c = <-h.master:
 		case <-retryTimer.C:
-			log.Infof("retry connect to master %s", h.masterAddr)
-			c, err = h.replicationConnectMaster(h.masterAddr)
+			log.Infof("retry connect to master %s", h.masterAddr.Get())
+			c, err = h.replicationConnectMaster(h.masterAddr.Get())
 			if err != nil {
-				log.ErrorErrorf(err, "repliaction retry connect master %s err, try 1s later again", h.masterAddr)
+				log.ErrorErrorf(err, "repliaction retry connect master %s err, try 1s later again", h.masterAddr.Get())
 				retryTimer.Reset(time.Second)
 				continue LOOP
 			}
@@ -236,18 +236,18 @@ LOOP:
 		if c != nil {
 			masterAddr := c.nc.RemoteAddr().String()
 
-			syncOffset := h.syncOffset
-			if masterAddr == h.masterAddr && h.masterRunID != "?" {
+			syncOffset := h.syncOffset.Get()
+			if masterAddr == h.masterAddr.Get() && h.masterRunID != "?" {
 				// sync same master with last synchronization
 				syncOffset++
 			} else {
 				// last sync master is not same
 				h.masterRunID = "?"
-				h.syncOffset = -1
+				h.syncOffset.Set(-1)
 				syncOffset = -1
 			}
 
-			h.masterAddr = masterAddr
+			h.masterAddr.Set(masterAddr)
 
 			go func(syncOffset int64) {
 				defer func() {
@@ -258,13 +258,13 @@ LOOP:
 				log.InfoErrorf(err, "slave %s do psync err", c)
 			}(syncOffset)
 
-			h.syncSince = time.Now().UnixNano() / int64(time.Millisecond)
-			log.Infof("slaveof %s", h.masterAddr)
+			h.syncSince.Set(time.Now().UnixNano() / int64(time.Millisecond))
+			log.Infof("slaveof %s", h.masterAddr.Get())
 		} else {
-			h.masterAddr = ""
-			h.syncOffset = -1
+			h.masterAddr.Set("")
+			h.syncOffset.Set(-1)
 			h.masterRunID = "?"
-			h.syncSince = 0
+			h.syncSince.Set(0)
 			log.Infof("slaveof no one")
 		}
 	}
@@ -316,17 +316,19 @@ func (h *Handler) psync(c *conn, masterRunID string, syncOffset int64) error {
 
 	if resp == "+continue" {
 		// do parital Resynchronization
-		log.Infof("master %s support psync, start from %d now", h.masterAddr, syncOffset)
+		log.Infof("master %s support psync, start from %d now", h.masterAddr.Get(), syncOffset)
 	} else {
-		h.syncOffset = -1
+		initialSyncOffset := int64(-1)
+		h.syncOffset.Set(-1)
 
 		if strings.HasPrefix(resp, "+fullresync") {
 			// go here we need full resync
-			h.masterRunID, h.syncOffset = h.parseFullResyncReply(resp)
-			log.Infof("start fullresync from %d", h.syncOffset)
+			h.masterRunID, initialSyncOffset = h.parseFullResyncReply(resp)
+			log.Infof("start fullresync from %d", initialSyncOffset)
+			h.syncOffset.Set(initialSyncOffset)
 		} else {
 			// here master does not support PSYNC, we use SYNC instead
-			log.Errorf("master %s doesn't support PSYNC, reply is %s, try SYNC", h.masterAddr, resp)
+			log.Errorf("master %s doesn't support PSYNC, reply is %s, try SYNC", h.masterAddr.Get(), resp)
 
 			if err = c.sendCommand("SYNC"); err != nil {
 				return errors.Trace(err)
@@ -445,15 +447,15 @@ func (h *Handler) doSyncFromMater(c *conn, counter *atomic2.Int64) error {
 			return errors.Trace(err)
 		}
 
-		if h.syncOffset != -1 {
-			h.syncOffset += counter.Get() - readTotalSize
+		if h.syncOffset.Get() != -1 {
+			h.syncOffset.Add(counter.Get() - readTotalSize)
 
 			n := time.Now()
 			if n.Sub(lastACKTime) > time.Second {
 				lastACKTime = n
 				// this command has no reply
-				if err := c.sendCommand("REPLCONF", "ACK", h.syncOffset); err != nil {
-					log.ErrorErrorf(err, "send REPLCONF ACK %d err", h.syncOffset)
+				if err := c.sendCommand("REPLCONF", "ACK", h.syncOffset.Get()); err != nil {
+					log.ErrorErrorf(err, "send REPLCONF ACK %d err", h.syncOffset.Get())
 				}
 			}
 		}

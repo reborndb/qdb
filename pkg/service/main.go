@@ -46,11 +46,11 @@ type Handler struct {
 	l net.Listener
 
 	// replication sync master address
-	masterAddr string
+	masterAddr atomic2.String
 	// replication sync from time
-	syncSince int64
+	syncSince atomic2.Int64
 	// replication sync offset
-	syncOffset int64
+	syncOffset atomic2.Int64
 	// replication sync master run ID
 	masterRunID string
 	// replication master connection
