@@ -11,8 +11,6 @@ import (
 )
 
 type Snapshot struct {
-	db *GoLevelDB
-
 	snap *leveldb.Snapshot
 	ropt *opt.ReadOptions
 }
@@ -22,7 +20,6 @@ func newSnapshot(db *GoLevelDB) *Snapshot {
 	ropt := &opt.ReadOptions{}
 	ropt.DontFillCache = true
 	return &Snapshot{
-		db:   db,
 		snap: snap,
 		ropt: ropt,
 	}
@@ -39,7 +36,7 @@ func (sp *Snapshot) NewIterator() engine.Iterator {
 }
 
 func (sp *Snapshot) Get(key []byte) ([]byte, error) {
-	value, err := sp.db.lvdb.Get(key, sp.ropt)
+	value, err := sp.snap.Get(key, sp.ropt)
 	if err == leveldb.ErrNotFound {
 		return nil, nil
 	}
