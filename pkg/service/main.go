@@ -16,10 +16,10 @@ import (
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
 	"github.com/reborndb/go/sync2"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
-func Serve(config *Config, bl *binlog.Binlog) error {
+func Serve(config *Config, bl *store.Store) error {
 	h, err := newHandler(config, bl)
 	if err != nil {
 		return errors.Trace(err)
@@ -34,14 +34,14 @@ func Serve(config *Config, bl *binlog.Binlog) error {
 type Session interface {
 	DB() uint32
 	SetDB(db uint32)
-	Binlog() *binlog.Binlog
+	Store() *store.Store
 }
 
 type Handler struct {
 	config *Config
 	htable handler.HandlerTable
 
-	bl *binlog.Binlog
+	store *store.Store
 
 	l net.Listener
 
@@ -97,12 +97,12 @@ type Handler struct {
 	}
 }
 
-func newHandler(config *Config, bl *binlog.Binlog) (*Handler, error) {
+func newHandler(config *Config, s *store.Store) (*Handler, error) {
 	h := &Handler{
 		config:    config,
 		master:    make(chan *conn, 0),
 		signal:    make(chan int, 0),
-		bl:        bl,
+		store:     s,
 		bgSaveSem: sync2.NewSemaphore(1),
 	}
 
@@ -116,7 +116,7 @@ func newHandler(config *Config, bl *binlog.Binlog) (*Handler, error) {
 	}
 	h.l = l
 
-	if err = h.initReplication(bl); err != nil {
+	if err = h.initReplication(s); err != nil {
 		h.close()
 		return nil, errors.Trace(err)
 	}
@@ -153,7 +153,7 @@ func (h *Handler) run() error {
 			go func() {
 				h.counters.clients.Add(1)
 				defer h.counters.clients.Sub(1)
-				c := newConn(nc, h.bl, h.config.ConnTimeout)
+				c := newConn(nc, h.store, h.config.ConnTimeout)
 				defer c.Close()
 				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {

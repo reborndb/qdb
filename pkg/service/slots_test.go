@@ -12,12 +12,12 @@ import (
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
-	"github.com/reborndb/qdb/pkg/store/rocksdb"
+	"github.com/reborndb/qdb/pkg/engine/rocksdb"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 var (
-	testbl2 *binlog.Binlog
+	testbl2 *store.Store
 	port    int
 )
 
@@ -33,7 +33,7 @@ func (s *fakeSession2) SetDB(db uint32) {
 	s.db = db
 }
 
-func (s *fakeSession2) Binlog() *binlog.Binlog {
+func (s *fakeSession2) Store() *store.Store {
 	return testbl2
 }
 
@@ -46,7 +46,7 @@ func init() {
 		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
 			log.PanicError(err, "open rocksdb failed")
 		} else {
-			testbl2 = binlog.New(testdb)
+			testbl2 = store.New(testdb)
 		}
 	}
 	l, err := net.Listen("tcp", ":0")

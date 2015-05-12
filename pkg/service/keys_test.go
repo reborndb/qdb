@@ -6,7 +6,7 @@ package service
 import (
 	"testing"
 
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 func TestSelect(t *testing.T) {
@@ -80,7 +80,7 @@ func TestPExpire(t *testing.T) {
 func TestExpireAt(t *testing.T) {
 	c := client(t)
 	k := random(t)
-	expireat, _ := binlog.TTLmsToExpireAt(1000)
+	expireat, _ := store.TTLmsToExpireAt(1000)
 	checkint(t, -2, c, "ttl", k)
 	checkok(t, c, "set", k, 100)
 	checkint(t, 1, c, "expireat", k, expireat/1e3+1000)
@@ -93,7 +93,7 @@ func TestExpireAt(t *testing.T) {
 func TestPExpireAt(t *testing.T) {
 	c := client(t)
 	k := random(t)
-	expireat, _ := binlog.TTLmsToExpireAt(1000)
+	expireat, _ := store.TTLmsToExpireAt(1000)
 	checkint(t, -2, c, "pttl", k)
 	checkok(t, c, "set", k, 100)
 	checkint(t, 1, c, "pexpireat", k, expireat+100000)
@@ -106,7 +106,7 @@ func TestPExpireAt(t *testing.T) {
 func TestPersist(t *testing.T) {
 	c := client(t)
 	k := random(t)
-	expireat, _ := binlog.TTLmsToExpireAt(1000)
+	expireat, _ := store.TTLmsToExpireAt(1000)
 	checkint(t, -2, c, "pttl", k)
 	checkint(t, 0, c, "persist", k)
 	checkok(t, c, "set", k, "100")

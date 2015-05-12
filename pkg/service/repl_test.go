@@ -17,8 +17,8 @@ import (
 	"time"
 
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/binlog"
-	"github.com/reborndb/qdb/pkg/store/rocksdb"
+	"github.com/reborndb/qdb/pkg/engine/rocksdb"
+	"github.com/reborndb/qdb/pkg/store"
 	. "gopkg.in/check.v1"
 )
 
@@ -44,7 +44,7 @@ func (s *testReplSuite) createServer(c *C, port int) *Handler {
 	testdb, err := rocksdb.Open(path.Join(base, "db"), conf, false)
 	c.Assert(err, IsNil)
 
-	bl := binlog.New(testdb)
+	bl := store.New(testdb)
 
 	cfg := NewDefaultConfig()
 	cfg.Listen = fmt.Sprintf("127.0.0.1:%d", port)
@@ -83,12 +83,12 @@ func (s *testReplSuite) TearDownSuite(c *C) {
 	}
 
 	if s.srv1.h != nil {
-		s.srv1.h.bl.Close()
+		s.srv1.h.store.Close()
 		s.srv1.h.close()
 	}
 
 	if s.srv2.h != nil {
-		s.srv2.h.bl.Close()
+		s.srv2.h.store.Close()
 		s.srv2.h.close()
 	}
 }

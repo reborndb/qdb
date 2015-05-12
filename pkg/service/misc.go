@@ -50,7 +50,7 @@ func (h *Handler) FlushAll(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 		return toRespError(err)
 	}
 
-	if err := s.Binlog().Reset(); err != nil {
+	if err := s.Store().Reset(); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -68,7 +68,7 @@ func (h *Handler) CompactAll(arg0 interface{}, args [][]byte) (redis.Resp, error
 		return toRespError(err)
 	}
 
-	if err := s.Binlog().CompactAll(); err != nil {
+	if err := s.Store().CompactAll(); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -86,7 +86,7 @@ func (h *Handler) Shutdown(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 		return toRespError(err)
 	}
 
-	s.Binlog().Close()
+	s.Store().Close()
 	os.Exit(0)
 	return nil, nil
 }
@@ -139,7 +139,7 @@ func (h *Handler) infoConfig(w io.Writer) {
 }
 
 func (h *Handler) infoDataBase(w io.Writer) {
-	v, _ := h.bl.Info()
+	v, _ := h.store.Info()
 
 	fmt.Fprintf(w, "# Database\r\n")
 	fmt.Fprintf(w, "%s\r\n", v)

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/reborndb/go/redis/rdb"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
 func TestBgsaveTo(t *testing.T) {
@@ -45,6 +45,6 @@ func TestBgsaveTo(t *testing.T) {
 		checkerror(t, err, true)
 		x, ok := o.(rdb.String)
 		checkerror(t, nil, ok)
-		checkerror(t, nil, string(x) == string(binlog.FormatInt(int64(i))))
+		checkerror(t, nil, string(x) == string(store.FormatInt(int64(i))))
 	}
 }

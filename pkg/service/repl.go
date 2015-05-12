@@ -17,10 +17,10 @@ import (
 	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
-	"github.com/reborndb/qdb/pkg/binlog"
+	"github.com/reborndb/qdb/pkg/store"
 )
 
-func (h *Handler) initReplication(bl *binlog.Binlog) error {
+func (h *Handler) initReplication(bl *store.Store) error {
 	h.repl.Lock()
 	defer h.repl.Unlock()
 
@@ -37,7 +37,7 @@ func (h *Handler) initReplication(bl *binlog.Binlog) error {
 			case <-h.signal:
 				return
 			case <-time.After(pingPeriod):
-				f := &binlog.Forward{Op: "PING",
+				f := &store.Forward{Op: "PING",
 					DB:   uint32(h.repl.lastSelectDB.Get()),
 					Args: nil}
 				if err := h.replicationFeedSlaves(f); err != nil {
@@ -126,7 +126,7 @@ func (h *Handler) feedReplicationBacklog(buf []byte) error {
 	return nil
 }
 
-func respEncodeBinlogForward(f *binlog.Forward) ([]byte, error) {
+func respEncodeStoreForward(f *store.Forward) ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.WriteString(fmt.Sprintf("*%d\r\n", len(f.Args)+1))
@@ -152,7 +152,7 @@ func respEncodeBinlogForward(f *binlog.Forward) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (h *Handler) replicationFeedSlaves(f *binlog.Forward) error {
+func (h *Handler) replicationFeedSlaves(f *store.Forward) error {
 	h.repl.Lock()
 	defer h.repl.Unlock()
 
@@ -179,7 +179,7 @@ func (h *Handler) replicationFeedSlaves(f *binlog.Forward) error {
 	}
 
 	// encode Forward with RESP format, then write into backlog
-	if buf, err := respEncodeBinlogForward(f); err != nil {
+	if buf, err := respEncodeStoreForward(f); err != nil {
 		return errors.Trace(err)
 	} else if err = h.feedReplicationBacklog(buf); err != nil {
 		return errors.Trace(err)
@@ -315,7 +315,7 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 
 func (h *Handler) replicationReplyFullReSync(c *conn) error {
 	// lock all to get the current master replication offset
-	if err := c.Binlog().Acquire(); err != nil {
+	if err := c.Store().Acquire(); err != nil {
 		return errors.Trace(err)
 	}
 	syncOffset := h.repl.masterOffset
@@ -323,7 +323,7 @@ func (h *Handler) replicationReplyFullReSync(c *conn) error {
 		// we will increment the master offset by one when backlog buffer created
 		syncOffset++
 	}
-	c.Binlog().Release()
+	c.Store().Release()
 
 	if err := c.writeRESP(redis.NewString(fmt.Sprintf("FULLRESYNC %s %d", h.runID, syncOffset))); err != nil {
 		log.ErrorErrorf(err, "reply slave %s psync FULLRESYNC err", c)
@@ -521,7 +521,7 @@ func (h *Handler) removeSlave(c *conn) {
 func (h *Handler) replicationBgSave() (*os.File, int64, error) {
 	// need to improve later
 	syncOffset := new(int64)
-	sp, err := h.bl.NewSnapshotFunc(func() {
+	sp, err := h.store.NewSnapshotFunc(func() {
 		offset := h.repl.masterOffset
 		// we will sync from masterOffset + 1
 		*syncOffset = offset + 1
@@ -535,7 +535,7 @@ func (h *Handler) replicationBgSave() (*os.File, int64, error) {
 	if err != nil {
 		return nil, 0, errors.Trace(err)
 	}
-	defer h.bl.ReleaseSnapshot(sp)
+	defer h.store.ReleaseSnapshot(sp)
 
 	path := h.config.DumpPath
 	if err := h.bgsaveTo(sp, path); err != nil {

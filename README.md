@@ -11,12 +11,12 @@ See [commands](./doc/commands.md) for more.
 ### Setup
 
     1. install gorocks.a & levigo.a to GOPATH
-    $ cd redis-binlog/extern && bash setup.sh
+    $ cd extern && bash setup.sh
 
-    2. run redis-binlog with specifed config file
-    $ redis-binlog -c conf/config.toml -n 4 --create
+    2. run qdb-server with specifed config file
+    $ qdb-server -c conf/config.toml -n 4 --create
 
-### redis-benchmark against redis-binlog (default config, see conf/config.toml)
+### redis-benchmark against qdb-server (default config, see conf/config.toml)
 
     $ ./redis-benchmark -q -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange -c 100 -p 6380 -r 1000 -n 100000
     SET: 31094.53 requests per second
