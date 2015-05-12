@@ -14,15 +14,15 @@ import (
 )
 
 var (
-	testbl *Binlog
+	testStore *Store
 )
 
 func reinit() {
-	if testbl != nil {
-		testbl.Close()
-		testbl = nil
+	if testStore != nil {
+		testStore.Close()
+		testStore = nil
 	}
-	const path = "/tmp/test_qdb/binlog/testdb-rocksdb"
+	const path = "/tmp/test_qdb/store/testdb-rocksdb"
 	if err := os.RemoveAll(path); err != nil {
 		log.PanicErrorf(err, "remove '%s' failed", path)
 	} else {
@@ -30,7 +30,7 @@ func reinit() {
 		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
 			log.PanicError(err, "open rocksdb failed")
 		} else {
-			testbl = New(testdb)
+			testStore = New(testdb)
 		}
 	}
 }
@@ -49,15 +49,15 @@ func checkerror(t *testing.T, err error, exp bool) {
 }
 
 func checkcompact(t *testing.T) {
-	err := testbl.CompactAll()
+	err := testStore.CompactAll()
 	checkerror(t, err, true)
 }
 
 func checkempty(t *testing.T) {
-	it := testbl.getIterator()
+	it := testStore.getIterator()
 	it.SeekToFirst()
 	empty, err := !it.Valid(), it.Error()
-	testbl.putIterator(it)
+	testStore.putIterator(it)
 	checkerror(t, err, empty)
 }
 

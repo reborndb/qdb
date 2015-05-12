@@ -83,12 +83,12 @@ func (s *testReplSuite) TearDownSuite(c *C) {
 	}
 
 	if s.srv1.h != nil {
-		s.srv1.h.bl.Close()
+		s.srv1.h.store.Close()
 		s.srv1.h.close()
 	}
 
 	if s.srv2.h != nil {
-		s.srv2.h.bl.Close()
+		s.srv2.h.store.Close()
 		s.srv2.h.close()
 	}
 }

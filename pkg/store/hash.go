@@ -12,7 +12,7 @@ import (
 )
 
 type hashRow struct {
-	*binlogRowHelper
+	*storeRowHelper
 
 	Size  int64
 	Field []byte
@@ -21,20 +21,20 @@ type hashRow struct {
 
 func newHashRow(db uint32, key []byte) *hashRow {
 	o := &hashRow{}
-	o.lazyInit(newBinlogRowHelper(db, key, HashCode))
+	o.lazyInit(newStoreRowHelper(db, key, HashCode))
 	return o
 }
 
-func (o *hashRow) lazyInit(h *binlogRowHelper) {
-	o.binlogRowHelper = h
+func (o *hashRow) lazyInit(h *storeRowHelper) {
+	o.storeRowHelper = h
 	o.dataKeyRefs = []interface{}{&o.Field}
 	o.metaValueRefs = []interface{}{&o.Size}
 	o.dataValueRefs = []interface{}{&o.Value}
 }
 
-func (o *hashRow) deleteObject(b *Binlog, bt *engine.Batch) error {
-	it := b.getIterator()
-	defer b.putIterator(it)
+func (o *hashRow) deleteObject(s *Store, bt *engine.Batch) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
 	for pfx := it.SeekTo(o.DataKeyPrefix()); it.Valid(); it.Next() {
 		key := it.Key()
 		if !bytes.HasPrefix(key, pfx) {
@@ -46,7 +46,7 @@ func (o *hashRow) deleteObject(b *Binlog, bt *engine.Batch) error {
 	return it.Error()
 }
 
-func (o *hashRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj interface{}) error {
+func (o *hashRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj interface{}) error {
 	hash, ok := obj.(rdb.Hash)
 	if !ok || len(hash) == 0 {
 		return errors.Trace(ErrObjectValue)
@@ -71,7 +71,7 @@ func (o *hashRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj 
 	return nil
 }
 
-func (o *hashRow) loadObjectValue(r binlogReader) (interface{}, error) {
+func (o *hashRow) loadObjectValue(r storeReader) (interface{}, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	hash := make([]*rdb.HashElement, 0, o.Size)
@@ -98,7 +98,7 @@ func (o *hashRow) loadObjectValue(r binlogReader) (interface{}, error) {
 	return rdb.Hash(hash), nil
 }
 
-func (o *hashRow) getAllFields(r binlogReader) ([][]byte, error) {
+func (o *hashRow) getAllFields(r storeReader) ([][]byte, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	var fields [][]byte
@@ -125,7 +125,7 @@ func (o *hashRow) getAllFields(r binlogReader) ([][]byte, error) {
 	return fields, nil
 }
 
-func (o *hashRow) getAllValues(r binlogReader) ([][]byte, error) {
+func (o *hashRow) getAllValues(r storeReader) ([][]byte, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	var values [][]byte
@@ -151,8 +151,8 @@ func (o *hashRow) getAllValues(r binlogReader) ([][]byte, error) {
 	return values, nil
 }
 
-func (b *Binlog) loadHashRow(db uint32, key []byte, deleteIfExpired bool) (*hashRow, error) {
-	o, err := b.loadBinlogRow(db, key, deleteIfExpired)
+func (s *Store) loadHashRow(db uint32, key []byte, deleteIfExpired bool) (*hashRow, error) {
+	o, err := s.loadStoreRow(db, key, deleteIfExpired)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -166,7 +166,7 @@ func (b *Binlog) loadHashRow(db uint32, key []byte, deleteIfExpired bool) (*hash
 }
 
 // HGETALL key
-func (b *Binlog) HGetAll(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) HGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -178,17 +178,17 @@ func (b *Binlog) HGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
 
-	x, err := o.loadObjectValue(b)
+	x, err := o.loadObjectValue(s)
 	if err != nil || x == nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (b *Binlog) HGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 }
 
 // HDEL key field [field ...]
-func (b *Binlog) HDel(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) HDel(db uint32, args ...interface{}) (int64, error) {
 	if len(args) < 2 {
 		return 0, errArguments("len(args) = %d, expect >= 2", len(args))
 	}
@@ -218,12 +218,12 @@ func (b *Binlog) HDel(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -232,7 +232,7 @@ func (b *Binlog) HDel(db uint32, args ...interface{}) (int64, error) {
 	bt := engine.NewBatch()
 	for _, o.Field = range fields {
 		if !ms.Has(o.Field) {
-			exists, err := o.TestDataValue(b)
+			exists, err := o.TestDataValue(s)
 			if err != nil {
 				return 0, err
 			}
@@ -252,11 +252,11 @@ func (b *Binlog) HDel(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 	fw := &Forward{DB: db, Op: "HDel", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }
 
 // HEXISTS key field
-func (b *Binlog) HExists(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) HExists(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -268,18 +268,18 @@ func (b *Binlog) HExists(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
 
 	o.Field = field
-	exists, err := o.TestDataValue(b)
+	exists, err := o.TestDataValue(s)
 	if err != nil || !exists {
 		return 0, err
 	} else {
@@ -288,7 +288,7 @@ func (b *Binlog) HExists(db uint32, args ...interface{}) (int64, error) {
 }
 
 // HGET key field
-func (b *Binlog) HGet(db uint32, args ...interface{}) ([]byte, error) {
+func (s *Store) HGet(db uint32, args ...interface{}) ([]byte, error) {
 	if len(args) != 2 {
 		return nil, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -300,18 +300,18 @@ func (b *Binlog) HGet(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
 
 	o.Field = field
-	exists, err := o.LoadDataValue(b)
+	exists, err := o.LoadDataValue(s)
 	if err != nil || !exists {
 		return nil, err
 	} else {
@@ -320,7 +320,7 @@ func (b *Binlog) HGet(db uint32, args ...interface{}) ([]byte, error) {
 }
 
 // HLEN key
-func (b *Binlog) HLen(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) HLen(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 1 {
 		return 0, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -332,12 +332,12 @@ func (b *Binlog) HLen(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -345,7 +345,7 @@ func (b *Binlog) HLen(db uint32, args ...interface{}) (int64, error) {
 }
 
 // HINCRBY key field delta
-func (b *Binlog) HIncrBy(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) HIncrBy(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -358,12 +358,12 @@ func (b *Binlog) HIncrBy(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -371,7 +371,7 @@ func (b *Binlog) HIncrBy(db uint32, args ...interface{}) (int64, error) {
 	var exists bool = false
 	if o != nil {
 		o.Field = field
-		exists, err = o.LoadDataValue(b)
+		exists, err = o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -394,11 +394,11 @@ func (b *Binlog) HIncrBy(db uint32, args ...interface{}) (int64, error) {
 	o.Value = FormatInt(delta)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "HIncrBy", Args: args}
-	return delta, b.commit(bt, fw)
+	return delta, s.commit(bt, fw)
 }
 
 // HINCRBYFLOAT key field delta
-func (b *Binlog) HIncrByFloat(db uint32, args ...interface{}) (float64, error) {
+func (s *Store) HIncrByFloat(db uint32, args ...interface{}) (float64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -411,12 +411,12 @@ func (b *Binlog) HIncrByFloat(db uint32, args ...interface{}) (float64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -424,7 +424,7 @@ func (b *Binlog) HIncrByFloat(db uint32, args ...interface{}) (float64, error) {
 	var exists bool = false
 	if o != nil {
 		o.Field = field
-		exists, err = o.LoadDataValue(b)
+		exists, err = o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -447,11 +447,11 @@ func (b *Binlog) HIncrByFloat(db uint32, args ...interface{}) (float64, error) {
 	o.Value = FormatFloat(delta)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "HIncrByFloat", Args: args}
-	return delta, b.commit(bt, fw)
+	return delta, s.commit(bt, fw)
 }
 
 // HKEYS key
-func (b *Binlog) HKeys(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) HKeys(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -463,20 +463,20 @@ func (b *Binlog) HKeys(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
-	return o.getAllFields(b)
+	return o.getAllFields(s)
 }
 
 // HVALS key
-func (b *Binlog) HVals(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) HVals(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -488,20 +488,20 @@ func (b *Binlog) HVals(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
-	return o.getAllValues(b)
+	return o.getAllValues(s)
 }
 
 // HSET key field value
-func (b *Binlog) HSet(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) HSet(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -513,12 +513,12 @@ func (b *Binlog) HSet(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -526,7 +526,7 @@ func (b *Binlog) HSet(db uint32, args ...interface{}) (int64, error) {
 	var exists bool = false
 	if o != nil {
 		o.Field = field
-		exists, err = o.TestDataValue(b)
+		exists, err = o.TestDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -548,11 +548,11 @@ func (b *Binlog) HSet(db uint32, args ...interface{}) (int64, error) {
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
 	fw := &Forward{DB: db, Op: "HSet", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }
 
 // HSETNX key field value
-func (b *Binlog) HSetNX(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) HSetNX(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -564,12 +564,12 @@ func (b *Binlog) HSetNX(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -577,7 +577,7 @@ func (b *Binlog) HSetNX(db uint32, args ...interface{}) (int64, error) {
 	var exists bool = false
 	if o != nil {
 		o.Field = field
-		exists, err = o.TestDataValue(b)
+		exists, err = o.TestDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -595,11 +595,11 @@ func (b *Binlog) HSetNX(db uint32, args ...interface{}) (int64, error) {
 	bt.Set(o.DataKey(), o.DataValue())
 	bt.Set(o.MetaKey(), o.MetaValue())
 	fw := &Forward{DB: db, Op: "HSet", Args: args}
-	return 1, b.commit(bt, fw)
+	return 1, s.commit(bt, fw)
 }
 
 // HMSET key field value [field value ...]
-func (b *Binlog) HMSet(db uint32, args ...interface{}) error {
+func (s *Store) HMSet(db uint32, args ...interface{}) error {
 	if len(args) == 1 || len(args)%2 != 1 {
 		return errArguments("len(args) = %d, expect != 1 && mod 2 = 1", len(args))
 	}
@@ -620,12 +620,12 @@ func (b *Binlog) HMSet(db uint32, args ...interface{}) error {
 		eles[i] = e
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return err
 	}
@@ -638,7 +638,7 @@ func (b *Binlog) HMSet(db uint32, args ...interface{}) error {
 	bt := engine.NewBatch()
 	for _, e := range eles {
 		o.Field, o.Value = e.Field, e.Value
-		exists, err := o.TestDataValue(b)
+		exists, err := o.TestDataValue(s)
 		if err != nil {
 			return err
 		}
@@ -654,11 +654,11 @@ func (b *Binlog) HMSet(db uint32, args ...interface{}) error {
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
 	fw := &Forward{DB: db, Op: "HMSet", Args: args}
-	return b.commit(bt, fw)
+	return s.commit(bt, fw)
 }
 
 // HMGET key field [field ...]
-func (b *Binlog) HMGet(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) HMGet(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) < 2 {
 		return nil, errArguments("len(args) = %d, expect >= 2", len(args))
 	}
@@ -675,12 +675,12 @@ func (b *Binlog) HMGet(db uint32, args ...interface{}) ([][]byte, error) {
 	}
 	var values = make([][]byte, len(fields))
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadHashRow(db, key, true)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +688,7 @@ func (b *Binlog) HMGet(db uint32, args ...interface{}) ([][]byte, error) {
 	if o != nil {
 		for i, field := range fields {
 			o.Field = field
-			exists, err := o.LoadDataValue(b)
+			exists, err := o.LoadDataValue(s)
 			if err != nil {
 				return nil, err
 			}

@@ -10,19 +10,19 @@ import (
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
-type binlogIterator struct {
+type storeIterator struct {
 	engine.Iterator
 	serial uint64
 }
 
-type binlogReader interface {
+type storeReader interface {
 	getRowValue(key []byte) ([]byte, error)
-	getIterator() *binlogIterator
-	putIterator(it *binlogIterator)
+	getIterator() *storeIterator
+	putIterator(it *storeIterator)
 }
 
-func loadObjEntry(r binlogReader, db uint32, key []byte) (binlogRow, *rdb.ObjEntry, error) {
-	o, err := loadBinlogRow(r, db, key)
+func loadObjEntry(r storeReader, db uint32, key []byte) (storeRow, *rdb.ObjEntry, error) {
+	o, err := loadStoreRow(r, db, key)
 	if err != nil || o == nil {
 		return o, nil, err
 	}
@@ -42,7 +42,7 @@ func loadObjEntry(r binlogReader, db uint32, key []byte) (binlogRow, *rdb.ObjEnt
 	}
 }
 
-func loadBinEntry(r binlogReader, db uint32, key []byte) (binlogRow, *rdb.BinEntry, error) {
+func loadBinEntry(r storeReader, db uint32, key []byte) (storeRow, *rdb.BinEntry, error) {
 	o, obj, err := loadObjEntry(r, db, key)
 	if err != nil || obj == nil {
 		return o, nil, err
@@ -54,7 +54,7 @@ func loadBinEntry(r binlogReader, db uint32, key []byte) (binlogRow, *rdb.BinEnt
 	}
 }
 
-func firstKeyUnderSlot(r binlogReader, db uint32, slot uint32) ([]byte, error) {
+func firstKeyUnderSlot(r storeReader, db uint32, slot uint32) ([]byte, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	pfx := EncodeMetaKeyPrefixSlot(db, slot)
@@ -72,7 +72,7 @@ func firstKeyUnderSlot(r binlogReader, db uint32, slot uint32) ([]byte, error) {
 	return nil, it.Error()
 }
 
-func allKeysWithTag(r binlogReader, db uint32, tag []byte) ([][]byte, error) {
+func allKeysWithTag(r storeReader, db uint32, tag []byte) ([][]byte, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	var keys [][]byte

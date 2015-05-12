@@ -18,7 +18,7 @@ func hdelall(t *testing.T, db uint32, key string, expect int64) {
 
 func hdump(t *testing.T, db uint32, key string, expect ...string) {
 	kexists(t, db, key, 1)
-	v, err := testbl.Dump(db, key)
+	v, err := testStore.Dump(db, key)
 	checkerror(t, err, v != nil)
 	x, ok := v.(rdb.Hash)
 	checkerror(t, nil, ok)
@@ -44,7 +44,7 @@ func hrestore(t *testing.T, db uint32, key string, ttlms int64, expect ...string
 	}
 	dump, err := rdb.EncodeDump(x)
 	checkerror(t, err, true)
-	err = testbl.Restore(db, key, ttlms, dump)
+	err = testStore.Restore(db, key, ttlms, dump)
 	checkerror(t, err, true)
 	hdump(t, db, key, expect...)
 	if ttlms == 0 {
@@ -55,7 +55,7 @@ func hrestore(t *testing.T, db uint32, key string, ttlms int64, expect ...string
 }
 
 func hlen(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.HLen(db, key)
+	x, err := testStore.HLen(db, key)
 	checkerror(t, err, x == expect)
 	if expect == 0 {
 		kexists(t, db, key, 0)
@@ -69,7 +69,7 @@ func hdel(t *testing.T, db uint32, key string, expect int64, fields ...string) {
 	for _, s := range fields {
 		args = append(args, s)
 	}
-	x, err := testbl.HDel(db, args...)
+	x, err := testStore.HDel(db, args...)
 	checkerror(t, err, x == expect)
 	for _, s := range fields {
 		hexists(t, db, key, s, 0)
@@ -77,12 +77,12 @@ func hdel(t *testing.T, db uint32, key string, expect int64, fields ...string) {
 }
 
 func hexists(t *testing.T, db uint32, key, field string, expect int64) {
-	x, err := testbl.HExists(db, key, field)
+	x, err := testStore.HExists(db, key, field)
 	checkerror(t, err, x == expect)
 }
 
 func hgetall(t *testing.T, db uint32, key string, expect ...string) {
-	x, err := testbl.HGetAll(db, key)
+	x, err := testStore.HGetAll(db, key)
 	checkerror(t, err, true)
 	if len(expect) == 0 {
 		checkerror(t, nil, len(x) == 0)
@@ -109,7 +109,7 @@ func hgetall(t *testing.T, db uint32, key string, expect ...string) {
 }
 
 func hget(t *testing.T, db uint32, key, field string, expect string) {
-	x, err := testbl.HGet(db, key, field)
+	x, err := testStore.HGet(db, key, field)
 	checkerror(t, err, true)
 	if expect == "" {
 		checkerror(t, nil, x == nil)
@@ -121,7 +121,7 @@ func hget(t *testing.T, db uint32, key, field string, expect string) {
 }
 
 func hkeys(t *testing.T, db uint32, key string, expect ...string) {
-	x, err := testbl.HKeys(db, key)
+	x, err := testStore.HKeys(db, key)
 	checkerror(t, err, true)
 	if len(expect) == 0 {
 		checkerror(t, nil, len(x) == 0)
@@ -144,7 +144,7 @@ func hkeys(t *testing.T, db uint32, key string, expect ...string) {
 }
 
 func hvals(t *testing.T, db uint32, key string, expect ...string) {
-	x, err := testbl.HVals(db, key)
+	x, err := testStore.HVals(db, key)
 	checkerror(t, err, true)
 	if len(expect) == 0 {
 		checkerror(t, nil, len(x) == 0)
@@ -169,23 +169,23 @@ func hvals(t *testing.T, db uint32, key string, expect ...string) {
 }
 
 func hincrby(t *testing.T, db uint32, key, field string, delta int64, expect int64) {
-	x, err := testbl.HIncrBy(db, key, field, delta)
+	x, err := testStore.HIncrBy(db, key, field, delta)
 	checkerror(t, err, x == expect)
 }
 
 func hincrbyfloat(t *testing.T, db uint32, key, field string, delta float64, expect float64) {
-	x, err := testbl.HIncrByFloat(db, key, field, delta)
+	x, err := testStore.HIncrByFloat(db, key, field, delta)
 	checkerror(t, err, math.Abs(x-expect) < 1e-9)
 }
 
 func hset(t *testing.T, db uint32, key, field, value string, expect int64) {
-	x, err := testbl.HSet(db, key, field, value)
+	x, err := testStore.HSet(db, key, field, value)
 	checkerror(t, err, x == expect)
 	hget(t, db, key, field, value)
 }
 
 func hsetnx(t *testing.T, db uint32, key, field, value string, expect int64) {
-	x, err := testbl.HSetNX(db, key, field, value)
+	x, err := testStore.HSetNX(db, key, field, value)
 	checkerror(t, err, expect == x)
 	hexists(t, db, key, field, 1)
 	if expect != 0 {
@@ -199,7 +199,7 @@ func hmset(t *testing.T, db uint32, key string, pairs ...string) {
 	for i := 0; i < len(pairs); i++ {
 		args = append(args, pairs[i])
 	}
-	err := testbl.HMSet(db, args...)
+	err := testStore.HMSet(db, args...)
 	checkerror(t, err, true)
 	for i := 0; i < len(pairs); i += 2 {
 		hget(t, db, key, pairs[i], pairs[i+1])
@@ -212,7 +212,7 @@ func hmget(t *testing.T, db uint32, key string, pairs ...string) {
 	for i := 0; i < len(pairs); i += 2 {
 		args = append(args, pairs[i])
 	}
-	x, err := testbl.HMGet(db, args...)
+	x, err := testStore.HMGet(db, args...)
 	checkerror(t, err, len(x) == len(pairs)/2)
 	for i, b := range x {
 		v := pairs[i*2+1]

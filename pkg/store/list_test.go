@@ -17,7 +17,7 @@ func ldel(t *testing.T, db uint32, key string, expect int64) {
 
 func ldump(t *testing.T, db uint32, key string, expect ...string) {
 	kexists(t, db, key, 1)
-	v, err := testbl.Dump(db, key)
+	v, err := testStore.Dump(db, key)
 	checkerror(t, err, v != nil)
 	x, ok := v.(rdb.List)
 	checkerror(t, nil, ok)
@@ -32,7 +32,7 @@ func ldump(t *testing.T, db uint32, key string, expect ...string) {
 }
 
 func llen(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.LLen(db, key)
+	x, err := testStore.LLen(db, key)
 	checkerror(t, err, expect == x)
 	if expect == 0 {
 		kexists(t, db, key, 0)
@@ -42,7 +42,7 @@ func llen(t *testing.T, db uint32, key string, expect int64) {
 }
 
 func lindex(t *testing.T, db uint32, key string, index int, expect string) {
-	x, err := testbl.LIndex(db, key, index)
+	x, err := testStore.LIndex(db, key, index)
 	checkerror(t, err, true)
 	if expect == "" {
 		checkerror(t, nil, x == nil)
@@ -52,7 +52,7 @@ func lindex(t *testing.T, db uint32, key string, index int, expect string) {
 }
 
 func lrange(t *testing.T, db uint32, key string, beg, end int, expect ...string) {
-	x, err := testbl.LRange(db, key, beg, end)
+	x, err := testStore.LRange(db, key, beg, end)
 	checkerror(t, err, len(x) == len(expect))
 	for i, v := range expect {
 		checkerror(t, nil, string(x[i]) == v)
@@ -60,19 +60,19 @@ func lrange(t *testing.T, db uint32, key string, beg, end int, expect ...string)
 }
 
 func lset(t *testing.T, db uint32, key string, index int, value string) {
-	err := testbl.LSet(db, key, index, value)
+	err := testStore.LSet(db, key, index, value)
 	checkerror(t, err, true)
 	lrange(t, db, key, index, index, value)
 	lindex(t, db, key, index, value)
 }
 
 func ltrim(t *testing.T, db uint32, key string, beg, end int) {
-	err := testbl.LTrim(db, key, beg, end)
+	err := testStore.LTrim(db, key, beg, end)
 	checkerror(t, err, true)
 }
 
 func lpop(t *testing.T, db uint32, key string, expect string) {
-	x, err := testbl.LPop(db, key)
+	x, err := testStore.LPop(db, key)
 	checkerror(t, err, true)
 	if expect == "" {
 		checkerror(t, nil, x == nil)
@@ -82,7 +82,7 @@ func lpop(t *testing.T, db uint32, key string, expect string) {
 }
 
 func rpop(t *testing.T, db uint32, key string, expect string) {
-	x, err := testbl.RPop(db, key)
+	x, err := testStore.RPop(db, key)
 	checkerror(t, err, true)
 	if expect == "" {
 		checkerror(t, nil, x == nil)
@@ -96,7 +96,7 @@ func lpush(t *testing.T, db uint32, key string, expect int64, values ...string) 
 	for _, v := range values {
 		args = append(args, v)
 	}
-	x, err := testbl.LPush(db, args...)
+	x, err := testStore.LPush(db, args...)
 	checkerror(t, err, x == expect)
 	llen(t, db, key, expect)
 }
@@ -106,19 +106,19 @@ func rpush(t *testing.T, db uint32, key string, expect int64, values ...string) 
 	for _, v := range values {
 		args = append(args, v)
 	}
-	x, err := testbl.RPush(db, args...)
+	x, err := testStore.RPush(db, args...)
 	checkerror(t, err, x == expect)
 	llen(t, db, key, expect)
 }
 
 func lpushx(t *testing.T, db uint32, key string, value string, expect int64) {
-	x, err := testbl.LPushX(db, key, value)
+	x, err := testStore.LPushX(db, key, value)
 	checkerror(t, err, x == expect)
 	llen(t, db, key, expect)
 }
 
 func rpushx(t *testing.T, db uint32, key string, value string, expect int64) {
-	x, err := testbl.RPushX(db, key, value)
+	x, err := testStore.RPushX(db, key, value)
 	checkerror(t, err, x == expect)
 	llen(t, db, key, expect)
 }
@@ -130,7 +130,7 @@ func lrestore(t *testing.T, db uint32, key string, ttlms int64, expect ...string
 	}
 	dump, err := rdb.EncodeDump(x)
 	checkerror(t, err, true)
-	err = testbl.Restore(db, key, ttlms, dump)
+	err = testStore.Restore(db, key, ttlms, dump)
 	checkerror(t, err, true)
 	ldump(t, db, key, expect...)
 	if ttlms == 0 {

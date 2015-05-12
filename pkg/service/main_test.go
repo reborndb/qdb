@@ -27,7 +27,7 @@ func TestT(t *testing.T) {
 }
 
 var (
-	testbl      *store.Binlog
+	testbl      *store.Store
 	testHandler = &Handler{
 		bgSaveSem: sync2.NewSemaphore(1),
 	}
@@ -47,7 +47,7 @@ func (s *fakeSession) SetDB(db uint32) {
 	s.db = db
 }
 
-func (s *fakeSession) Binlog() *store.Binlog {
+func (s *fakeSession) Store() *store.Store {
 	return testbl
 }
 

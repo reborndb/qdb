@@ -41,11 +41,11 @@ func (h *Handler) Bgsave(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	}
 	defer h.bgSaveSem.Release()
 
-	sp, err := s.Binlog().NewSnapshot()
+	sp, err := s.Store().NewSnapshot()
 	if err != nil {
 		return toRespError(err)
 	}
-	defer s.Binlog().ReleaseSnapshot(sp)
+	defer s.Store().ReleaseSnapshot(sp)
 
 	if err := h.bgsaveTo(sp, h.config.DumpPath); err != nil {
 		return toRespError(err)
@@ -70,11 +70,11 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 	}
 	defer h.bgSaveSem.Release()
 
-	sp, err := s.Binlog().NewSnapshot()
+	sp, err := s.Store().NewSnapshot()
 	if err != nil {
 		return toRespError(err)
 	}
-	defer s.Binlog().ReleaseSnapshot(sp)
+	defer s.Store().ReleaseSnapshot(sp)
 
 	if err := h.bgsaveTo(sp, string(args[0])); err != nil {
 		return toRespError(err)
@@ -83,7 +83,7 @@ func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 	}
 }
 
-func (h *Handler) bgsaveTo(sp *store.BinlogSnapshot, path string) error {
+func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 	h.counters.bgsave.Add(1)
 	defer h.counters.bgsave.Sub(1)
 
@@ -168,7 +168,7 @@ func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
 
 	// maybe do AUTH later here.
 
-	c := newConn(nc, h.bl, 0)
+	c := newConn(nc, h.store, 0)
 	if err := c.ping(); err != nil {
 		c.Close()
 		return nil, errors.Trace(err)
@@ -427,7 +427,7 @@ func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
 
 	if size > 0 {
 		// we need full sync first
-		if err := c.Binlog().Reset(); err != nil {
+		if err := c.Store().Reset(); err != nil {
 			return errors.Trace(err)
 		}
 
@@ -516,7 +516,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 						ttlms = 1
 					}
 				}
-				if err := c.Binlog().SlotsRestore(db, key, ttlms, value); err != nil {
+				if err := c.Store().SlotsRestore(db, key, ttlms, value); err != nil {
 					errs <- err
 					return
 				}

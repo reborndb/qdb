@@ -19,7 +19,7 @@ func zdel(t *testing.T, db uint32, key string, expect int64) {
 
 func zdump(t *testing.T, db uint32, key string, expect ...interface{}) {
 	kexists(t, db, key, 1)
-	v, err := testbl.Dump(db, key)
+	v, err := testStore.Dump(db, key)
 	checkerror(t, err, v != nil)
 	x, ok := v.(rdb.ZSet)
 	checkerror(t, nil, ok)
@@ -35,7 +35,7 @@ func zdump(t *testing.T, db uint32, key string, expect ...interface{}) {
 		checkerror(t, nil, math.Abs(m[string(e.Member)]-e.Score) < 1e-9)
 	}
 	zcard(t, db, key, int64(len(m)))
-	p, err := testbl.ZGetAll(db, key)
+	p, err := testStore.ZGetAll(db, key)
 	checkerror(t, err, len(p) == len(m)*2)
 	for i := 0; i < len(p); i += 2 {
 		s, err := ParseFloat(string(p[i+1]))
@@ -53,7 +53,7 @@ func zrestore(t *testing.T, db uint32, key string, ttlms int64, expect ...interf
 	}
 	dump, err := rdb.EncodeDump(x)
 	checkerror(t, err, true)
-	err = testbl.Restore(db, key, ttlms, dump)
+	err = testStore.Restore(db, key, ttlms, dump)
 	checkerror(t, err, true)
 	zdump(t, db, key, expect...)
 	if ttlms == 0 {
@@ -64,7 +64,7 @@ func zrestore(t *testing.T, db uint32, key string, ttlms int64, expect ...interf
 }
 
 func zcard(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.ZCard(db, key)
+	x, err := testStore.ZCard(db, key)
 	checkerror(t, err, x == expect)
 	if expect == 0 {
 		kexists(t, db, key, 0)
@@ -78,7 +78,7 @@ func zrem(t *testing.T, db uint32, key string, expect int64, members ...string) 
 	for _, s := range members {
 		args = append(args, s)
 	}
-	x, err := testbl.ZRem(db, args...)
+	x, err := testStore.ZRem(db, args...)
 	checkerror(t, err, x == expect)
 }
 
@@ -87,7 +87,7 @@ func zadd(t *testing.T, db uint32, key string, expect int64, pairs ...interface{
 	for i := 0; i < len(pairs); i += 2 {
 		args = append(args, pairs[i+1], pairs[i])
 	}
-	x, err := testbl.ZAdd(db, args...)
+	x, err := testStore.ZAdd(db, args...)
 	checkerror(t, err, x == expect)
 	for i := 0; i < len(pairs); i += 2 {
 		score, err := ParseFloat(pairs[i+1])
@@ -97,12 +97,12 @@ func zadd(t *testing.T, db uint32, key string, expect int64, pairs ...interface{
 }
 
 func zscore(t *testing.T, db uint32, key string, member string, expect float64) {
-	x, ok, err := testbl.ZScore(db, key, member)
+	x, ok, err := testStore.ZScore(db, key, member)
 	checkerror(t, err, ok && math.Abs(x-expect) < 1e-9)
 }
 
 func zincrby(t *testing.T, db uint32, key string, member string, delta float64, expect float64) {
-	x, err := testbl.ZIncrBy(db, key, delta, member)
+	x, err := testStore.ZIncrBy(db, key, delta, member)
 	checkerror(t, err, math.Abs(x-expect) < 1e-9)
 }
 

@@ -42,7 +42,7 @@ func HashKeyToSlot(key []byte) ([]byte, uint32) {
 }
 
 // SLOTSINFO [start] [count]
-func (b *Binlog) SlotsInfo(db uint32, args ...interface{}) (map[uint32]int64, error) {
+func (s *Store) SlotsInfo(db uint32, args ...interface{}) (map[uint32]int64, error) {
 	if len(args) > 2 {
 		return nil, errArguments("len(args) = %d, expect <= 2", len(args))
 	}
@@ -61,14 +61,14 @@ func (b *Binlog) SlotsInfo(db uint32, args ...interface{}) (map[uint32]int64, er
 	}
 	limit := start + count
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
 	m := make(map[uint32]int64)
 	for slot := start; slot < limit && slot < MaxSlotNum; slot++ {
-		if key, err := firstKeyUnderSlot(b, db, slot); err != nil {
+		if key, err := firstKeyUnderSlot(s, db, slot); err != nil {
 			return nil, err
 		} else if key != nil {
 			m[slot] = 1
@@ -80,7 +80,7 @@ func (b *Binlog) SlotsInfo(db uint32, args ...interface{}) (map[uint32]int64, er
 }
 
 // SLOTSRESTORE key ttlms value [key ttlms value ...]
-func (b *Binlog) SlotsRestore(db uint32, args ...interface{}) error {
+func (s *Store) SlotsRestore(db uint32, args ...interface{}) error {
 	if len(args) == 0 || len(args)%3 != 0 {
 		return errArguments("len(args) = %d, expect != 0 && mod 3 = 0", len(args))
 	}
@@ -114,10 +114,10 @@ func (b *Binlog) SlotsRestore(db uint32, args ...interface{}) error {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return err
 	}
-	defer b.release()
+	defer s.release()
 
 	ms := &markSet{}
 	bt := engine.NewBatch()
@@ -129,18 +129,18 @@ func (b *Binlog) SlotsRestore(db uint32, args ...interface{}) error {
 		} else {
 			log.Debugf("[%d] restore batch, db = %d, key = %v", i, e.DB, e.Key)
 		}
-		if err := b.restore(bt, e.DB, e.Key, e.ExpireAt, e.Value); err != nil {
+		if err := s.restore(bt, e.DB, e.Key, e.ExpireAt, e.Value); err != nil {
 			log.DebugErrorf(err, "restore object failed, db = %d, key = %v", e.DB, e.Key)
 			return err
 		}
 		ms.Set(e.Key)
 	}
 	fw := &Forward{DB: db, Op: "SlotsRestore", Args: args}
-	return b.commit(bt, fw)
+	return s.commit(bt, fw)
 }
 
 // SLOTSMGRTSLOT host port timeout slot
-func (b *Binlog) SlotsMgrtSlot(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SlotsMgrtSlot(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 4 {
 		return 0, errArguments("len(args) = %d, expect = 4", len(args))
 	}
@@ -163,22 +163,22 @@ func (b *Binlog) SlotsMgrtSlot(db uint32, args ...interface{}) (int64, error) {
 	}
 	addr := fmt.Sprintf("%s:%d", host, port)
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
 	log.Debugf("migrate slot, addr = %s, timeout = %d, db = %d, slot = %d", addr, timeout, db, slot)
 
-	key, err := firstKeyUnderSlot(b, db, slot)
+	key, err := firstKeyUnderSlot(s, db, slot)
 	if err != nil || key == nil {
 		return 0, err
 	}
-	return b.migrateOne(addr, timeout, db, key)
+	return s.migrateOne(addr, timeout, db, key)
 }
 
 // SLOTSMGRTTAGSLOT host port timeout slot
-func (b *Binlog) SlotsMgrtTagSlot(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SlotsMgrtTagSlot(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 4 {
 		return 0, errArguments("len(args) = %d, expect = 4", len(args))
 	}
@@ -201,27 +201,27 @@ func (b *Binlog) SlotsMgrtTagSlot(db uint32, args ...interface{}) (int64, error)
 	}
 	addr := fmt.Sprintf("%s:%d", host, port)
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
 	log.Debugf("migrate slot with tag, addr = %s, timeout = %d, db = %d, slot = %d", addr, timeout, db, slot)
 
-	key, err := firstKeyUnderSlot(b, db, slot)
+	key, err := firstKeyUnderSlot(s, db, slot)
 	if err != nil || key == nil {
 		return 0, err
 	}
 
 	if tag := HashTag(key); len(tag) == len(key) {
-		return b.migrateOne(addr, timeout, db, key)
+		return s.migrateOne(addr, timeout, db, key)
 	} else {
-		return b.migrateTag(addr, timeout, db, tag)
+		return s.migrateTag(addr, timeout, db, tag)
 	}
 }
 
 // SLOTSMGRTONE host port timeout key
-func (b *Binlog) SlotsMgrtOne(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SlotsMgrtOne(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 4 {
 		return 0, errArguments("len(args) = %d, expect = 4", len(args))
 	}
@@ -241,18 +241,18 @@ func (b *Binlog) SlotsMgrtOne(db uint32, args ...interface{}) (int64, error) {
 	}
 	addr := fmt.Sprintf("%s:%d", host, port)
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
 	log.Debugf("migrate one, addr = %s, timeout = %d, db = %d, key = %v", addr, timeout, db, key)
 
-	return b.migrateOne(addr, timeout, db, key)
+	return s.migrateOne(addr, timeout, db, key)
 }
 
 // SLOTSMGRTTAGONE host port timeout key
-func (b *Binlog) SlotsMgrtTagOne(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SlotsMgrtTagOne(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 4 {
 		return 0, errArguments("len(args) = %d, expect = 4", len(args))
 	}
@@ -272,22 +272,22 @@ func (b *Binlog) SlotsMgrtTagOne(db uint32, args ...interface{}) (int64, error) 
 	}
 	addr := fmt.Sprintf("%s:%d", host, port)
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
 	log.Debugf("migrate one with tag, addr = %s, timeout = %d, db = %d, key = %v", addr, timeout, db, key)
 
 	if tag := HashTag(key); len(tag) == len(key) {
-		return b.migrateOne(addr, timeout, db, key)
+		return s.migrateOne(addr, timeout, db, key)
 	} else {
-		return b.migrateTag(addr, timeout, db, tag)
+		return s.migrateTag(addr, timeout, db, tag)
 	}
 }
 
-func (b *Binlog) migrateOne(addr string, timeout time.Duration, db uint32, key []byte) (int64, error) {
-	n, err := b.migrate(addr, timeout, db, key)
+func (s *Store) migrateOne(addr string, timeout time.Duration, db uint32, key []byte) (int64, error) {
+	n, err := s.migrate(addr, timeout, db, key)
 	if err != nil {
 		log.ErrorErrorf(err, "migrate one failed")
 		return 0, err
@@ -295,12 +295,12 @@ func (b *Binlog) migrateOne(addr string, timeout time.Duration, db uint32, key [
 	return n, nil
 }
 
-func (b *Binlog) migrateTag(addr string, timeout time.Duration, db uint32, tag []byte) (int64, error) {
-	keys, err := allKeysWithTag(b, db, tag)
+func (s *Store) migrateTag(addr string, timeout time.Duration, db uint32, tag []byte) (int64, error) {
+	keys, err := allKeysWithTag(s, db, tag)
 	if err != nil || len(keys) == 0 {
 		return 0, err
 	}
-	n, err := b.migrate(addr, timeout, db, keys...)
+	n, err := s.migrate(addr, timeout, db, keys...)
 	if err != nil {
 		log.ErrorErrorf(err, "migrate tag failed")
 		return 0, err
@@ -308,12 +308,12 @@ func (b *Binlog) migrateTag(addr string, timeout time.Duration, db uint32, tag [
 	return n, nil
 }
 
-func (b *Binlog) migrate(addr string, timeout time.Duration, db uint32, keys ...[]byte) (int64, error) {
-	var rows []binlogRow
+func (s *Store) migrate(addr string, timeout time.Duration, db uint32, keys ...[]byte) (int64, error) {
+	var rows []storeRow
 	var bins []*rdb.BinEntry
 
 	for i, key := range keys {
-		o, bin, err := loadBinEntry(b, db, key)
+		o, bin, err := loadBinEntry(s, db, key)
 		if err != nil {
 			return 0, err
 		}
@@ -343,7 +343,7 @@ func (b *Binlog) migrate(addr string, timeout time.Duration, db uint32, keys ...
 
 	bt := engine.NewBatch()
 	for _, o := range rows {
-		if err := o.deleteObject(b, bt); err != nil {
+		if err := o.deleteObject(s, bt); err != nil {
 			return 0, err
 		}
 	}
@@ -351,5 +351,5 @@ func (b *Binlog) migrate(addr string, timeout time.Duration, db uint32, keys ...
 	for _, key := range keys {
 		fw.Args = append(fw.Args, key)
 	}
-	return int64(len(rows)), b.commit(bt, fw)
+	return int64(len(rows)), s.commit(bt, fw)
 }

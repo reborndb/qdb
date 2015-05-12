@@ -12,7 +12,7 @@ import (
 )
 
 type setRow struct {
-	*binlogRowHelper
+	*storeRowHelper
 
 	Size   int64
 	Member []byte
@@ -20,20 +20,20 @@ type setRow struct {
 
 func newSetRow(db uint32, key []byte) *setRow {
 	o := &setRow{}
-	o.lazyInit(newBinlogRowHelper(db, key, SetCode))
+	o.lazyInit(newStoreRowHelper(db, key, SetCode))
 	return o
 }
 
-func (o *setRow) lazyInit(h *binlogRowHelper) {
-	o.binlogRowHelper = h
+func (o *setRow) lazyInit(h *storeRowHelper) {
+	o.storeRowHelper = h
 	o.dataKeyRefs = []interface{}{&o.Member}
 	o.metaValueRefs = []interface{}{&o.Size}
 	o.dataValueRefs = nil
 }
 
-func (o *setRow) deleteObject(b *Binlog, bt *engine.Batch) error {
-	it := b.getIterator()
-	defer b.putIterator(it)
+func (o *setRow) deleteObject(s *Store, bt *engine.Batch) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
 	for pfx := it.SeekTo(o.DataKeyPrefix()); it.Valid(); it.Next() {
 		key := it.Key()
 		if !bytes.HasPrefix(key, pfx) {
@@ -45,7 +45,7 @@ func (o *setRow) deleteObject(b *Binlog, bt *engine.Batch) error {
 	return it.Error()
 }
 
-func (o *setRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj interface{}) error {
+func (o *setRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj interface{}) error {
 	set, ok := obj.(rdb.Set)
 	if !ok || len(set) == 0 {
 		return errors.Trace(ErrObjectValue)
@@ -67,7 +67,7 @@ func (o *setRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj i
 	return nil
 }
 
-func (o *setRow) loadObjectValue(r binlogReader) (interface{}, error) {
+func (o *setRow) loadObjectValue(r storeReader) (interface{}, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	set := make([][]byte, 0, o.Size)
@@ -94,7 +94,7 @@ func (o *setRow) loadObjectValue(r binlogReader) (interface{}, error) {
 	return rdb.Set(set), nil
 }
 
-func (o *setRow) getMembers(r binlogReader, count int64) ([][]byte, error) {
+func (o *setRow) getMembers(r storeReader, count int64) ([][]byte, error) {
 	it := r.getIterator()
 	defer r.putIterator(it)
 	var members [][]byte
@@ -125,8 +125,8 @@ func (o *setRow) getMembers(r binlogReader, count int64) ([][]byte, error) {
 	return members, nil
 }
 
-func (b *Binlog) loadSetRow(db uint32, key []byte, deleteIfExpired bool) (*setRow, error) {
-	o, err := b.loadBinlogRow(db, key, deleteIfExpired)
+func (s *Store) loadSetRow(db uint32, key []byte, deleteIfExpired bool) (*setRow, error) {
+	o, err := s.loadStoreRow(db, key, deleteIfExpired)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -140,7 +140,7 @@ func (b *Binlog) loadSetRow(db uint32, key []byte, deleteIfExpired bool) (*setRo
 }
 
 // SADD key member [member ...]
-func (b *Binlog) SAdd(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SAdd(db uint32, args ...interface{}) (int64, error) {
 	if len(args) < 2 {
 		return 0, errArguments("len(args) = %d, expect >= 2", len(args))
 	}
@@ -156,12 +156,12 @@ func (b *Binlog) SAdd(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -173,7 +173,7 @@ func (b *Binlog) SAdd(db uint32, args ...interface{}) (int64, error) {
 	ms := &markSet{}
 	bt := engine.NewBatch()
 	for _, o.Member = range members {
-		exists, err := o.TestDataValue(b)
+		exists, err := o.TestDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -189,11 +189,11 @@ func (b *Binlog) SAdd(db uint32, args ...interface{}) (int64, error) {
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
 	fw := &Forward{DB: db, Op: "SAdd", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }
 
 // SCARD key
-func (b *Binlog) SCard(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SCard(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 1 {
 		return 0, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -205,12 +205,12 @@ func (b *Binlog) SCard(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -218,7 +218,7 @@ func (b *Binlog) SCard(db uint32, args ...interface{}) (int64, error) {
 }
 
 // SISMEMBER key member
-func (b *Binlog) SIsMember(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SIsMember(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -230,18 +230,18 @@ func (b *Binlog) SIsMember(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
 
 	o.Member = member
-	exists, err := o.TestDataValue(b)
+	exists, err := o.TestDataValue(s)
 	if err != nil || !exists {
 		return 0, err
 	} else {
@@ -250,7 +250,7 @@ func (b *Binlog) SIsMember(db uint32, args ...interface{}) (int64, error) {
 }
 
 // SMEMBERS key
-func (b *Binlog) SMembers(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) SMembers(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -262,21 +262,21 @@ func (b *Binlog) SMembers(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
 
-	return o.getMembers(b, o.Size)
+	return o.getMembers(s, o.Size)
 }
 
 // SPOP key
-func (b *Binlog) SPop(db uint32, args ...interface{}) ([]byte, error) {
+func (s *Store) SPop(db uint32, args ...interface{}) ([]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -288,17 +288,17 @@ func (b *Binlog) SPop(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
 
-	members, err := o.getMembers(b, 1)
+	members, err := o.getMembers(s, 1)
 	if err != nil || len(members) == 0 {
 		return nil, err
 	}
@@ -312,11 +312,11 @@ func (b *Binlog) SPop(db uint32, args ...interface{}) ([]byte, error) {
 		bt.Del(o.MetaKey())
 	}
 	fw := &Forward{DB: db, Op: "SRem", Args: []interface{}{key, members[0]}}
-	return o.Member, b.commit(bt, fw)
+	return o.Member, s.commit(bt, fw)
 }
 
 // SRANDMEMBER key [count]
-func (b *Binlog) SRandMember(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) SRandMember(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) != 1 && len(args) != 2 {
 		return nil, errArguments("len(args) = %d, expect = 1 or 2", len(args))
 	}
@@ -332,12 +332,12 @@ func (b *Binlog) SRandMember(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -346,14 +346,14 @@ func (b *Binlog) SRandMember(db uint32, args ...interface{}) ([][]byte, error) {
 		count += o.Size
 	}
 	if count > 0 {
-		return o.getMembers(b, count)
+		return o.getMembers(s, count)
 	} else {
 		return nil, nil
 	}
 }
 
 // SREM key member [member ...]
-func (b *Binlog) SRem(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SRem(db uint32, args ...interface{}) (int64, error) {
 	if len(args) < 2 {
 		return 0, errArguments("len(args) = %d, expect >= 2", len(args))
 	}
@@ -369,12 +369,12 @@ func (b *Binlog) SRem(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadSetRow(db, key, true)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -383,7 +383,7 @@ func (b *Binlog) SRem(db uint32, args ...interface{}) (int64, error) {
 	bt := engine.NewBatch()
 	for _, o.Member = range members {
 		if !ms.Has(o.Member) {
-			exists, err := o.TestDataValue(b)
+			exists, err := o.TestDataValue(s)
 			if err != nil {
 				return 0, err
 			}
@@ -403,5 +403,5 @@ func (b *Binlog) SRem(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 	fw := &Forward{DB: db, Op: "SRem", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }

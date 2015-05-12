@@ -16,7 +16,7 @@ func (h *Handler) SAdd(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if n, err := s.Binlog().SAdd(s.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SAdd(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -34,7 +34,7 @@ func (h *Handler) SCard(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if n, err := s.Binlog().SCard(s.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SCard(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -52,7 +52,7 @@ func (h *Handler) SIsMember(arg0 interface{}, args [][]byte) (redis.Resp, error)
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().SIsMember(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().SIsMember(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -70,7 +70,7 @@ func (h *Handler) SMembers(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 		return toRespError(err)
 	}
 
-	if a, err := s.Binlog().SMembers(s.DB(), iconvert(args)...); err != nil {
+	if a, err := s.Store().SMembers(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -92,7 +92,7 @@ func (h *Handler) SPop(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if v, err := s.Binlog().SPop(s.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().SPop(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytes(v), nil
@@ -110,7 +110,7 @@ func (h *Handler) SRandMember(arg0 interface{}, args [][]byte) (redis.Resp, erro
 		return toRespError(err)
 	}
 
-	if a, err := s.Binlog().SRandMember(s.DB(), iconvert(args)...); err != nil {
+	if a, err := s.Store().SRandMember(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -132,7 +132,7 @@ func (h *Handler) SRem(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if n, err := s.Binlog().SRem(s.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SRem(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil

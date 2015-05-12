@@ -18,7 +18,7 @@ func xdel(t *testing.T, db uint32, key string, expect int64) {
 
 func xdump(t *testing.T, db uint32, key string, expect string) {
 	kexists(t, db, key, 1)
-	v, err := testbl.Dump(db, key)
+	v, err := testStore.Dump(db, key)
 	checkerror(t, err, v != nil)
 	x, ok := v.(rdb.String)
 	checkerror(t, nil, ok && string([]byte(x)) == expect)
@@ -29,7 +29,7 @@ func xrestore(t *testing.T, db uint32, key string, ttlms uint64, value string) {
 	var x rdb.String = []byte(value)
 	dump, err := rdb.EncodeDump(x)
 	checkerror(t, err, true)
-	err = testbl.Restore(db, key, ttlms, dump)
+	err = testStore.Restore(db, key, ttlms, dump)
 	checkerror(t, err, true)
 	xdump(t, db, key, value)
 	if ttlms == 0 {
@@ -40,14 +40,14 @@ func xrestore(t *testing.T, db uint32, key string, ttlms uint64, value string) {
 }
 
 func xset(t *testing.T, db uint32, key, value string) {
-	err := testbl.Set(db, []byte(key), []byte(value))
+	err := testStore.Set(db, []byte(key), []byte(value))
 	checkerror(t, err, true)
 	kttl(t, db, key, -1)
 	xget(t, db, key, value)
 }
 
 func xget(t *testing.T, db uint32, key string, expect string) {
-	x, err := testbl.Get(db, []byte(key))
+	x, err := testStore.Get(db, []byte(key))
 	if expect == "" {
 		checkerror(t, err, x == nil)
 		xstrlen(t, db, key, 0)
@@ -58,12 +58,12 @@ func xget(t *testing.T, db uint32, key string, expect string) {
 }
 
 func xappend(t *testing.T, db uint32, key, value string, expect int64) {
-	x, err := testbl.Append(db, key, value)
+	x, err := testStore.Append(db, key, value)
 	checkerror(t, err, x == expect)
 }
 
 func xgetset(t *testing.T, db uint32, key, value string, expect string) {
-	x, err := testbl.GetSet(db, key, value)
+	x, err := testStore.GetSet(db, key, value)
 	if expect == "" {
 		checkerror(t, err, x == nil)
 	} else {
@@ -73,21 +73,21 @@ func xgetset(t *testing.T, db uint32, key, value string, expect string) {
 }
 
 func xpsetex(t *testing.T, db uint32, key, value string, ttlms uint64) {
-	err := testbl.PSetEX(db, key, ttlms, value)
+	err := testStore.PSetEX(db, key, ttlms, value)
 	checkerror(t, err, true)
 	xdump(t, db, key, value)
 	kpttl(t, db, key, int64(ttlms))
 }
 
 func xsetex(t *testing.T, db uint32, key, value string, ttls uint64) {
-	err := testbl.SetEX(db, key, ttls, value)
+	err := testStore.SetEX(db, key, ttls, value)
 	checkerror(t, err, true)
 	xdump(t, db, key, value)
 	kpttl(t, db, key, int64(ttls*1e3))
 }
 
 func xsetnx(t *testing.T, db uint32, key, value string, expect int64) {
-	x, err := testbl.SetNX(db, key, value)
+	x, err := testStore.SetNX(db, key, value)
 	checkerror(t, err, x == expect)
 	if expect != 0 {
 		xdump(t, db, key, value)
@@ -101,54 +101,54 @@ func xstrlen(t *testing.T, db uint32, key string, expect int64) {
 	} else {
 		kexists(t, db, key, 0)
 	}
-	x, err := testbl.Strlen(db, key)
+	x, err := testStore.Strlen(db, key)
 	checkerror(t, err, x == expect)
 }
 
 func xincr(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.Incr(db, key)
+	x, err := testStore.Incr(db, key)
 	checkerror(t, err, x == expect)
 }
 
 func xdecr(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.Decr(db, key)
+	x, err := testStore.Decr(db, key)
 	checkerror(t, err, x == expect)
 }
 
 func xincrby(t *testing.T, db uint32, key string, delta int64, expect int64) {
-	x, err := testbl.IncrBy(db, key, delta)
+	x, err := testStore.IncrBy(db, key, delta)
 	checkerror(t, err, x == expect)
 }
 
 func xdecrby(t *testing.T, db uint32, key string, delta int64, expect int64) {
-	x, err := testbl.DecrBy(db, key, delta)
+	x, err := testStore.DecrBy(db, key, delta)
 	checkerror(t, err, x == expect)
 }
 
 func xincrbyfloat(t *testing.T, db uint32, key string, delta float64, expect float64) {
-	x, err := testbl.IncrByFloat(db, key, delta)
+	x, err := testStore.IncrByFloat(db, key, delta)
 	checkerror(t, err, math.Abs(x-expect) < 1e-9)
 }
 
 func xsetbit(t *testing.T, db uint32, key string, offset uint, value int64, expect int64) {
-	x, err := testbl.SetBit(db, key, offset, value)
+	x, err := testStore.SetBit(db, key, offset, value)
 	checkerror(t, err, x == expect)
 	xgetbit(t, db, key, offset, value)
 }
 
 func xgetbit(t *testing.T, db uint32, key string, offset uint, expect int64) {
-	x, err := testbl.GetBit(db, key, offset)
+	x, err := testStore.GetBit(db, key, offset)
 	checkerror(t, err, x == expect)
 }
 
 func xsetrange(t *testing.T, db uint32, key string, offset uint, value string, expect int64) {
-	x, err := testbl.SetRange(db, key, offset, value)
+	x, err := testStore.SetRange(db, key, offset, value)
 	checkerror(t, err, x == expect)
 	xgetrange(t, db, key, int(offset), int(offset)+len(value)-1, value)
 }
 
 func xgetrange(t *testing.T, db uint32, key string, beg, end int, expect string) {
-	x, err := testbl.GetRange(db, key, beg, end)
+	x, err := testStore.GetRange(db, key, beg, end)
 	checkerror(t, err, string(x) == expect)
 }
 
@@ -157,7 +157,7 @@ func xmset(t *testing.T, db uint32, pairs ...string) {
 	for i, s := range pairs {
 		args[i] = s
 	}
-	err := testbl.MSet(db, args...)
+	err := testStore.MSet(db, args...)
 	checkerror(t, err, true)
 	m := make(map[string]string)
 	for i := 0; i < len(pairs); i += 2 {
@@ -174,7 +174,7 @@ func xmsetnx(t *testing.T, expect int64, db uint32, pairs ...string) {
 	for i, s := range pairs {
 		args[i] = s
 	}
-	x, err := testbl.MSetNX(db, args...)
+	x, err := testStore.MSetNX(db, args...)
 	checkerror(t, err, x == expect)
 	if expect == 0 {
 		return
@@ -195,7 +195,7 @@ func xmget(t *testing.T, db uint32, pairs ...string) {
 	for i := 0; i < len(pairs); i += 2 {
 		args = append(args, pairs[i])
 	}
-	x, err := testbl.MGet(db, args...)
+	x, err := testStore.MGet(db, args...)
 	checkerror(t, err, len(x) == len(args))
 	for i := 0; i < len(pairs); i += 2 {
 		value := pairs[i+1]

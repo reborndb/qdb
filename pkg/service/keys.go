@@ -43,7 +43,7 @@ func (h *Handler) Del(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if n, err := s.Binlog().Del(s.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().Del(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -61,7 +61,7 @@ func (h *Handler) Dump(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().Dump(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Dump(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else if dump, err := rdb.EncodeDump(x); err != nil {
 		return toRespError(err)
@@ -81,7 +81,7 @@ func (h *Handler) Type(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if c, err := s.Binlog().Type(s.DB(), iconvert(args)...); err != nil {
+	if c, err := s.Store().Type(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString(c.String()), nil
@@ -99,7 +99,7 @@ func (h *Handler) Exists(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().Exists(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Exists(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -117,7 +117,7 @@ func (h *Handler) TTL(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().TTL(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().TTL(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -135,7 +135,7 @@ func (h *Handler) PTTL(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().PTTL(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().PTTL(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -153,7 +153,7 @@ func (h *Handler) Persist(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().Persist(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Persist(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -171,7 +171,7 @@ func (h *Handler) Expire(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().Expire(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Expire(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -189,7 +189,7 @@ func (h *Handler) PExpire(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().PExpire(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().PExpire(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -207,7 +207,7 @@ func (h *Handler) ExpireAt(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().ExpireAt(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().ExpireAt(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -225,7 +225,7 @@ func (h *Handler) PExpireAt(arg0 interface{}, args [][]byte) (redis.Resp, error)
 		return toRespError(err)
 	}
 
-	if x, err := s.Binlog().PExpireAt(s.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().PExpireAt(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -243,7 +243,7 @@ func (h *Handler) Restore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if err := s.Binlog().Restore(s.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().Restore(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil

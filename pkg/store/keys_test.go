@@ -13,7 +13,7 @@ func kdel(t *testing.T, expect int64, db uint32, keys ...string) {
 	for i, key := range keys {
 		args[i] = key
 	}
-	n, err := testbl.Del(db, args...)
+	n, err := testStore.Del(db, args...)
 	checkerror(t, err, n == expect)
 	for _, key := range keys {
 		kexists(t, db, key, 0)
@@ -21,7 +21,7 @@ func kdel(t *testing.T, expect int64, db uint32, keys ...string) {
 }
 
 func ktype(t *testing.T, db uint32, key string, expect ObjectCode) {
-	c, err := testbl.Type(db, key)
+	c, err := testStore.Type(db, key)
 	checkerror(t, err, c == expect)
 	if expect == 0 {
 		kexists(t, db, key, 0)
@@ -31,12 +31,12 @@ func ktype(t *testing.T, db uint32, key string, expect ObjectCode) {
 }
 
 func kexists(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.Exists(db, key)
+	x, err := testStore.Exists(db, key)
 	checkerror(t, err, x == expect)
 }
 
 func kttl(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.TTL(db, key)
+	x, err := testStore.TTL(db, key)
 	switch expect {
 	case -1, -2, 0:
 		checkerror(t, err, x == expect)
@@ -46,7 +46,7 @@ func kttl(t *testing.T, db uint32, key string, expect int64) {
 }
 
 func kpttl(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.PTTL(db, key)
+	x, err := testStore.PTTL(db, key)
 	switch expect {
 	case -1, -2, 0:
 		checkerror(t, err, x == expect)
@@ -56,7 +56,7 @@ func kpttl(t *testing.T, db uint32, key string, expect int64) {
 }
 
 func kpersist(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.Persist(db, key)
+	x, err := testStore.Persist(db, key)
 	checkerror(t, err, x == expect)
 	if expect != 0 {
 		kpttl(t, db, key, -1)
@@ -64,7 +64,7 @@ func kpersist(t *testing.T, db uint32, key string, expect int64) {
 }
 
 func kexpire(t *testing.T, db uint32, key string, ttls uint64, expect int64) {
-	x, err := testbl.Expire(db, key, ttls)
+	x, err := testStore.Expire(db, key, ttls)
 	checkerror(t, err, x == expect)
 	if expect != 0 {
 		if ttls == 0 {
@@ -76,7 +76,7 @@ func kexpire(t *testing.T, db uint32, key string, ttls uint64, expect int64) {
 }
 
 func kpexpire(t *testing.T, db uint32, key string, ttlms uint64, expect int64) {
-	x, err := testbl.PExpire(db, key, ttlms)
+	x, err := testStore.PExpire(db, key, ttlms)
 	checkerror(t, err, x == expect)
 	if expect != 0 {
 		if ttlms == 0 {
@@ -88,7 +88,7 @@ func kpexpire(t *testing.T, db uint32, key string, ttlms uint64, expect int64) {
 }
 
 func kexpireat(t *testing.T, db uint32, key string, timestamp uint64, expect int64) {
-	x, err := testbl.ExpireAt(db, key, timestamp)
+	x, err := testStore.ExpireAt(db, key, timestamp)
 	checkerror(t, err, x == expect)
 	if expect != 0 {
 		expireat := timestamp * 1e3
@@ -101,7 +101,7 @@ func kexpireat(t *testing.T, db uint32, key string, timestamp uint64, expect int
 }
 
 func kpexpireat(t *testing.T, db uint32, key string, expireat uint64, expect int64) {
-	x, err := testbl.PExpireAt(db, key, expireat)
+	x, err := testStore.PExpireAt(db, key, expireat)
 	checkerror(t, err, x == expect)
 	if expect != 0 {
 		if now := nowms(); expireat < now {
@@ -256,5 +256,5 @@ func TestRestore(t *testing.T) {
 
 /*
 // TODO
-func (b *Binlog) Restore(db uint32, args ...interface{}) error {
+func (s *Store) Restore(db uint32, args ...interface{}) error {
 */

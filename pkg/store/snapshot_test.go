@@ -32,7 +32,7 @@ func TestSnapshot(t *testing.T) {
 
 	sleepms(20)
 
-	s, err := testbl.NewSnapshot()
+	s, err := testStore.NewSnapshot()
 	checkerror(t, err, true)
 
 	objs, _, err := s.LoadObjCron(time.Hour, 4, 4096)
@@ -40,7 +40,7 @@ func TestSnapshot(t *testing.T) {
 
 	kpttl(t, 0, "string", -2)
 
-	testbl.ReleaseSnapshot(s)
+	testStore.ReleaseSnapshot(s)
 
 	for db := uint32(0); db < 128; db++ {
 		ok := false
@@ -63,10 +63,10 @@ func TestSnapshot(t *testing.T) {
 	checkcompact(t)
 	checkempty(t)
 
-	s, err = testbl.NewSnapshot()
+	s, err = testStore.NewSnapshot()
 	checkerror(t, err, true)
 	objs, _, err = s.LoadObjCron(time.Hour, 4, 4096)
 	checkerror(t, err, len(objs) == 0)
-	testbl.ReleaseSnapshot(s)
+	testStore.ReleaseSnapshot(s)
 	checkempty(t)
 }

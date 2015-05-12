@@ -16,35 +16,35 @@ type Forward struct {
 type ForwardHandler func(f *Forward) error
 
 // Register the handler that will be called before db storage commit
-func (b *Binlog) RegPreCommitHandler(h ForwardHandler) {
-	if err := b.acquire(); err != nil {
+func (s *Store) RegPreCommitHandler(h ForwardHandler) {
+	if err := s.acquire(); err != nil {
 		return
 	}
-	defer b.release()
+	defer s.release()
 
-	b.preCommitHandlers = append(b.preCommitHandlers, h)
+	s.preCommitHandlers = append(s.preCommitHandlers, h)
 }
 
 // Register the handler that will be called after db storage committed
-func (b *Binlog) RegPostCommitHandler(h ForwardHandler) {
-	if err := b.acquire(); err != nil {
+func (s *Store) RegPostCommitHandler(h ForwardHandler) {
+	if err := s.acquire(); err != nil {
 		return
 	}
-	defer b.release()
+	defer s.release()
 
-	b.postCommitHandlers = append(b.postCommitHandlers, h)
+	s.postCommitHandlers = append(s.postCommitHandlers, h)
 }
 
-func (b *Binlog) travelPreCommitHandlers(f *Forward) {
-	for _, h := range b.preCommitHandlers {
+func (s *Store) travelPreCommitHandlers(f *Forward) {
+	for _, h := range s.preCommitHandlers {
 		if err := h(f); err != nil {
 			log.WarnErrorf(err, "handle WillCommitHandler err")
 		}
 	}
 }
 
-func (b *Binlog) travelPostCommitHandlers(f *Forward) {
-	for _, h := range b.postCommitHandlers {
+func (s *Store) travelPostCommitHandlers(f *Forward) {
+	for _, h := range s.postCommitHandlers {
 		if err := h(f); err != nil {
 			log.WarnErrorf(err, "handle DidCommitHandler err")
 		}

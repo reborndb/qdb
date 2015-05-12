@@ -12,7 +12,7 @@ import (
 )
 
 type zsetRow struct {
-	*binlogRowHelper
+	*storeRowHelper
 
 	Size   int64
 	Member []byte
@@ -21,20 +21,20 @@ type zsetRow struct {
 
 func newZSetRow(db uint32, key []byte) *zsetRow {
 	o := &zsetRow{}
-	o.lazyInit(newBinlogRowHelper(db, key, ZSetCode))
+	o.lazyInit(newStoreRowHelper(db, key, ZSetCode))
 	return o
 }
 
-func (o *zsetRow) lazyInit(h *binlogRowHelper) {
-	o.binlogRowHelper = h
+func (o *zsetRow) lazyInit(h *storeRowHelper) {
+	o.storeRowHelper = h
 	o.dataKeyRefs = []interface{}{&o.Member}
 	o.metaValueRefs = []interface{}{&o.Size}
 	o.dataValueRefs = []interface{}{&o.Score}
 }
 
-func (o *zsetRow) deleteObject(b *Binlog, bt *engine.Batch) error {
-	it := b.getIterator()
-	defer b.putIterator(it)
+func (o *zsetRow) deleteObject(s *Store, bt *engine.Batch) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
 	for pfx := it.SeekTo(o.DataKeyPrefix()); it.Valid(); it.Next() {
 		key := it.Key()
 		if !bytes.HasPrefix(key, pfx) {
@@ -46,7 +46,7 @@ func (o *zsetRow) deleteObject(b *Binlog, bt *engine.Batch) error {
 	return it.Error()
 }
 
-func (o *zsetRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj interface{}) error {
+func (o *zsetRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj interface{}) error {
 	zset, ok := obj.(rdb.ZSet)
 	if !ok || len(zset) == 0 {
 		return errors.Trace(ErrObjectValue)
@@ -71,7 +71,7 @@ func (o *zsetRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj 
 	return nil
 }
 
-func (o *zsetRow) loadObjectValue(r binlogReader) (interface{}, error) {
+func (o *zsetRow) loadObjectValue(r storeReader) (interface{}, error) {
 	zset := make([]*rdb.ZSetElement, 0, o.Size)
 	it := r.getIterator()
 	defer r.putIterator(it)
@@ -98,8 +98,8 @@ func (o *zsetRow) loadObjectValue(r binlogReader) (interface{}, error) {
 	return rdb.ZSet(zset), nil
 }
 
-func (b *Binlog) loadZSetRow(db uint32, key []byte, deleteIfExpired bool) (*zsetRow, error) {
-	o, err := b.loadBinlogRow(db, key, deleteIfExpired)
+func (s *Store) loadZSetRow(db uint32, key []byte, deleteIfExpired bool) (*zsetRow, error) {
+	o, err := s.loadStoreRow(db, key, deleteIfExpired)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -113,7 +113,7 @@ func (b *Binlog) loadZSetRow(db uint32, key []byte, deleteIfExpired bool) (*zset
 }
 
 // ZGETALL key
-func (b *Binlog) ZGetAll(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) ZGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -125,17 +125,17 @@ func (b *Binlog) ZGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadZSetRow(db, key, true)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
 
-	x, err := o.loadObjectValue(b)
+	x, err := o.loadObjectValue(s)
 	if err != nil || x == nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (b *Binlog) ZGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 }
 
 // ZCARD key
-func (b *Binlog) ZCard(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) ZCard(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 1 {
 		return 0, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -161,12 +161,12 @@ func (b *Binlog) ZCard(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadZSetRow(db, key, true)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -174,7 +174,7 @@ func (b *Binlog) ZCard(db uint32, args ...interface{}) (int64, error) {
 }
 
 // ZADD key score member [score member ...]
-func (b *Binlog) ZAdd(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	if len(args) == 1 || len(args)%2 != 1 {
 		return 0, errArguments("len(args) = %d, expect != 1 && mod 2 = 1", len(args))
 	}
@@ -195,12 +195,12 @@ func (b *Binlog) ZAdd(db uint32, args ...interface{}) (int64, error) {
 		eles[i] = e
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadZSetRow(db, key, true)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -213,7 +213,7 @@ func (b *Binlog) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	bt := engine.NewBatch()
 	for _, e := range eles {
 		o.Member, o.Score = e.Member, e.Score
-		exists, err := o.TestDataValue(b)
+		exists, err := o.TestDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -229,11 +229,11 @@ func (b *Binlog) ZAdd(db uint32, args ...interface{}) (int64, error) {
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
 	fw := &Forward{DB: db, Op: "ZAdd", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }
 
 // ZREM key member [member ...]
-func (b *Binlog) ZRem(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) ZRem(db uint32, args ...interface{}) (int64, error) {
 	if len(args) < 2 {
 		return 0, errArguments("len(args) = %d, expect >= 2", len(args))
 	}
@@ -249,12 +249,12 @@ func (b *Binlog) ZRem(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadZSetRow(db, key, true)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -263,7 +263,7 @@ func (b *Binlog) ZRem(db uint32, args ...interface{}) (int64, error) {
 	bt := engine.NewBatch()
 	for _, o.Member = range members {
 		if !ms.Has(o.Member) {
-			exists, err := o.TestDataValue(b)
+			exists, err := o.TestDataValue(s)
 			if err != nil {
 				return 0, err
 			}
@@ -283,11 +283,11 @@ func (b *Binlog) ZRem(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 	fw := &Forward{DB: db, Op: "ZRem", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }
 
 // ZSCORE key member
-func (b *Binlog) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
+func (s *Store) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
 	if len(args) != 2 {
 		return 0, false, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -299,18 +299,18 @@ func (b *Binlog) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, false, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadZSetRow(db, key, true)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, false, err
 	}
 
 	o.Member = member
-	exists, err := o.LoadDataValue(b)
+	exists, err := o.LoadDataValue(s)
 	if err != nil || !exists {
 		return 0, false, err
 	} else {
@@ -319,7 +319,7 @@ func (b *Binlog) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
 }
 
 // ZINCRBY key delta member
-func (b *Binlog) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
+func (s *Store) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -332,12 +332,12 @@ func (b *Binlog) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadZSetRow(db, key, true)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -345,7 +345,7 @@ func (b *Binlog) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
 	var exists bool = false
 	if o != nil {
 		o.Member = member
-		exists, err = o.LoadDataValue(b)
+		exists, err = o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -364,5 +364,5 @@ func (b *Binlog) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
 	o.Score = delta
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "ZIncrBy", Args: args}
-	return delta, b.commit(bt, fw)
+	return delta, s.commit(bt, fw)
 }

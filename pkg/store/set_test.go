@@ -16,7 +16,7 @@ func sdel(t *testing.T, db uint32, key string, expect int64) {
 
 func sdump(t *testing.T, db uint32, key string, expect ...string) {
 	kexists(t, db, key, 1)
-	v, err := testbl.Dump(db, key)
+	v, err := testStore.Dump(db, key)
 	checkerror(t, err, v != nil)
 	x, ok := v.(rdb.Set)
 	checkerror(t, nil, ok)
@@ -37,7 +37,7 @@ func srestore(t *testing.T, db uint32, key string, ttlms int64, expect ...string
 	}
 	dump, err := rdb.EncodeDump(x)
 	checkerror(t, err, true)
-	err = testbl.Restore(db, key, ttlms, dump)
+	err = testStore.Restore(db, key, ttlms, dump)
 	checkerror(t, err, true)
 	sdump(t, db, key, expect...)
 	if ttlms == 0 {
@@ -52,7 +52,7 @@ func sadd(t *testing.T, db uint32, key string, expect int64, members ...string) 
 	for _, s := range members {
 		args = append(args, s)
 	}
-	x, err := testbl.SAdd(db, args...)
+	x, err := testStore.SAdd(db, args...)
 	checkerror(t, err, x == expect)
 	for _, s := range members {
 		sismember(t, db, key, s, 1)
@@ -60,7 +60,7 @@ func sadd(t *testing.T, db uint32, key string, expect int64, members ...string) 
 }
 
 func scard(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.SCard(db, key)
+	x, err := testStore.SCard(db, key)
 	checkerror(t, err, x == expect)
 	if expect == 0 {
 		kexists(t, db, key, 0)
@@ -70,7 +70,7 @@ func scard(t *testing.T, db uint32, key string, expect int64) {
 }
 
 func smembers(t *testing.T, db uint32, key string, expect ...string) {
-	x, err := testbl.SMembers(db, key)
+	x, err := testStore.SMembers(db, key)
 	checkerror(t, err, true)
 	if len(expect) == 0 {
 		checkerror(t, nil, len(x) == 0)
@@ -90,12 +90,12 @@ func smembers(t *testing.T, db uint32, key string, expect ...string) {
 }
 
 func sismember(t *testing.T, db uint32, key, member string, expect int64) {
-	x, err := testbl.SIsMember(db, key, member)
+	x, err := testStore.SIsMember(db, key, member)
 	checkerror(t, err, x == expect)
 }
 
 func spop(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.SPop(db, key)
+	x, err := testStore.SPop(db, key)
 	checkerror(t, err, true)
 	if expect == 0 {
 		checkerror(t, err, x == nil)
@@ -106,7 +106,7 @@ func spop(t *testing.T, db uint32, key string, expect int64) {
 }
 
 func srandpop(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testbl.SRandMember(db, key, 1)
+	x, err := testStore.SRandMember(db, key, 1)
 	checkerror(t, err, true)
 	if expect == 0 {
 		checkerror(t, err, len(x) == 0)
@@ -124,7 +124,7 @@ func srem(t *testing.T, db uint32, key string, expect int64, members ...string) 
 	for _, s := range members {
 		args = append(args, s)
 	}
-	x, err := testbl.SRem(db, args...)
+	x, err := testStore.SRem(db, args...)
 	checkerror(t, err, x == expect)
 	for _, s := range members {
 		sismember(t, db, key, s, 0)

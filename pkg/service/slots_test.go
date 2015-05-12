@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	testbl2 *store.Binlog
+	testbl2 *store.Store
 	port    int
 )
 
@@ -33,7 +33,7 @@ func (s *fakeSession2) SetDB(db uint32) {
 	s.db = db
 }
 
-func (s *fakeSession2) Binlog() *store.Binlog {
+func (s *fakeSession2) Store() *store.Store {
 	return testbl2
 }
 

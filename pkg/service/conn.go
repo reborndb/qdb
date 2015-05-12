@@ -28,7 +28,7 @@ type conn struct {
 
 	db uint32
 	nc net.Conn
-	bl *store.Binlog
+	bl *store.Store
 
 	// summary for this connection
 	summ    string
@@ -47,7 +47,7 @@ type conn struct {
 	backlogACKTime atomic2.Int64
 }
 
-func newConn(nc net.Conn, bl *store.Binlog, timeout int) *conn {
+func newConn(nc net.Conn, bl *store.Store, timeout int) *conn {
 	c := &conn{
 		nc: nc,
 		bl: bl,
@@ -263,6 +263,6 @@ func (c *conn) SetDB(db uint32) {
 	c.db = db
 }
 
-func (c *conn) Binlog() *store.Binlog {
+func (c *conn) Store() *store.Store {
 	return c.bl
 }

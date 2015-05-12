@@ -10,31 +10,31 @@ import (
 )
 
 type stringRow struct {
-	*binlogRowHelper
+	*storeRowHelper
 
 	Value []byte
 }
 
 func newStringRow(db uint32, key []byte) *stringRow {
 	o := &stringRow{}
-	o.lazyInit(newBinlogRowHelper(db, key, StringCode))
+	o.lazyInit(newStoreRowHelper(db, key, StringCode))
 	return o
 }
 
-func (o *stringRow) lazyInit(h *binlogRowHelper) {
-	o.binlogRowHelper = h
+func (o *stringRow) lazyInit(h *storeRowHelper) {
+	o.storeRowHelper = h
 	o.dataKeyRefs = nil
 	o.metaValueRefs = nil
 	o.dataValueRefs = []interface{}{&o.Value}
 }
 
-func (o *stringRow) deleteObject(b *Binlog, bt *engine.Batch) error {
+func (o *stringRow) deleteObject(s *Store, bt *engine.Batch) error {
 	bt.Del(o.DataKey())
 	bt.Del(o.MetaKey())
 	return nil
 }
 
-func (o *stringRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, obj interface{}) error {
+func (o *stringRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj interface{}) error {
 	value, ok := obj.(rdb.String)
 	if !ok || len(value) == 0 {
 		return errors.Trace(ErrObjectValue)
@@ -46,7 +46,7 @@ func (o *stringRow) storeObject(b *Binlog, bt *engine.Batch, expireat uint64, ob
 	return nil
 }
 
-func (o *stringRow) loadObjectValue(r binlogReader) (interface{}, error) {
+func (o *stringRow) loadObjectValue(r storeReader) (interface{}, error) {
 	_, err := o.LoadDataValue(r)
 	if err != nil {
 		return nil, err
@@ -54,8 +54,8 @@ func (o *stringRow) loadObjectValue(r binlogReader) (interface{}, error) {
 	return rdb.String(o.Value), nil
 }
 
-func (b *Binlog) loadStringRow(db uint32, key []byte, deleteIfExpired bool) (*stringRow, error) {
-	o, err := b.loadBinlogRow(db, key, deleteIfExpired)
+func (s *Store) loadStringRow(db uint32, key []byte, deleteIfExpired bool) (*stringRow, error) {
+	o, err := s.loadStoreRow(db, key, deleteIfExpired)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -69,7 +69,7 @@ func (b *Binlog) loadStringRow(db uint32, key []byte, deleteIfExpired bool) (*st
 }
 
 // GET key
-func (b *Binlog) Get(db uint32, args ...interface{}) ([]byte, error) {
+func (s *Store) Get(db uint32, args ...interface{}) ([]byte, error) {
 	if len(args) != 1 {
 		return nil, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -81,16 +81,16 @@ func (b *Binlog) Get(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	} else {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func (b *Binlog) Get(db uint32, args ...interface{}) ([]byte, error) {
 }
 
 // APPEND key value
-func (b *Binlog) Append(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) Append(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -111,19 +111,19 @@ func (b *Binlog) Append(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -135,11 +135,11 @@ func (b *Binlog) Append(db uint32, args ...interface{}) (int64, error) {
 	}
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "Append", Args: args}
-	return int64(len(o.Value)), b.commit(bt, fw)
+	return int64(len(o.Value)), s.commit(bt, fw)
 }
 
 // SET key value
-func (b *Binlog) Set(db uint32, args ...interface{}) error {
+func (s *Store) Set(db uint32, args ...interface{}) error {
 	if len(args) != 2 {
 		return errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -151,13 +151,13 @@ func (b *Binlog) Set(db uint32, args ...interface{}) error {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return err
 	}
-	defer b.release()
+	defer s.release()
 
 	bt := engine.NewBatch()
-	_, err := b.deleteIfExists(bt, db, key)
+	_, err := s.deleteIfExists(bt, db, key)
 	if err != nil {
 		return err
 	}
@@ -166,11 +166,11 @@ func (b *Binlog) Set(db uint32, args ...interface{}) error {
 	bt.Set(o.DataKey(), o.DataValue())
 	bt.Set(o.MetaKey(), o.MetaValue())
 	fw := &Forward{DB: db, Op: "Set", Args: args}
-	return b.commit(bt, fw)
+	return s.commit(bt, fw)
 }
 
 // PSETEX key milliseconds value
-func (b *Binlog) PSetEX(db uint32, args ...interface{}) error {
+func (s *Store) PSetEX(db uint32, args ...interface{}) error {
 	if len(args) != 3 {
 		return errArguments("len(args) = %d, expect = 3", len(args))
 	}
@@ -192,13 +192,13 @@ func (b *Binlog) PSetEX(db uint32, args ...interface{}) error {
 		return errArguments("invalid ttlms = %d", ttlms)
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return err
 	}
-	defer b.release()
+	defer s.release()
 
 	bt := engine.NewBatch()
-	_, err := b.deleteIfExists(bt, db, key)
+	_, err := s.deleteIfExists(bt, db, key)
 	if err != nil {
 		return err
 	}
@@ -208,15 +208,15 @@ func (b *Binlog) PSetEX(db uint32, args ...interface{}) error {
 		bt.Set(o.DataKey(), o.DataValue())
 		bt.Set(o.MetaKey(), o.MetaValue())
 		fw := &Forward{DB: db, Op: "PSetEX", Args: args}
-		return b.commit(bt, fw)
+		return s.commit(bt, fw)
 	} else {
 		fw := &Forward{DB: db, Op: "Del", Args: []interface{}{key}}
-		return b.commit(bt, fw)
+		return s.commit(bt, fw)
 	}
 }
 
 // SETEX key seconds value
-func (b *Binlog) SetEX(db uint32, args ...interface{}) error {
+func (s *Store) SetEX(db uint32, args ...interface{}) error {
 	if len(args) != 3 {
 		return errArguments("len(args) = %d, expect = 3", len(args))
 	}
@@ -238,13 +238,13 @@ func (b *Binlog) SetEX(db uint32, args ...interface{}) error {
 		return errArguments("invalid ttls = %d", ttls)
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return err
 	}
-	defer b.release()
+	defer s.release()
 
 	bt := engine.NewBatch()
-	_, err := b.deleteIfExists(bt, db, key)
+	_, err := s.deleteIfExists(bt, db, key)
 	if err != nil {
 		return err
 	}
@@ -254,15 +254,15 @@ func (b *Binlog) SetEX(db uint32, args ...interface{}) error {
 		bt.Set(o.DataKey(), o.DataValue())
 		bt.Set(o.MetaKey(), o.MetaValue())
 		fw := &Forward{DB: db, Op: "SetEX", Args: args}
-		return b.commit(bt, fw)
+		return s.commit(bt, fw)
 	} else {
 		fw := &Forward{DB: db, Op: "Del", Args: []interface{}{key}}
-		return b.commit(bt, fw)
+		return s.commit(bt, fw)
 	}
 }
 
 // SETNX key value
-func (b *Binlog) SetNX(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SetNX(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -274,12 +274,12 @@ func (b *Binlog) SetNX(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadBinlogRow(db, key, true)
+	o, err := s.loadStoreRow(db, key, true)
 	if err != nil || o != nil {
 		return 0, err
 	} else {
@@ -289,12 +289,12 @@ func (b *Binlog) SetNX(db uint32, args ...interface{}) (int64, error) {
 		bt.Set(o.DataKey(), o.DataValue())
 		bt.Set(o.MetaKey(), o.MetaValue())
 		fw := &Forward{DB: db, Op: "Set", Args: args}
-		return 1, b.commit(bt, fw)
+		return 1, s.commit(bt, fw)
 	}
 }
 
 // GETSET key value
-func (b *Binlog) GetSet(db uint32, args ...interface{}) ([]byte, error) {
+func (s *Store) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 	if len(args) != 2 {
 		return nil, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -306,19 +306,19 @@ func (b *Binlog) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return nil, err
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return nil, err
 		}
@@ -333,18 +333,18 @@ func (b *Binlog) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 	o.Value, value = value, o.Value
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "Set", Args: args}
-	return value, b.commit(bt, fw)
+	return value, s.commit(bt, fw)
 }
 
-func (b *Binlog) incrInt(db uint32, key []byte, delta int64) (int64, error) {
-	o, err := b.loadStringRow(db, key, true)
+func (s *Store) incrInt(db uint32, key []byte, delta int64) (int64, error) {
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -360,18 +360,18 @@ func (b *Binlog) incrInt(db uint32, key []byte, delta int64) (int64, error) {
 	o.Value = FormatInt(delta)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "IncrBy", Args: []interface{}{key, delta}}
-	return delta, b.commit(bt, fw)
+	return delta, s.commit(bt, fw)
 }
 
-func (b *Binlog) incrFloat(db uint32, key []byte, delta float64) (float64, error) {
-	o, err := b.loadStringRow(db, key, true)
+func (s *Store) incrFloat(db uint32, key []byte, delta float64) (float64, error) {
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -387,11 +387,11 @@ func (b *Binlog) incrFloat(db uint32, key []byte, delta float64) (float64, error
 	o.Value = FormatFloat(delta)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "IncrByFloat", Args: []interface{}{key, delta}}
-	return delta, b.commit(bt, fw)
+	return delta, s.commit(bt, fw)
 }
 
 // INCR key
-func (b *Binlog) Incr(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) Incr(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 1 {
 		return 0, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -403,16 +403,16 @@ func (b *Binlog) Incr(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	return b.incrInt(db, key, 1)
+	return s.incrInt(db, key, 1)
 }
 
 // INCRBY key delta
-func (b *Binlog) IncrBy(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) IncrBy(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -425,16 +425,16 @@ func (b *Binlog) IncrBy(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	return b.incrInt(db, key, delta)
+	return s.incrInt(db, key, delta)
 }
 
 // DECR key
-func (b *Binlog) Decr(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) Decr(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 1 {
 		return 0, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -446,16 +446,16 @@ func (b *Binlog) Decr(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	return b.incrInt(db, key, -1)
+	return s.incrInt(db, key, -1)
 }
 
 // DECRBY key delta
-func (b *Binlog) DecrBy(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) DecrBy(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -468,16 +468,16 @@ func (b *Binlog) DecrBy(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	return b.incrInt(db, key, -delta)
+	return s.incrInt(db, key, -delta)
 }
 
 // INCRBYFLOAT key delta
-func (b *Binlog) IncrByFloat(db uint32, args ...interface{}) (float64, error) {
+func (s *Store) IncrByFloat(db uint32, args ...interface{}) (float64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -490,16 +490,16 @@ func (b *Binlog) IncrByFloat(db uint32, args ...interface{}) (float64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	return b.incrFloat(db, key, delta)
+	return s.incrFloat(db, key, delta)
 }
 
 // SETBIT key offset value
-func (b *Binlog) SetBit(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SetBit(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 3", len(args))
 	}
@@ -517,19 +517,19 @@ func (b *Binlog) SetBit(db uint32, args ...interface{}) (int64, error) {
 
 	var bit bool = value != 0
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -555,11 +555,11 @@ func (b *Binlog) SetBit(db uint32, args ...interface{}) (int64, error) {
 		n = 1
 	}
 	fw := &Forward{DB: db, Op: "SetBit", Args: args}
-	return n, b.commit(bt, fw)
+	return n, s.commit(bt, fw)
 }
 
 // SETRANGE key offset value
-func (b *Binlog) SetRange(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) SetRange(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 3", len(args))
 	}
@@ -575,19 +575,19 @@ func (b *Binlog) SetRange(db uint32, args ...interface{}) (int64, error) {
 		return 0, errArguments("offset = %d", offset)
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
@@ -601,11 +601,11 @@ func (b *Binlog) SetRange(db uint32, args ...interface{}) (int64, error) {
 	copy(o.Value[offset:], value)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "SetRange", Args: args}
-	return int64(len(o.Value)), b.commit(bt, fw)
+	return int64(len(o.Value)), s.commit(bt, fw)
 }
 
 // MSET key value [key value ...]
-func (b *Binlog) MSet(db uint32, args ...interface{}) error {
+func (s *Store) MSet(db uint32, args ...interface{}) error {
 	if len(args) == 0 || len(args)%2 != 0 {
 		return errArguments("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
 	}
@@ -617,17 +617,17 @@ func (b *Binlog) MSet(db uint32, args ...interface{}) error {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return err
 	}
-	defer b.release()
+	defer s.release()
 
 	ms := &markSet{}
 	bt := engine.NewBatch()
 	for i := len(pairs)/2 - 1; i >= 0; i-- {
 		key, value := pairs[i*2], pairs[i*2+1]
 		if !ms.Has(key) {
-			_, err := b.deleteIfExists(bt, db, key)
+			_, err := s.deleteIfExists(bt, db, key)
 			if err != nil {
 				return err
 			}
@@ -639,11 +639,11 @@ func (b *Binlog) MSet(db uint32, args ...interface{}) error {
 		}
 	}
 	fw := &Forward{DB: db, Op: "MSet", Args: args}
-	return b.commit(bt, fw)
+	return s.commit(bt, fw)
 }
 
 // MSETNX key value [key value ...]
-func (b *Binlog) MSetNX(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) MSetNX(db uint32, args ...interface{}) (int64, error) {
 	if len(args) == 0 || len(args)%2 != 0 {
 		return 0, errArguments("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
 	}
@@ -655,13 +655,13 @@ func (b *Binlog) MSetNX(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
 	for i := 0; i < len(pairs); i += 2 {
-		o, err := b.loadBinlogRow(db, pairs[i], true)
+		o, err := s.loadStoreRow(db, pairs[i], true)
 		if err != nil || o != nil {
 			return 0, err
 		}
@@ -680,11 +680,11 @@ func (b *Binlog) MSetNX(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 	fw := &Forward{DB: db, Op: "MSet", Args: args}
-	return 1, b.commit(bt, fw)
+	return 1, s.commit(bt, fw)
 }
 
 // MGET key [key ...]
-func (b *Binlog) MGet(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 	if len(args) == 0 {
 		return nil, errArguments("len(args) = %d, expect != 0", len(args))
 	}
@@ -696,13 +696,13 @@ func (b *Binlog) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
 	for _, key := range keys {
-		_, err := b.loadBinlogRow(db, key, true)
+		_, err := s.loadStoreRow(db, key, true)
 		if err != nil {
 			return nil, err
 		}
@@ -710,12 +710,12 @@ func (b *Binlog) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 
 	values := make([][]byte, len(keys))
 	for i, key := range keys {
-		o, err := b.loadStringRow(db, key, false)
+		o, err := s.loadStringRow(db, key, false)
 		if err != nil {
 			return nil, err
 		}
 		if o != nil {
-			_, err := o.LoadDataValue(b)
+			_, err := o.LoadDataValue(s)
 			if err != nil {
 				return nil, err
 			}
@@ -726,7 +726,7 @@ func (b *Binlog) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 }
 
 // GETBIT key offset
-func (b *Binlog) GetBit(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) GetBit(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -742,17 +742,17 @@ func (b *Binlog) GetBit(db uint32, args ...interface{}) (int64, error) {
 		return 0, errArguments("offset = %d", offset)
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
 
-	if _, err := o.LoadDataValue(b); err != nil {
+	if _, err := o.LoadDataValue(s); err != nil {
 		return 0, err
 	}
 
@@ -770,7 +770,7 @@ func (b *Binlog) GetBit(db uint32, args ...interface{}) (int64, error) {
 }
 
 // GETRANGE key beg end
-func (b *Binlog) GetRange(db uint32, args ...interface{}) ([]byte, error) {
+func (s *Store) GetRange(db uint32, args ...interface{}) ([]byte, error) {
 	if len(args) != 3 {
 		return nil, errArguments("len(args) = %d, expect = 3", len(args))
 	}
@@ -783,18 +783,18 @@ func (b *Binlog) GetRange(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return nil, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return nil, err
 	}
 
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return nil, err
 		}
@@ -833,7 +833,7 @@ func maxIntValue(v1, v2 int64) int64 {
 }
 
 // STRLEN key
-func (b *Binlog) Strlen(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) Strlen(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 1 {
 		return 0, errArguments("len(args) = %d, expect = 1", len(args))
 	}
@@ -845,18 +845,18 @@ func (b *Binlog) Strlen(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	if err := b.acquire(); err != nil {
+	if err := s.acquire(); err != nil {
 		return 0, err
 	}
-	defer b.release()
+	defer s.release()
 
-	o, err := b.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
 
 	if o != nil {
-		_, err := o.LoadDataValue(b)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
