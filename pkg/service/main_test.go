@@ -68,7 +68,7 @@ func reinit() {
 		}
 	}
 
-	testHandler.bl = testbl
+	testHandler.store = testbl
 }
 
 func init() {
