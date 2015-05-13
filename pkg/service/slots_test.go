@@ -3,166 +3,93 @@
 
 package service
 
-import (
-	"bufio"
-	"net"
-	"os"
-	"testing"
+import . "gopkg.in/check.v1"
 
-	"github.com/reborndb/go/log"
-	"github.com/reborndb/go/redis/handler"
-	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/engine/rocksdb"
-	"github.com/reborndb/qdb/pkg/store"
-)
+func (s *testServiceSuite) slotCheckString(c *C, db uint32, key string, expect string) {
+	nc := s.slotConnPool.Get(c)
+	defer nc.Recycle()
 
-var (
-	testbl2 *store.Store
-	port    int
-)
-
-type fakeSession2 struct {
-	db uint32
+	nc.checkOK(c, "SELECT", db)
+	nc.checkString(c, expect, "GET", key)
 }
 
-func (s *fakeSession2) DB() uint32 {
-	return s.db
+func (s *testServiceSuite) TestSlotsHashKey(c *C) {
+	s.checkIntArray(c, []int64{579, 1017, 879}, "slotshashkey", "a", "b", "c")
 }
 
-func (s *fakeSession2) SetDB(db uint32) {
-	s.db = db
+func (s *testServiceSuite) TestSlotsMgrtOne(c *C) {
+	port := s.slotPort
+	k1 := "{tag}" + randomKey(c)
+	k2 := "{tag}" + randomKey(c)
+	s.checkOK(c, "mset", k1, "1", k2, "2")
+	s.checkInt(c, 1, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
+	s.checkInt(c, 0, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
+	s.slotCheckString(c, 0, k1, "1")
+
+	s.checkInt(c, 1, "slotsmgrtone", "127.0.0.1", port, 1000, k2)
+	s.checkInt(c, 0, "slotsmgrtone", "127.0.0.1", port, 1000, k2)
+	s.slotCheckString(c, 0, k2, "2")
+
+	s.checkOK(c, "set", k1, "3")
+
+	s.checkInt(c, 1, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
+	s.checkInt(c, 0, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
+	s.slotCheckString(c, 0, k1, "3")
 }
 
-func (s *fakeSession2) Store() *store.Store {
-	return testbl2
+func (s *testServiceSuite) TestSlotsMgrtTagOne(c *C) {
+	port := s.slotPort
+
+	k1 := "{tag}" + randomKey(c)
+	k2 := "{tag}" + randomKey(c)
+	k3 := "{tag}" + randomKey(c)
+	s.checkOK(c, "mset", k1, "1", k2, "2")
+	s.checkInt(c, 2, "slotsmgrttagone", "127.0.0.1", port, 1000, k1)
+	s.checkInt(c, 0, "slotsmgrttagone", "127.0.0.1", port, 1000, k1)
+	s.slotCheckString(c, 0, k1, "1")
+
+	s.checkInt(c, 0, "slotsmgrtone", "127.0.0.1", port, 1000, k2)
+	s.slotCheckString(c, 0, k2, "2")
+
+	s.checkOK(c, "mset", k1, "0", k3, "100")
+
+	s.checkInt(c, 2, "slotsmgrttagone", "127.0.0.1", port, 1000, k1)
+	s.checkInt(c, 0, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
+	s.checkInt(c, 0, "slotsmgrtone", "127.0.0.1", port, 1000, k3)
+	s.slotCheckString(c, 0, k1, "0")
+	s.slotCheckString(c, 0, k3, "100")
 }
 
-func init() {
-	const path = "/tmp/test_qdb/service/testdb2-rocksdb"
-	if err := os.RemoveAll(path); err != nil {
-		log.PanicErrorf(err, "remove '%s' failed", path)
-	} else {
-		conf := rocksdb.NewDefaultConfig()
-		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
-			log.PanicError(err, "open rocksdb failed")
-		} else {
-			testbl2 = store.New(testdb)
-		}
-	}
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		log.PanicError(err, "open listen port failed")
-	}
-	port = l.Addr().(*net.TCPAddr).Port
-	go func() {
-		server := handler.MustServer(&Handler{})
-		for {
-			c, err := l.Accept()
-			if err != nil {
-				log.PanicError(err, "accept socket failed")
-			}
-			go func() {
-				defer c.Close()
-				r, w := bufio.NewReader(c), bufio.NewWriter(c)
-				s := &fakeSession2{}
-				for {
-					if req, err := redis.Decode(r); err != nil {
-						return
-					} else {
-						if rsp, err := server.Dispatch(s, req); err != nil {
-							return
-						} else if rsp != nil {
-							if err := redis.Encode(w, rsp); err != nil {
-								return
-							}
-						}
-					}
-				}
-			}()
-		}
-	}()
+func (s *testServiceSuite) TestSlotsMgrtSlot(c *C) {
+	port := s.slotPort
+
+	k1 := "{tag}" + randomKey(c)
+	k2 := "{tag}" + randomKey(c)
+	s.checkOK(c, "mset", k1, "1", k2, "2")
+	s.checkIntArray(c, []int64{1, 1}, "slotsmgrtslot", "127.0.0.1", port, 1000, 899)
+	s.checkIntArray(c, []int64{1, 1}, "slotsmgrtslot", "127.0.0.1", port, 1000, 899)
+	s.checkIntArray(c, []int64{0, 0}, "slotsmgrtslot", "127.0.0.1", port, 1000, 899)
+
+	s.slotCheckString(c, 0, k1, "1")
+	s.slotCheckString(c, 0, k2, "2")
 }
 
-func xcheck2(t *testing.T, db uint32, key string, expect string) {
-	x, err := testbl2.Get(db, []byte(key))
-	checkerror(t, err, x != nil && string(x) == expect)
-}
+func (s *testServiceSuite) TestSlotsMgrtTagSlot(c *C) {
+	port := s.slotPort
 
-func TestSlotsHashKey(t *testing.T) {
-	c := client(t)
-	checkintarray(t, []int64{579, 1017, 879}, c, "slotshashkey", "a", "b", "c")
-}
+	k1 := "{tag}" + randomKey(c)
+	k2 := "{tag}" + randomKey(c)
+	k3 := "{tag}" + randomKey(c)
+	s.checkOK(c, "mset", k1, "1", k2, "2", k3, "3")
+	s.checkIntArray(c, []int64{3, 1}, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
+	s.checkIntArray(c, []int64{0, 0}, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
 
-func TestSlotsMgrtOne(t *testing.T) {
-	c := client(t)
-	k1 := "{tag}" + random(t)
-	k2 := "{tag}" + random(t)
-	checkok(t, c, "mset", k1, "1", k2, "2")
-	checkint(t, 1, c, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
-	checkint(t, 0, c, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
-	xcheck2(t, 0, k1, "1")
+	s.slotCheckString(c, 0, k1, "1")
+	s.slotCheckString(c, 0, k2, "2")
 
-	checkint(t, 1, c, "slotsmgrtone", "127.0.0.1", port, 1000, k2)
-	checkint(t, 0, c, "slotsmgrtone", "127.0.0.1", port, 1000, k2)
-	xcheck2(t, 0, k2, "2")
-
-	checkok(t, c, "set", k1, "3")
-
-	checkint(t, 1, c, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
-	checkint(t, 0, c, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
-	xcheck2(t, 0, k1, "3")
-}
-
-func TestSlotsMgrtTagOne(t *testing.T) {
-	c := client(t)
-	k1 := "{tag}" + random(t)
-	k2 := "{tag}" + random(t)
-	k3 := "{tag}" + random(t)
-	checkok(t, c, "mset", k1, "1", k2, "2")
-	checkint(t, 2, c, "slotsmgrttagone", "127.0.0.1", port, 1000, k1)
-	checkint(t, 0, c, "slotsmgrttagone", "127.0.0.1", port, 1000, k1)
-	xcheck2(t, 0, k1, "1")
-
-	checkint(t, 0, c, "slotsmgrtone", "127.0.0.1", port, 1000, k2)
-	xcheck2(t, 0, k2, "2")
-
-	checkok(t, c, "mset", k1, "0", k3, "100")
-
-	checkint(t, 2, c, "slotsmgrttagone", "127.0.0.1", port, 1000, k1)
-	checkint(t, 0, c, "slotsmgrtone", "127.0.0.1", port, 1000, k1)
-	checkint(t, 0, c, "slotsmgrtone", "127.0.0.1", port, 1000, k3)
-	xcheck2(t, 0, k1, "0")
-	xcheck2(t, 0, k3, "100")
-}
-
-func TestSlotsMgrtSlot(t *testing.T) {
-	c := client(t)
-	k1 := "{tag}" + random(t)
-	k2 := "{tag}" + random(t)
-	checkok(t, c, "mset", k1, "1", k2, "2")
-	checkintarray(t, []int64{1, 1}, c, "slotsmgrtslot", "127.0.0.1", port, 1000, 899)
-	checkintarray(t, []int64{1, 1}, c, "slotsmgrtslot", "127.0.0.1", port, 1000, 899)
-	checkintarray(t, []int64{0, 0}, c, "slotsmgrtslot", "127.0.0.1", port, 1000, 899)
-
-	xcheck2(t, 0, k1, "1")
-	xcheck2(t, 0, k2, "2")
-}
-
-func TestSlotsMgrtTagSlot(t *testing.T) {
-	c := client(t)
-	k1 := "{tag}" + random(t)
-	k2 := "{tag}" + random(t)
-	k3 := "{tag}" + random(t)
-	checkok(t, c, "mset", k1, "1", k2, "2", k3, "3")
-	checkintarray(t, []int64{3, 1}, c, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
-	checkintarray(t, []int64{0, 0}, c, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
-
-	xcheck2(t, 0, k1, "1")
-	xcheck2(t, 0, k2, "2")
-
-	checkok(t, c, "mset", k1, "0", k3, "100")
-	checkintarray(t, []int64{2, 1}, c, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
-	checkintarray(t, []int64{0, 0}, c, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
-	xcheck2(t, 0, k1, "0")
-	xcheck2(t, 0, k3, "100")
+	s.checkOK(c, "mset", k1, "0", k3, "100")
+	s.checkIntArray(c, []int64{2, 1}, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
+	s.checkIntArray(c, []int64{0, 0}, "slotsmgrttagslot", "127.0.0.1", port, 1000, 899)
+	s.slotCheckString(c, 0, k1, "0")
+	s.slotCheckString(c, 0, k3, "100")
 }

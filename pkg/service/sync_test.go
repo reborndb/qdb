@@ -6,45 +6,44 @@ package service
 import (
 	"os"
 	"strconv"
-	"testing"
 
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/store"
+	. "gopkg.in/check.v1"
 )
 
-func TestBgsaveTo(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "flushall")
+func (s *testServiceSuite) TestBgsaveTo(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "flushall")
 	const max = 100
 	for i := 0; i < max; i++ {
-		checkok(t, c, "set", k+strconv.Itoa(i), i)
+		s.checkOK(c, "set", k+strconv.Itoa(i), i)
 	}
 	path := "/tmp/testdb-dump.rdb"
-	checkok(t, c, "bgsaveto", path)
+	s.checkOK(c, "bgsaveto", path)
 	f, err := os.Open(path)
-	checkerror(t, err, true)
+	c.Assert(err, IsNil)
 	defer f.Close()
 	l := rdb.NewLoader(f)
-	checkerror(t, l.Header(), true)
+	c.Assert(l.Header(), IsNil)
 	m := make(map[string][]byte)
 	for {
 		e, err := l.NextBinEntry()
-		checkerror(t, err, true)
+		c.Assert(err, IsNil)
 		if e == nil {
 			break
 		}
-		checkerror(t, nil, e.DB == 0)
-		checkerror(t, nil, e.ExpireAt == 0)
+		c.Assert(e.DB, Equals, uint32(0))
+		c.Assert(e.ExpireAt, Equals, uint64(0))
 		m[string(e.Key)] = e.Value
 	}
-	checkerror(t, l.Footer(), true)
+	c.Assert(l.Footer(), IsNil)
 	for i := 0; i < max; i++ {
 		b := m[k+strconv.Itoa(i)]
 		o, err := rdb.DecodeDump(b)
-		checkerror(t, err, true)
+		c.Assert(err, IsNil)
 		x, ok := o.(rdb.String)
-		checkerror(t, nil, ok)
-		checkerror(t, nil, string(x) == string(store.FormatInt(int64(i))))
+		c.Assert(ok, Equals, true)
+		c.Assert(string(x), Equals, string(store.FormatInt(int64(i))))
 	}
 }

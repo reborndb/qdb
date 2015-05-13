@@ -3,123 +3,113 @@
 
 package service
 
-import "testing"
+import . "gopkg.in/check.v1"
 
-func checklist(t *testing.T, s Session, k string, expect []string) {
-	array := checkbytesarray(t, s, "lrange", k, 0, -1)
+func (s *testServiceSuite) checkList(c *C, key string, expect []string) {
+	ay := s.checkBytesArray(c, "lrange", key, 0, -1)
 	if expect == nil {
-		checkerror(t, nil, array == nil)
+		c.Assert(ay, IsNil)
 	} else {
-		checkerror(t, nil, len(array) == len(expect))
+		c.Assert(ay, HasLen, len(expect))
 		for i := 0; i < len(expect); i++ {
-			checkerror(t, nil, string(array[i]) == expect[i])
+			c.Assert(string(ay[i]), Equals, expect[i])
 		}
 	}
 }
 
-func TestLPush(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 1, c, "lpush", k, "key1")
-	checkint(t, 2, c, "lpush", k, "key2")
-	checkint(t, 4, c, "lpush", k, "key3", "key4")
-	checklist(t, c, k, []string{"key4", "key3", "key2", "key1"})
+func (s *testServiceSuite) TestLPush(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 1, "lpush", k, "key1")
+	s.checkInt(c, 2, "lpush", k, "key2")
+	s.checkInt(c, 4, "lpush", k, "key3", "key4")
+	s.checkList(c, k, []string{"key4", "key3", "key2", "key1"})
 }
 
-func TestLPushX(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 0, c, "lpushx", k, "key1")
-	checklist(t, c, k, nil)
-	checkint(t, 1, c, "lpush", k, "key1")
-	checkint(t, 2, c, "lpushx", k, "key2")
-	checklist(t, c, k, []string{"key2", "key1"})
+func (s *testServiceSuite) TestLPushX(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 0, "lpushx", k, "key1")
+	s.checkList(c, k, nil)
+	s.checkInt(c, 1, "lpush", k, "key1")
+	s.checkInt(c, 2, "lpushx", k, "key2")
+	s.checkList(c, k, []string{"key2", "key1"})
 }
 
-func TestLPop(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 4, c, "lpush", k, "key1", "key2", "key3", "key4")
-	checkstring(t, "key4", c, "lpop", k)
-	checkstring(t, "key3", c, "lpop", k)
-	checklist(t, c, k, []string{"key2", "key1"})
-	checkstring(t, "key2", c, "lpop", k)
-	checkstring(t, "key1", c, "lpop", k)
-	checklist(t, c, k, nil)
-	checknil(t, c, "lpop", k)
+func (s *testServiceSuite) TestLPop(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 4, "lpush", k, "key1", "key2", "key3", "key4")
+	s.checkString(c, "key4", "lpop", k)
+	s.checkString(c, "key3", "lpop", k)
+	s.checkList(c, k, []string{"key2", "key1"})
+	s.checkString(c, "key2", "lpop", k)
+	s.checkString(c, "key1", "lpop", k)
+	s.checkList(c, k, nil)
+	s.checkNil(c, "lpop", k)
 }
 
-func TestRPush(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 1, c, "rpush", k, "key1")
-	checkint(t, 2, c, "rpush", k, "key2")
-	checkint(t, 4, c, "rpush", k, "key3", "key4")
-	checklist(t, c, k, []string{"key1", "key2", "key3", "key4"})
+func (s *testServiceSuite) TestRPush(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 1, "rpush", k, "key1")
+	s.checkInt(c, 2, "rpush", k, "key2")
+	s.checkInt(c, 4, "rpush", k, "key3", "key4")
+	s.checkList(c, k, []string{"key1", "key2", "key3", "key4"})
 }
 
-func TestRPushX(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 1, c, "rpush", k, "key1")
-	checkint(t, 2, c, "rpushx", k, "key2")
-	checklist(t, c, k, []string{"key1", "key2"})
-	checkint(t, 1, c, "del", k)
-	checkint(t, 0, c, "rpushx", k, "key3")
-	checklist(t, c, k, nil)
+func (s *testServiceSuite) TestRPushX(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 1, "rpush", k, "key1")
+	s.checkInt(c, 2, "rpushx", k, "key2")
+	s.checkList(c, k, []string{"key1", "key2"})
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, 0, "rpushx", k, "key3")
+	s.checkList(c, k, nil)
 }
 
-func TestRPop(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "lpush", k, "key1", "key2", "key3")
-	checkstring(t, "key1", c, "rpop", k)
-	checkstring(t, "key2", c, "rpop", k)
-	checkstring(t, "key3", c, "rpop", k)
-	checklist(t, c, k, nil)
+func (s *testServiceSuite) TestRPop(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "lpush", k, "key1", "key2", "key3")
+	s.checkString(c, "key1", "rpop", k)
+	s.checkString(c, "key2", "rpop", k)
+	s.checkString(c, "key3", "rpop", k)
+	s.checkList(c, k, nil)
 }
 
-func TestLSet(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "lpush", k, "key1", "key2", "key3")
-	checkok(t, c, "lset", k, 0, "one")
-	checkok(t, c, "lset", k, 1, "two")
-	checkok(t, c, "lset", k, 2, "three")
-	checklist(t, c, k, []string{"one", "two", "three"})
-	checkok(t, c, "lset", k, -1, "3")
-	checkok(t, c, "lset", k, -2, "2")
-	checkok(t, c, "lset", k, -3, "1")
-	checklist(t, c, k, []string{"1", "2", "3"})
+func (s *testServiceSuite) TestLSet(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "lpush", k, "key1", "key2", "key3")
+	s.checkOK(c, "lset", k, 0, "one")
+	s.checkOK(c, "lset", k, 1, "two")
+	s.checkOK(c, "lset", k, 2, "three")
+	s.checkList(c, k, []string{"one", "two", "three"})
+	s.checkOK(c, "lset", k, -1, "3")
+	s.checkOK(c, "lset", k, -2, "2")
+	s.checkOK(c, "lset", k, -3, "1")
+	s.checkList(c, k, []string{"1", "2", "3"})
 }
 
-func TestLIndex(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "lpush", k, "key1", "key2", "key3")
-	checkstring(t, "key1", c, "lindex", k, -1)
-	checkstring(t, "key2", c, "lindex", k, -2)
-	checkstring(t, "key3", c, "lindex", k, -3)
+func (s *testServiceSuite) TestLIndex(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "lpush", k, "key1", "key2", "key3")
+	s.checkString(c, "key1", "lindex", k, -1)
+	s.checkString(c, "key2", "lindex", k, -2)
+	s.checkString(c, "key3", "lindex", k, -3)
 }
 
-func TestLLen(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 0, c, "llen", k)
-	checkint(t, 3, c, "lpush", k, "key1", "key2", "key3")
-	checkint(t, 3, c, "llen", k)
+func (s *testServiceSuite) TestLLen(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 0, "llen", k)
+	s.checkInt(c, 3, "lpush", k, "key1", "key2", "key3")
+	s.checkInt(c, 3, "llen", k)
 }
 
-func TestTrim(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "lpush", k, "key1", "key2", "key3")
-	checkok(t, c, "ltrim", k, 0, -1)
-	checkint(t, 3, c, "llen", k)
-	checkok(t, c, "ltrim", k, 0, -2)
-	checklist(t, c, k, []string{"key3", "key2"})
-	checkok(t, c, "ltrim", k, 0, 0)
-	checklist(t, c, k, []string{"key3"})
-	checkok(t, c, "ltrim", k, 1, 0)
-	checkint(t, 0, c, "llen", k)
+func (s *testServiceSuite) TestTrim(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "lpush", k, "key1", "key2", "key3")
+	s.checkOK(c, "ltrim", k, 0, -1)
+	s.checkInt(c, 3, "llen", k)
+	s.checkOK(c, "ltrim", k, 0, -2)
+	s.checkList(c, k, []string{"key3", "key2"})
+	s.checkOK(c, "ltrim", k, 0, 0)
+	s.checkList(c, k, []string{"key3"})
+	s.checkOK(c, "ltrim", k, 1, 0)
+	s.checkInt(c, 0, "llen", k)
 }
