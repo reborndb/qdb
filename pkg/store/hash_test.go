@@ -293,9 +293,9 @@ func TestHRestore(t *testing.T) {
 		ss[i] = strconv.Itoa(rand.Int())
 	}
 
-	hrestore(t, 0, "hash", 10, ss...)
+	hrestore(t, 0, "hash", 50, ss...)
 	hgetall(t, 0, "hash", ss...)
-	sleepms(20)
+	sleepms(100)
 	hlen(t, 0, "hash", 0)
 	kpttl(t, 0, "hash", -2)
 	hdelall(t, 0, "hash", 0)
