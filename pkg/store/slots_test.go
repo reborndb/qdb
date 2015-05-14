@@ -191,7 +191,6 @@ func slotsmgrtslot(addr *net.TCPAddr, db uint32, tag string, expect int64) chan 
 	c := make(chan error, 1)
 	go func() {
 		host, port := addr.IP.String(), addr.Port
-		fmt.Println(host, port)
 		n, err := testStore.SlotsMgrtSlot(db, host, port, 1000, HashTagToSlot([]byte(tag)))
 		if err != nil {
 			c <- err

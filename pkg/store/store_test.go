@@ -38,6 +38,7 @@ func reinit() {
 func init() {
 	reinit()
 	log.SetFlags(log.Flags() | log.Lshortfile)
+	log.SetLevel(log.LEVEL_ERROR)
 }
 
 func checkerror(t *testing.T, err error, exp bool) {

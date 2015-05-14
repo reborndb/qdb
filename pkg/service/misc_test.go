@@ -3,25 +3,22 @@
 
 package service
 
-import "testing"
+import . "gopkg.in/check.v1"
 
-func TestPing(t *testing.T) {
-	c := client(t)
-	checkstring(t, "PONG", c, "ping")
+func (s *testServiceSuite) TestPing(c *C) {
+	s.checkString(c, "PONG", "ping")
 }
 
-func TestEcho(t *testing.T) {
-	c := client(t)
-	checkstring(t, "HELLO", c, "echo", "HELLO")
+func (s *testServiceSuite) TestEcho(c *C) {
+	s.checkString(c, "hello", "echo", "hello")
 }
 
-func TestFlushAll(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checknil(t, c, "get", k)
-	checkint(t, 5, c, "append", k, "hello")
-	checkint(t, 11, c, "append", k, " world")
-	checkstring(t, "hello world", c, "get", k)
-	checkok(t, c, "flushall")
-	checknil(t, c, "get", k)
+func (s *testServiceSuite) TestFlushAll(c *C) {
+	k := randomKey(c)
+	s.checkNil(c, "get", k)
+	s.checkInt(c, 5, "append", k, "hello")
+	s.checkInt(c, 11, "append", k, " world")
+	s.checkString(c, "hello world", "get", k)
+	s.checkOK(c, "flushall")
+	s.checkNil(c, "get", k)
 }

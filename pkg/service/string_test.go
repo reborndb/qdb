@@ -3,165 +3,145 @@
 
 package service
 
-import "testing"
+import . "gopkg.in/check.v1"
 
-func TestXAppend(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checknil(t, c, "get", k)
-	checkint(t, 5, c, "append", k, "hello")
-	checkint(t, 11, c, "append", k, " world")
-	checkstring(t, "hello world", c, "get", k)
+func (s *testServiceSuite) TestXAppend(c *C) {
+	k := randomKey(c)
+	s.checkNil(c, "get", k)
+	s.checkInt(c, 5, "append", k, "hello")
+	s.checkInt(c, 11, "append", k, " world")
+	s.checkString(c, "hello world", "get", k)
 }
 
-func TestXDecr(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, 10)
-	checkint(t, 9, c, "decr", k)
-	checkok(t, c, "set", k, -100)
-	checkint(t, -101, c, "decr", k)
+func (s *testServiceSuite) TestXDecr(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, 10)
+	s.checkInt(c, 9, "decr", k)
+	s.checkOK(c, "set", k, -100)
+	s.checkInt(c, -101, "decr", k)
 }
 
-func TestXDecrBy(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, 10)
-	checkint(t, 5, c, "decrby", k, 5)
-	checkint(t, 5, c, "decrby", k, 0)
+func (s *testServiceSuite) TestXDecrBy(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, 10)
+	s.checkInt(c, 5, "decrby", k, 5)
+	s.checkInt(c, 5, "decrby", k, 0)
 }
 
-func TestXGet(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checknil(t, c, "get", k)
-	checkok(t, c, "set", k, "hello world")
-	checkstring(t, "hello world", c, "get", k)
-	checkok(t, c, "set", k, "goodbye")
+func (s *testServiceSuite) TestXGet(c *C) {
+	k := randomKey(c)
+	s.checkNil(c, "get", k)
+	s.checkOK(c, "set", k, "hello world")
+	s.checkString(c, "hello world", "get", k)
+	s.checkOK(c, "set", k, "goodbye")
 }
 
-func TestXGetSet(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 1, c, "incr", k)
-	checkstring(t, "1", c, "getset", k, 0)
-	checkstring(t, "0", c, "get", k)
+func (s *testServiceSuite) TestXGetSet(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 1, "incr", k)
+	s.checkString(c, "1", "getset", k, 0)
+	s.checkString(c, "0", "get", k)
 }
 
-func TestXIncr(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, 10)
-	checkint(t, 11, c, "incr", k)
-	checkstring(t, "11", c, "get", k)
+func (s *testServiceSuite) TestXIncr(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, 10)
+	s.checkInt(c, 11, "incr", k)
+	s.checkString(c, "11", "get", k)
 }
 
-func TestXIncrBy(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, 10)
-	checkint(t, 15, c, "incrby", k, 5)
+func (s *testServiceSuite) TestXIncrBy(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, 10)
+	s.checkInt(c, 15, "incrby", k, 5)
 }
 
-func TestXIncrByFloat(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, 10.50)
-	checkfloat(t, 10.6, c, "incrbyfloat", k, 0.1)
-	checkok(t, c, "set", k, "5.0e3")
-	checkfloat(t, 5200, c, "incrbyfloat", k, 2.0e2)
-	checkok(t, c, "set", k, "0")
-	checkfloat(t, 996945661, c, "incrbyfloat", k, 996945661)
+func (s *testServiceSuite) TestXIncrByFloat(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, 10.50)
+	s.checkFloat(c, 10.6, "incrbyfloat", k, 0.1)
+	s.checkOK(c, "set", k, "5.0e3")
+	s.checkFloat(c, 5200, "incrbyfloat", k, 2.0e2)
+	s.checkOK(c, "set", k, "0")
+	s.checkFloat(c, 996945661, "incrbyfloat", k, 996945661)
 }
 
-func TestXSet(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, "hello")
-	checkstring(t, "hello", c, "get", k)
+func (s *testServiceSuite) TestXSet(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, "hello")
+	s.checkString(c, "hello", "get", k)
 }
 
-func TestXPSetEX(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "psetex", k, 1000*1000, "hello")
-	checkok(t, c, "psetex", k, 2000*1000, "world")
-	checkstring(t, "world", c, "get", k)
-	checkintapprox(t, 2000, 5, c, "ttl", k)
+func (s *testServiceSuite) TestXPSetEX(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "psetex", k, 1000*1000, "hello")
+	s.checkOK(c, "psetex", k, 2000*1000, "world")
+	s.checkString(c, "world", "get", k)
+	s.checkIntApprox(c, 2000, 5, "ttl", k)
 }
 
-func TestXSetEX(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "setex", k, 1000, "hello")
-	checkok(t, c, "setex", k, 2000, "world")
-	checkstring(t, "world", c, "get", k)
-	checkintapprox(t, 2000, 5, c, "ttl", k)
+func (s *testServiceSuite) TestXSetEX(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "setex", k, 1000, "hello")
+	s.checkOK(c, "setex", k, 2000, "world")
+	s.checkString(c, "world", "get", k)
+	s.checkIntApprox(c, 2000, 5, "ttl", k)
 }
 
-func TestXSetNX(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 1, c, "setnx", k, "hello")
-	checkint(t, 0, c, "setnx", k, "world")
-	checkstring(t, "hello", c, "get", k)
-	checkint(t, -1, c, "ttl", k)
+func (s *testServiceSuite) TestXSetNX(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 1, "setnx", k, "hello")
+	s.checkInt(c, 0, "setnx", k, "world")
+	s.checkString(c, "hello", "get", k)
+	s.checkInt(c, -1, "ttl", k)
 }
 
-func TestXSetRange(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 7, c, "setrange", k, 2, "redis")
-	checkstring(t, "\x00\x00redis", c, "get", k)
-	checkint(t, 7, c, "setrange", k, 1, "redis")
-	checkstring(t, "\x00rediss", c, "get", k)
-	checkint(t, 11, c, "setrange", k, 0, "hello world")
-	checkstring(t, "hello world", c, "get", k)
+func (s *testServiceSuite) TestXSetRange(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 7, "setrange", k, 2, "redis")
+	s.checkString(c, "\x00\x00redis", "get", k)
+	s.checkInt(c, 7, "setrange", k, 1, "redis")
+	s.checkString(c, "\x00rediss", "get", k)
+	s.checkInt(c, 11, "setrange", k, 0, "hello world")
+	s.checkString(c, "hello world", "get", k)
 }
 
-func TestXSetBit(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 0, c, "setbit", k, 3, 1)
-	checkstring(t, "\x08", c, "get", k)
-	checkint(t, 1, c, "setbit", k, 3, 1)
-	checkstring(t, "\x08", c, "get", k)
-	checkint(t, 1, c, "setbit", k, 3, 0)
-	checkstring(t, "\x00", c, "get", k)
-	checkint(t, 0, c, "setbit", k, 8, 1)
-	checkstring(t, "\x00\x01", c, "get", k)
+func (s *testServiceSuite) TestXSetBit(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 0, "setbit", k, 3, 1)
+	s.checkString(c, "\x08", "get", k)
+	s.checkInt(c, 1, "setbit", k, 3, 1)
+	s.checkString(c, "\x08", "get", k)
+	s.checkInt(c, 1, "setbit", k, 3, 0)
+	s.checkString(c, "\x00", "get", k)
+	s.checkInt(c, 0, "setbit", k, 8, 1)
+	s.checkString(c, "\x00\x01", "get", k)
 }
 
-func TestXMSet(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "mset", k, 0, k+"1", 1, k+"2", 2, k+"3", 3)
-	checkstring(t, "0", c, "get", k)
-	checkstring(t, "1", c, "get", k+"1")
-	checkstring(t, "2", c, "get", k+"2")
-	checkstring(t, "3", c, "get", k+"3")
-	checkok(t, c, "mset", k, 100, k, 1000)
-	checkstring(t, "1000", c, "get", k)
+func (s *testServiceSuite) TestXMSet(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "mset", k, 0, k+"1", 1, k+"2", 2, k+"3", 3)
+	s.checkString(c, "0", "get", k)
+	s.checkString(c, "1", "get", k+"1")
+	s.checkString(c, "2", "get", k+"2")
+	s.checkString(c, "3", "get", k+"3")
+	s.checkOK(c, "mset", k, 100, k, 1000)
+	s.checkString(c, "1000", "get", k)
 }
 
-func TestMSetNX(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, "haha")
-	checkint(t, 0, c, "msetnx", k, "1", "1", "1", "2", "2")
-	checkint(t, 1, c, "del", k)
-	checkint(t, 1, c, "msetnx", k, "1", k, "2")
-	checkstring(t, "2", c, "get", k)
+func (s *testServiceSuite) TestMSetNX(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, "haha")
+	s.checkInt(c, 0, "msetnx", k, "1", "1", "1", "2", "2")
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, 1, "msetnx", k, "1", k, "2")
+	s.checkString(c, "2", "get", k)
 }
 
-func TestMGet(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "mset", k, 0, k+"1", 1, k+"2", 2, k+"3", 3)
-	a := checkbytesarray(t, c, "mget", k, k+"1", k+"2", k+"3")
-	checkerror(t, nil, len(a) == 4)
-	checkerror(t, nil, string(a[0]) == "0")
-	checkerror(t, nil, string(a[1]) == "1")
-	checkerror(t, nil, string(a[2]) == "2")
-	checkerror(t, nil, string(a[3]) == "3")
+func (s *testServiceSuite) TestMGet(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "mset", k, 0, k+"1", 1, k+"2", 2, k+"3", 3)
+	a := s.checkBytesArray(c, "mget", k, k+"1", k+"2", k+"3")
+	c.Assert(a, HasLen, 4)
+	c.Assert(a, DeepEquals, [][]byte{[]byte("0"), []byte("1"), []byte("2"), []byte("3")})
 }

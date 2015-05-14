@@ -4,21 +4,15 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
-	"net"
-	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/engine/rocksdb"
-	"github.com/reborndb/qdb/pkg/store"
 	. "gopkg.in/check.v1"
 )
 
@@ -30,30 +24,8 @@ type testReplSuite struct {
 	srv1      *testReplSrvNode
 	srv2      *testReplSrvNode
 	redisNode *testReplRedisNode
-}
 
-func (s *testReplSuite) createServer(c *C, port int) *Handler {
-	base := fmt.Sprintf("/tmp/test_qdb/service/test-replication/%d", port)
-	err := os.RemoveAll(base)
-	c.Assert(err, IsNil)
-
-	err = os.MkdirAll(base, 0700)
-	c.Assert(err, IsNil)
-
-	conf := rocksdb.NewDefaultConfig()
-	testdb, err := rocksdb.Open(path.Join(base, "db"), conf, false)
-	c.Assert(err, IsNil)
-
-	bl := store.New(testdb)
-
-	cfg := NewDefaultConfig()
-	cfg.Listen = fmt.Sprintf("127.0.0.1:%d", port)
-	cfg.DumpPath = path.Join(base, "rdb.dump")
-	cfg.SyncFilePath = path.Join(base, "sync.pipe")
-
-	h, err := newHandler(cfg, bl)
-	c.Assert(err, IsNil)
-	return h
+	connPools map[int]*testConnPool
 }
 
 func (s *testReplSuite) SetUpSuite(c *C) {
@@ -65,31 +37,35 @@ func (s *testReplSuite) SetUpSuite(c *C) {
 		s.startRedis(c, redisPort)
 	}
 
-	s.redisNode = &testReplRedisNode{redisPort}
+	s.redisNode = &testReplRedisNode{redisPort, s}
 
 	svr1Port := 17778
 	svr2Port := 17779
 
-	s.srv1 = &testReplSrvNode{port: svr1Port, h: s.createServer(c, svr1Port)}
-	s.srv2 = &testReplSrvNode{port: svr2Port, h: s.createServer(c, svr2Port)}
+	s.srv1 = &testReplSrvNode{port: svr1Port, s: testCreateServer(c, svr1Port)}
+	s.srv2 = &testReplSrvNode{port: svr2Port, s: testCreateServer(c, svr2Port)}
 
-	go s.srv1.h.run()
-	go s.srv2.h.run()
+	s.connPools = make(map[int]*testConnPool, 3)
+	s.connPools[redisPort] = testCreateConnPool(redisPort)
+	s.connPools[svr1Port] = testCreateConnPool(svr1Port)
+	s.connPools[svr2Port] = testCreateConnPool(svr2Port)
 }
 
 func (s *testReplSuite) TearDownSuite(c *C) {
+	for _, p := range s.connPools {
+		p.Close()
+	}
+
 	if s.redisExists {
 		s.stopRedis(c, s.redisNode.Port())
 	}
 
-	if s.srv1.h != nil {
-		s.srv1.h.store.Close()
-		s.srv1.h.close()
+	if s.srv1.s != nil {
+		s.srv1.s.Close()
 	}
 
-	if s.srv2.h != nil {
-		s.srv2.h.store.Close()
-		s.srv2.h.close()
+	if s.srv2.s != nil {
+		s.srv2.s.Close()
 	}
 }
 
@@ -141,36 +117,24 @@ func (s *testReplSuite) stopRedis(c *C, port int) {
 	cmd.Run()
 }
 
-func testDoCmd(c *C, port int, cmd string, args ...interface{}) redis.Resp {
-	nc, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-	c.Assert(err, IsNil)
-
-	r := bufio.NewReaderSize(nc, 32)
-	w := bufio.NewWriterSize(nc, 32)
-
-	req := redis.NewRequest(cmd, args...)
-	err = redis.Encode(w, req)
-	c.Assert(err, IsNil)
-
-	resp, err := redis.Decode(r)
-	c.Assert(err, IsNil)
-	return resp
-}
-
-func testDoCmdMustOK(c *C, port int, cmd string, args ...interface{}) {
-	resp := testDoCmd(c, port, cmd, args...)
-	c.Assert(resp, DeepEquals, redis.NewString("OK"))
-	v, ok := resp.(*redis.String)
+func (s *testReplSuite) getConn(c *C, port int) *testPoolConn {
+	p, ok := s.connPools[port]
 	c.Assert(ok, Equals, true)
-	c.Assert(v.Value, Equals, "OK")
+	return p.Get(c)
 }
 
 func (s *testReplSuite) doCmd(c *C, port int, cmd string, args ...interface{}) redis.Resp {
-	return testDoCmd(c, port, cmd, args...)
+	nc := s.getConn(c, port)
+	defer nc.Recycle()
+
+	return nc.doCmd(c, cmd, args...)
 }
 
 func (s *testReplSuite) doCmdMustOK(c *C, port int, cmd string, args ...interface{}) {
-	testDoCmdMustOK(c, port, cmd, args...)
+	nc := s.getConn(c, port)
+	defer nc.Recycle()
+
+	nc.checkOK(c, cmd, args...)
 }
 
 type testReplConn interface {
@@ -185,6 +149,7 @@ type testReplNode interface {
 
 type testReplRedisNode struct {
 	port int
+	s    *testReplSuite
 }
 
 func (n *testReplRedisNode) Port() int {
@@ -193,20 +158,21 @@ func (n *testReplRedisNode) Port() int {
 
 type testReplRedisConn struct {
 	port int
+	s    *testReplSuite
 }
 
 func (nc *testReplRedisConn) Close(c *C) {
-	testDoCmd(c, nc.port, "CLIENT", "KILL", "addr", fmt.Sprintf("127.0.0.1:%d", nc.port), "type", "slave")
+	nc.s.doCmd(c, nc.port, "CLIENT", "KILL", "addr", fmt.Sprintf("127.0.0.1:%d", nc.port), "type", "slave")
 }
 
 func (n *testReplRedisNode) Slaveof(c *C, port int) testReplConn {
-	testDoCmdMustOK(c, n.port, "SLAVEOF", "127.0.0.1", port)
+	n.s.doCmdMustOK(c, n.port, "SLAVEOF", "127.0.0.1", port)
 
-	return &testReplRedisConn{n.port}
+	return &testReplRedisConn{n.port, n.s}
 }
 
 func (n *testReplRedisNode) SyncOffset(c *C) int64 {
-	resp := testDoCmd(c, n.port, "ROLE")
+	resp := n.s.doCmd(c, n.port, "ROLE")
 
 	// we only care slave replication sync offset
 
@@ -241,18 +207,18 @@ func (nc *testReplSrvConn) Close(c *C) {
 
 type testReplSrvNode struct {
 	port int
-	h    *Handler
+	s    *testServer
 }
 
 func (n *testReplSrvNode) Slaveof(c *C, port int) testReplConn {
-	nc, err := n.h.replicationConnectMaster(fmt.Sprintf("127.0.0.1:%d", port))
+	nc, err := n.s.h.replicationConnectMaster(fmt.Sprintf("127.0.0.1:%d", port))
 	c.Assert(err, IsNil)
-	n.h.master <- nc
+	n.s.h.master <- nc
 	return &testReplSrvConn{nc}
 }
 
 func (n *testReplSrvNode) Port() int             { return n.port }
-func (n *testReplSrvNode) SyncOffset(c *C) int64 { return n.h.syncOffset.Get() }
+func (n *testReplSrvNode) SyncOffset(c *C) int64 { return n.s.h.syncOffset.Get() }
 
 func (s *testReplSuite) waitAndCheckSyncOffset(c *C, node testReplNode, lastSyncOffset int64) {
 	for i := 0; i < 10; i++ {

@@ -4,19 +4,20 @@
 package service
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
 	"math"
 	"math/rand"
+	"net"
 	"os"
+	"path"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/reborndb/go/log"
-	"github.com/reborndb/go/redis/handler"
+	"github.com/reborndb/go/pools"
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/go/sync2"
-	"github.com/reborndb/go/testing/assert"
 	"github.com/reborndb/qdb/pkg/engine/rocksdb"
 	"github.com/reborndb/qdb/pkg/store"
 	. "gopkg.in/check.v1"
@@ -26,196 +27,336 @@ func TestT(t *testing.T) {
 	TestingT(t)
 }
 
-var (
-	testbl      *store.Store
-	testHandler = &Handler{
-		bgSaveSem: sync2.NewSemaphore(1),
+var _ = Suite(&testServiceSuite{})
+
+type testServiceSuite struct {
+	s        *testServer
+	coonPool *testConnPool
+
+	slotPort     int
+	slotServer   *testServer
+	slotConnPool *testConnPool
+}
+
+func (s *testServiceSuite) SetUpSuite(c *C) {
+	s.s = testCreateServer(c, 16380)
+	s.coonPool = testCreateConnPool(16380)
+
+	s.slotPort = 16381
+	s.slotServer = testCreateServer(c, s.slotPort)
+	s.slotConnPool = testCreateConnPool(s.slotPort)
+}
+
+func (s *testServiceSuite) TearDownSuite(c *C) {
+	if s.coonPool != nil {
+		s.coonPool.Close()
 	}
-	server = handler.MustServer(testHandler)
-	keymap = make(map[string]bool)
+
+	if s.slotConnPool != nil {
+		s.slotConnPool.Close()
+	}
+
+	if s.s != nil {
+		s.s.Close()
+	}
+
+	if s.slotServer != nil {
+		s.slotServer.Close()
+	}
+}
+
+type testServer struct {
+	s *store.Store
+	h *Handler
+}
+
+func testCreateServer(c *C, port int) *testServer {
+	base := fmt.Sprintf("/tmp/test_qdb/test_service/%d", port)
+	err := os.RemoveAll(base)
+	c.Assert(err, IsNil)
+
+	err = os.MkdirAll(base, 0700)
+	c.Assert(err, IsNil)
+
+	conf := rocksdb.NewDefaultConfig()
+	testdb, err := rocksdb.Open(path.Join(base, "db"), conf, false)
+	c.Assert(err, IsNil)
+
+	store := store.New(testdb)
+
+	cfg := NewDefaultConfig()
+	cfg.Listen = fmt.Sprintf("127.0.0.1:%d", port)
+	cfg.DumpPath = path.Join(base, "rdb.dump")
+	cfg.SyncFilePath = path.Join(base, "sync.pipe")
+
+	h, err := newHandler(cfg, store)
+	c.Assert(err, IsNil)
+	go h.run()
+
+	s := new(testServer)
+	s.s = store
+	s.h = h
+
+	return s
+}
+
+type testConnPool struct {
+	p *pools.ResourcePool
+}
+
+func testCreateConnPool(port int) *testConnPool {
+	f := func() (pools.Resource, error) {
+		nc, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+		if err != nil {
+			return nil, err
+		}
+		return &testPoolConn{Conn: nc, closed: false, p: nil}, nil
+	}
+
+	return &testConnPool{pools.NewResourcePool(f, 4, 4, 10*time.Second)}
+}
+
+func (p *testConnPool) Close() {
+	p.p.Close()
+}
+
+func (p *testConnPool) Get(c *C) *testPoolConn {
+	nc, err := p.p.Get()
+	c.Assert(err, IsNil)
+
+	pc, ok := nc.(*testPoolConn)
+	c.Assert(ok, Equals, true)
+	pc.p = p.p
+	return pc
+}
+
+func (s *testServer) Close() {
+	if s.s != nil {
+		s.s.Close()
+		s.s = nil
+	}
+
+	if s.h != nil {
+		s.h.close()
+	}
+}
+
+type testPoolConn struct {
+	net.Conn
+	closed bool
+	p      *pools.ResourcePool
+}
+
+func (c *testPoolConn) Close() {
+	c.Conn.Close()
+	c.closed = true
+}
+
+func (c *testPoolConn) Recycle() {
+	if c.closed {
+		return
+	}
+	c.p.Put(c)
+}
+
+func (pc *testPoolConn) doCmd(c *C, cmd string, args ...interface{}) redis.Resp {
+	r := bufio.NewReaderSize(pc.Conn, 32)
+	w := bufio.NewWriterSize(pc.Conn, 32)
+
+	req := redis.NewRequest(cmd, args...)
+	err := redis.Encode(w, req)
+	c.Assert(err, IsNil)
+
+	resp, err := redis.Decode(r)
+	c.Assert(err, IsNil)
+	return resp
+}
+
+func (pc *testPoolConn) checkNil(c *C, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	switch t := resp.(type) {
+	case *redis.BulkBytes:
+		c.Assert(t.Value, IsNil)
+	case *redis.Array:
+		c.Assert(t.Value, IsNil)
+	default:
+		c.Errorf("invalid nil, type is %T", t)
+	}
+}
+
+func (pc *testPoolConn) checkOK(c *C, cmd string, args ...interface{}) {
+	pc.checkString(c, "OK", cmd, args...)
+}
+
+func (pc *testPoolConn) checkString(c *C, expect string, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	switch x := resp.(type) {
+	case *redis.String:
+		c.Assert(x.Value, Equals, expect)
+	case *redis.BulkBytes:
+		c.Assert(string(x.Value), Equals, expect)
+	default:
+		c.Errorf("invalid type %T", resp)
+	}
+}
+
+func (pc *testPoolConn) checkInt(c *C, expect int64, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	c.Assert(resp, DeepEquals, redis.NewInt(expect))
+}
+
+func (pc *testPoolConn) checkIntApprox(c *C, expect, delta int64, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	v, ok := resp.(*redis.Int)
+	c.Assert(ok, Equals, true)
+	c.Assert(math.Abs(float64(v.Value-expect)) <= float64(delta), Equals, true)
+}
+
+func (pc *testPoolConn) checkFloat(c *C, expect float64, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	var v string
+	switch x := resp.(type) {
+	case *redis.String:
+		v = x.Value
+	case *redis.BulkBytes:
+		v = string(x.Value)
+	default:
+		c.Errorf("invalid type, type is %T", resp)
+
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	c.Assert(err, IsNil)
+	c.Assert(math.Abs(f-expect) < 1e-10, Equals, true)
+}
+
+func (pc *testPoolConn) checkBytes(c *C, expect []byte, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	v, ok := resp.(*redis.BulkBytes)
+	c.Assert(ok, Equals, true)
+	c.Assert(v.Value, DeepEquals, expect)
+}
+
+func (pc *testPoolConn) checkBytesArray(c *C, cmd string, args ...interface{}) [][]byte {
+	resp := pc.doCmd(c, cmd, args...)
+	v, ok := resp.(*redis.Array)
+	c.Assert(ok, Equals, true)
+	if v.Value == nil {
+		return nil
+	}
+
+	ay := make([][]byte, len(v.Value))
+	for i, vv := range v.Value {
+		b, ok := vv.(*redis.BulkBytes)
+		c.Assert(ok, Equals, true)
+		ay[i] = b.Value
+	}
+	return ay
+}
+
+func (pc *testPoolConn) checkIntArray(c *C, expect []int64, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	v, ok := resp.(*redis.Array)
+	c.Assert(ok, Equals, true)
+	c.Assert(v.Value, HasLen, len(expect))
+
+	for i, vv := range v.Value {
+		b, ok := vv.(*redis.Int)
+		c.Assert(ok, Equals, true)
+		c.Assert(b.Value, Equals, expect[i])
+	}
+}
+
+func (s *testServiceSuite) getConn(c *C) *testPoolConn {
+	return s.coonPool.Get(c)
+}
+
+func (s *testServiceSuite) checkNil(c *C, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkNil(c, cmd, args...)
+}
+
+func (s *testServiceSuite) checkDo(c *C, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	resp := nc.doCmd(c, cmd, args...)
+	c.Assert(resp, NotNil)
+}
+
+func (s *testServiceSuite) checkOK(c *C, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkString(c, "OK", cmd, args...)
+}
+
+func (s *testServiceSuite) checkString(c *C, expect string, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkString(c, expect, cmd, args...)
+}
+
+func (s *testServiceSuite) checkInt(c *C, expect int64, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkInt(c, expect, cmd, args...)
+}
+
+func (s *testServiceSuite) checkIntApprox(c *C, expect, delta int64, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+	nc.checkIntApprox(c, expect, delta, cmd, args...)
+}
+
+func (s *testServiceSuite) checkFloat(c *C, expect float64, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+	nc.checkFloat(c, expect, cmd, args...)
+}
+
+func (s *testServiceSuite) checkBytes(c *C, expect []byte, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+	nc.checkBytes(c, expect, cmd, args...)
+}
+
+func (s *testServiceSuite) checkBytesArray(c *C, cmd string, args ...interface{}) [][]byte {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	return nc.checkBytesArray(c, cmd, args...)
+}
+
+func (s *testServiceSuite) checkIntArray(c *C, expect []int64, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkIntArray(c, expect, cmd, args...)
+}
+
+var (
+	keyMarkSet = make(map[string]bool)
 )
 
-type fakeSession struct {
-	db uint32
-}
-
-func (s *fakeSession) DB() uint32 {
-	return s.db
-}
-
-func (s *fakeSession) SetDB(db uint32) {
-	s.db = db
-}
-
-func (s *fakeSession) Store() *store.Store {
-	return testbl
-}
-
-func reinit() {
-	if testbl != nil {
-		testbl.Close()
-		testbl = nil
-	}
-	const path = "/tmp/test_qdb/service/testdb-rocksdb"
-	if err := os.RemoveAll(path); err != nil {
-		log.PanicErrorf(err, "remove '%s' failed", path)
-	} else {
-		conf := rocksdb.NewDefaultConfig()
-		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
-			log.PanicError(err, "open rocksdb failed")
-		} else {
-			testbl = store.New(testdb)
-		}
-	}
-
-	testHandler.store = testbl
-}
-
 func init() {
-	reinit()
+	log.SetLevel(log.LEVEL_ERROR)
 }
 
-func client(t *testing.T) *fakeSession {
-	return &fakeSession{}
-}
-
-func random(t *testing.T) string {
+func randomKey(c *C) string {
 	for i := 0; ; i++ {
 		p := make([]byte, 16)
 		for j := 0; j < len(p); j++ {
 			p[j] = 'a' + byte(rand.Intn(26))
 		}
 		s := "key_" + string(p)
-		if _, ok := keymap[s]; !ok {
-			keymap[s] = true
+		if _, ok := keyMarkSet[s]; !ok {
+			keyMarkSet[s] = true
 			return s
 		}
-		assert.Must(t, i < 32)
-	}
-}
-
-func checkerror(t *testing.T, err error, exp bool) {
-	if err != nil || !exp {
-		reinit()
-	}
-	assert.ErrorIsNil(t, err)
-	assert.Must(t, exp)
-}
-
-func request(cmd string, args ...interface{}) redis.Resp {
-	resp := redis.NewArray()
-	resp.AppendBulkBytes([]byte(cmd))
-	for _, v := range args {
-		resp.AppendBulkBytes([]byte(fmt.Sprintf("%v", v)))
-	}
-	return resp
-}
-
-func checkok(t *testing.T, s Session, cmd string, args ...interface{}) {
-	checkstring(t, "OK", s, cmd, args...)
-}
-
-func checkdo(t *testing.T, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-}
-
-func checknil(t *testing.T, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	switch x := rsp.(type) {
-	case *redis.BulkBytes:
-		checkerror(t, nil, x.Value == nil)
-	case *redis.Array:
-		checkerror(t, nil, x.Value == nil)
-	default:
-		checkerror(t, nil, false)
-	}
-}
-
-func checkstring(t *testing.T, expect string, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	switch x := rsp.(type) {
-	case *redis.String:
-		checkerror(t, nil, x.Value == expect)
-	case *redis.BulkBytes:
-		checkerror(t, nil, string(x.Value) == expect)
-	default:
-		checkerror(t, nil, false)
-	}
-}
-
-func checkint(t *testing.T, expect int64, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	x, ok := rsp.(*redis.Int)
-	checkerror(t, nil, ok)
-	checkerror(t, nil, x.Value == expect)
-}
-
-func checkintapprox(t *testing.T, expect, delta int64, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	x, ok := rsp.(*redis.Int)
-	checkerror(t, nil, ok)
-	checkerror(t, nil, math.Abs(float64(x.Value-expect)) <= float64(delta))
-}
-
-func checkbytes(t *testing.T, expect []byte, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	x, ok := rsp.(*redis.BulkBytes)
-	checkerror(t, nil, ok)
-	checkerror(t, nil, bytes.Equal(x.Value, expect))
-}
-
-func checkfloat(t *testing.T, expect float64, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	var v string
-	switch x := rsp.(type) {
-	case *redis.String:
-		v = x.Value
-	case *redis.BulkBytes:
-		v = string(x.Value)
-	default:
-		checkerror(t, nil, false)
-	}
-	f, err := strconv.ParseFloat(v, 64)
-	checkerror(t, err, math.Abs(f-expect) < 1e-10)
-}
-
-func checkbytesarray(t *testing.T, s Session, cmd string, args ...interface{}) [][]byte {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	x, ok := rsp.(*redis.Array)
-	checkerror(t, nil, ok)
-	if x.Value == nil {
-		return nil
-	}
-	array := make([][]byte, len(x.Value))
-	for i, v := range x.Value {
-		x, ok := v.(*redis.BulkBytes)
-		checkerror(t, nil, ok)
-		array[i] = x.Value
-	}
-	return array
-}
-
-func checkintarray(t *testing.T, expect []int64, s Session, cmd string, args ...interface{}) {
-	rsp, err := server.Dispatch(s, request(cmd, args...))
-	checkerror(t, err, rsp != nil)
-	x, ok := rsp.(*redis.Array)
-	checkerror(t, nil, ok && x.Value != nil)
-	array := make([]int64, len(x.Value))
-	for i, v := range x.Value {
-		x, ok := v.(*redis.Int)
-		checkerror(t, nil, ok)
-		array[i] = x.Value
-	}
-	checkerror(t, nil, len(array) == len(expect))
-	for i := 0; i < len(array); i++ {
-		checkerror(t, nil, array[i] == expect[i])
+		c.Assert(i < 32, Equals, true)
 	}
 }

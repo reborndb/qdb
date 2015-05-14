@@ -4,115 +4,109 @@
 package service
 
 import (
-	"testing"
-
 	"github.com/reborndb/qdb/pkg/store"
+	. "gopkg.in/check.v1"
 )
 
-func TestSelect(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "select", 128)
-	checkok(t, c, "set", k, "128")
-	checkstring(t, "128", c, "get", k)
-	checkok(t, c, "select", 258)
-	checknil(t, c, "get", k)
-	checkok(t, c, "select", 128)
-	checkstring(t, "128", c, "get", k)
-	checkok(t, c, "select", 0)
+func (s *testServiceSuite) TestSelect(c *C) {
+	k := randomKey(c)
+
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkOK(c, "select", 128)
+	nc.checkOK(c, "set", k, "128")
+	nc.checkString(c, "128", "get", k)
+	nc.checkOK(c, "select", 258)
+	nc.checkNil(c, "get", k)
+	nc.checkOK(c, "select", 128)
+	nc.checkString(c, "128", "get", k)
+	nc.checkOK(c, "select", 0)
 }
 
-func TestDel(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, 100)
-	checkint(t, 1, c, "del", k)
-	checkok(t, c, "set", k, 200)
-	checkint(t, 1, c, "del", k, k, k, k)
-	checkint(t, 0, c, "del", k)
+func (s *testServiceSuite) TestDel(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, 100)
+	s.checkInt(c, 1, "del", k)
+	s.checkOK(c, "set", k, 200)
+	s.checkInt(c, 1, "del", k, k, k, k)
+	s.checkInt(c, 0, "del", k)
 }
 
-func TestDump(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkok(t, c, "set", k, "hello")
+func (s *testServiceSuite) TestDump(c *C) {
+	k := randomKey(c)
+	s.checkOK(c, "set", k, "hello")
 	expect := "\x00\x05\x68\x65\x6c\x6c\x6f\x06\x00\xf5\x9f\xb7\xf6\x90\x61\x1c\x99"
-	checkbytes(t, []byte(expect), c, "dump", k)
-
-	checkint(t, 1, c, "del", k)
-	checkok(t, c, "restore", k, 1000, expect)
-	checkstring(t, "hello", c, "get", k)
-	checkintapprox(t, 1000, 50, c, "pttl", k)
+	s.checkBytes(c, []byte(expect), "dump", k)
+	s.checkInt(c, 1, "del", k)
+	s.checkOK(c, "restore", k, 1000, expect)
+	s.checkString(c, "hello", "get", k)
+	s.checkIntApprox(c, 1000, 50, "pttl", k)
 }
 
-func TestType(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkstring(t, "none", c, "type", k)
-	checkint(t, 0, c, "exists", k)
-	checkok(t, c, "set", k, "hello")
-	checkstring(t, "string", c, "type", k)
-	checkint(t, 1, c, "exists", k)
+func (s *testServiceSuite) TestType(c *C) {
+	k := randomKey(c)
+	s.checkString(c, "none", "type", k)
+	s.checkInt(c, 0, "exists", k)
+	s.checkOK(c, "set", k, "hello")
+	s.checkString(c, "string", "type", k)
+	s.checkString(c, "hello", "GET", k)
+	s.checkInt(c, 1, "exists", k)
 }
 
-func TestExpire(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, -2, c, "ttl", k)
-	checkint(t, 0, c, "expire", k, 1000)
-	checkok(t, c, "set", k, 100)
-	checkint(t, -1, c, "ttl", k)
-	checkint(t, 1, c, "expire", k, 1000)
-	checkintapprox(t, 1000, 5, c, "ttl", k)
+func (s *testServiceSuite) TestExpire(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, -2, "ttl", k)
+	s.checkInt(c, 0, "expire", k, 1000)
+	s.checkOK(c, "set", k, 100)
+	s.checkInt(c, -1, "ttl", k)
+	s.checkInt(c, 1, "expire", k, 1000)
+	s.checkIntApprox(c, 1000, 5, "ttl", k)
 }
 
-func TestPExpire(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, -2, c, "pttl", k)
-	checkint(t, 0, c, "pexpire", k, 100000)
-	checkok(t, c, "set", k, 100)
-	checkint(t, -1, c, "pttl", k)
-	checkint(t, 1, c, "pexpire", k, 100000)
-	checkintapprox(t, 100000, 5000, c, "pttl", k)
+func (s *testServiceSuite) TestPExpire(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, -2, "pttl", k)
+	s.checkInt(c, 0, "pexpire", k, 100000)
+	s.checkOK(c, "set", k, 100)
+	s.checkInt(c, -1, "pttl", k)
+	s.checkInt(c, 1, "pexpire", k, 100000)
+	s.checkIntApprox(c, 100000, 5000, "pttl", k)
 }
 
-func TestExpireAt(t *testing.T) {
-	c := client(t)
-	k := random(t)
+func (s *testServiceSuite) TestExpireAt(c *C) {
+	k := randomKey(c)
 	expireat, _ := store.TTLmsToExpireAt(1000)
-	checkint(t, -2, c, "ttl", k)
-	checkok(t, c, "set", k, 100)
-	checkint(t, 1, c, "expireat", k, expireat/1e3+1000)
-	checkintapprox(t, 1000, 5, c, "ttl", k)
-	checkintapprox(t, 1000000, 5000, c, "pttl", k)
-	checkint(t, 1, c, "del", k)
-	checkint(t, -2, c, "ttl", k)
+	s.checkInt(c, -2, "ttl", k)
+	s.checkOK(c, "set", k, 100)
+	s.checkInt(c, 1, "expireat", k, expireat/1e3+1000)
+	s.checkIntApprox(c, 1000, 5, "ttl", k)
+	s.checkIntApprox(c, 1000000, 5000, "pttl", k)
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, -2, "ttl", k)
 }
 
-func TestPExpireAt(t *testing.T) {
-	c := client(t)
-	k := random(t)
+func (s *testServiceSuite) TestPExpireAt(c *C) {
+	k := randomKey(c)
 	expireat, _ := store.TTLmsToExpireAt(1000)
-	checkint(t, -2, c, "pttl", k)
-	checkok(t, c, "set", k, 100)
-	checkint(t, 1, c, "pexpireat", k, expireat+100000)
-	checkintapprox(t, 100000, 5000, c, "pttl", k)
-	checkintapprox(t, 100, 5, c, "ttl", k)
-	checkint(t, 1, c, "del", k)
-	checkint(t, -2, c, "pttl", k)
+	s.checkInt(c, -2, "pttl", k)
+	s.checkOK(c, "set", k, 100)
+	s.checkInt(c, 1, "pexpireat", k, expireat+100000)
+	s.checkIntApprox(c, 100000, 5000, "pttl", k)
+	s.checkIntApprox(c, 100, 5, "ttl", k)
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, -2, "pttl", k)
 }
 
-func TestPersist(t *testing.T) {
-	c := client(t)
-	k := random(t)
+func (s *testServiceSuite) TestPersist(c *C) {
+	k := randomKey(c)
 	expireat, _ := store.TTLmsToExpireAt(1000)
-	checkint(t, -2, c, "pttl", k)
-	checkint(t, 0, c, "persist", k)
-	checkok(t, c, "set", k, "100")
-	checkint(t, 1, c, "pexpireat", k, expireat+100000)
-	checkintapprox(t, 100000, 5000, c, "pttl", k)
-	checkint(t, 1, c, "persist", k)
-	checkint(t, 0, c, "persist", k)
-	checkint(t, -1, c, "pttl", k)
+	s.checkInt(c, -2, "pttl", k)
+	s.checkInt(c, 0, "persist", k)
+	s.checkOK(c, "set", k, "100")
+	s.checkInt(c, 1, "pexpireat", k, expireat+100000)
+	s.checkIntApprox(c, 100000, 5000, "pttl", k)
+	s.checkInt(c, 1, "persist", k)
+	s.checkInt(c, 0, "persist", k)
+	s.checkInt(c, -1, "pttl", k)
 }

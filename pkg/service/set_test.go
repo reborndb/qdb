@@ -3,96 +3,89 @@
 
 package service
 
-import (
-	"testing"
-)
+import . "gopkg.in/check.v1"
 
-func checkset(t *testing.T, s Session, k string, expect []string) {
-	array := checkbytesarray(t, s, "smembers", k)
+func (s *testServiceSuite) checkSet(c *C, key string, expect []string) {
+	ay := s.checkBytesArray(c, "smembers", key)
 	if expect == nil {
-		checkerror(t, nil, array == nil)
+		c.Assert(ay, IsNil)
 	} else {
-		checkerror(t, nil, len(array) == len(expect))
+		c.Assert(ay, HasLen, len(expect))
 		m := make(map[string]bool)
 		for _, s := range expect {
 			m[s] = true
 		}
-		checkerror(t, nil, len(array) == len(m))
-		for _, v := range array {
-			checkerror(t, nil, m[string(v)])
+
+		c.Assert(ay, HasLen, len(m))
+		for _, v := range ay {
+			c.Assert(m[string(v)], Equals, true)
 		}
 	}
 }
 
-func TestSAdd(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "sadd", k, "key1", "key2", "key3")
-	checkint(t, 1, c, "sadd", k, "key1", "key2", "key3", "key4", "key4")
-	checkset(t, c, k, []string{"key1", "key2", "key3", "key4"})
-	checkint(t, -1, c, "ttl", k)
+func (s *testServiceSuite) TestSAdd(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "sadd", k, "key1", "key2", "key3")
+	s.checkInt(c, 1, "sadd", k, "key1", "key2", "key3", "key4", "key4")
+	s.checkSet(c, k, []string{"key1", "key2", "key3", "key4"})
+	s.checkInt(c, -1, "ttl", k)
 }
 
-func TestSRem(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "sadd", k, "key1", "key2", "key3")
-	checkint(t, 1, c, "srem", k, "key1", "key4")
-	checkint(t, 0, c, "srem", k, "key1", "key4")
-	checkset(t, c, k, []string{"key2", "key3"})
-	checkint(t, 2, c, "srem", k, "key2", "key3")
-	checkint(t, -2, c, "ttl", k)
-	checkint(t, 0, c, "srem", k, "key1")
-	checkset(t, c, k, nil)
+func (s *testServiceSuite) TestSRem(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "sadd", k, "key1", "key2", "key3")
+	s.checkInt(c, 1, "srem", k, "key1", "key4")
+	s.checkInt(c, 0, "srem", k, "key1", "key4")
+	s.checkSet(c, k, []string{"key2", "key3"})
+	s.checkInt(c, 2, "srem", k, "key2", "key3")
+	s.checkInt(c, -2, "ttl", k)
+	s.checkInt(c, 0, "srem", k, "key1")
+	s.checkSet(c, k, nil)
 }
 
-func TestSCard(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "sadd", k, "key1", "key2", "key3", "key1")
-	checkint(t, 3, c, "scard", k)
-	checkint(t, 1, c, "srem", k, "key1", "key4")
-	checkint(t, 2, c, "scard", k)
-	checkint(t, 0, c, "srem", k, "key1", "key4")
-	checkint(t, 2, c, "scard", k)
-	checkint(t, 1, c, "del", k)
-	checkint(t, 0, c, "scard", k)
+func (s *testServiceSuite) TestSCard(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "sadd", k, "key1", "key2", "key3", "key1")
+	s.checkInt(c, 3, "scard", k)
+	s.checkInt(c, 1, "srem", k, "key1", "key4")
+	s.checkInt(c, 2, "scard", k)
+	s.checkInt(c, 0, "srem", k, "key1", "key4")
+	s.checkInt(c, 2, "scard", k)
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, 0, "scard", k)
 }
 
-func TestSIsMember(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "sadd", k, "key1", "key2", "key3")
-	checkint(t, 1, c, "sismember", k, "key1")
-	checkint(t, 0, c, "sismember", k, "key0")
-	checkint(t, 1, c, "del", k)
-	checkint(t, 0, c, "sismember", k, "key1")
+func (s *testServiceSuite) TestSIsMember(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "sadd", k, "key1", "key2", "key3")
+	s.checkInt(c, 1, "sismember", k, "key1")
+	s.checkInt(c, 0, "sismember", k, "key0")
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, 0, "sismember", k, "key1")
 }
 
-func TestSPop(t *testing.T) {
-	c := client(t)
-	k := random(t)
-	checkint(t, 3, c, "sadd", k, "key1", "key2", "key3")
+func (s *testServiceSuite) TestSPop(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "sadd", k, "key1", "key2", "key3")
 	for i := 2; i >= 0; i-- {
-		checkdo(t, c, "spop", k)
-		checkint(t, int64(i), c, "scard", k)
+		s.checkDo(c, "spop", k)
+		s.checkInt(c, int64(i), "scard", k)
 	}
 }
 
-func TestRandMember(t *testing.T) {
-	c := client(t)
-	k := random(t)
+func (s *testServiceSuite) TestRandMember(c *C) {
+	k := randomKey(c)
 	var a [][]byte
-	checkint(t, 3, c, "sadd", k, "key1", "key2", "key3")
-	a = checkbytesarray(t, c, "srandmember", k, 0)
-	checkerror(t, nil, len(a) == 0)
-	a = checkbytesarray(t, c, "srandmember", k, 100)
-	checkerror(t, nil, len(a) == 3)
+	s.checkInt(c, 3, "sadd", k, "key1", "key2", "key3")
+	a = s.checkBytesArray(c, "srandmember", k, 0)
+	c.Assert(a, HasLen, 0)
+	a = s.checkBytesArray(c, "srandmember", k, 100)
+	c.Assert(a, HasLen, 3)
 	m := make(map[string]bool)
 	for _, v := range a {
 		m[string(v)] = true
 	}
-	checkerror(t, nil, m["key1"])
-	checkerror(t, nil, m["key2"])
-	checkerror(t, nil, m["key3"])
+	c.Assert(m["key1"], Equals, true)
+	c.Assert(m["key2"], Equals, true)
+	c.Assert(m["key3"], Equals, true)
 }
