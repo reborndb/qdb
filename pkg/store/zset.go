@@ -11,18 +11,30 @@ import (
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
+const (
+	// we will use int64 as the score for backend binary sort
+	// but redis rdb will use float64
+	// to avoid data precison lost, the int64 range must be in [- 2**53, 2**53] like javascript
+	MaxScore = int64(1) << 53
+	MinScore = -(int64(1) << 53)
+)
+
 type zsetRow struct {
 	*storeRowHelper
 
 	Size   int64
 	Member []byte
-	Score  float64
+	Score  int64
 }
 
 func newZSetRow(db uint32, key []byte) *zsetRow {
 	o := &zsetRow{}
 	o.lazyInit(newStoreRowHelper(db, key, ZSetCode))
 	return o
+}
+
+func isValidScore(score int64) bool {
+	return score >= MinScore && score <= MaxScore
 }
 
 func (o *zsetRow) lazyInit(h *storeRowHelper) {
@@ -62,7 +74,10 @@ func (o *zsetRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj i
 
 	ms := &markSet{}
 	for _, e := range zset {
-		o.Member, o.Score = e.Member, e.Score
+		o.Member, o.Score = e.Member, int64(e.Score)
+		if !isValidScore(o.Score) {
+			return errors.Errorf("invalid score %v, must in [%d, %d]", e.Score, MinScore, MaxScore)
+		}
 		ms.Set(o.Member)
 		bt.Set(o.DataKey(), o.DataValue())
 	}
@@ -87,7 +102,7 @@ func (o *zsetRow) loadObjectValue(r storeReader) (interface{}, error) {
 		if err := o.ParseDataValue(it.Value()); err != nil {
 			return nil, err
 		}
-		zset = append(zset, &rdb.ZSetElement{Member: o.Member, Score: o.Score})
+		zset = append(zset, &rdb.ZSetElement{Member: o.Member, Score: float64(o.Score)})
 	}
 	if err := it.Error(); err != nil {
 		return nil, err
@@ -143,7 +158,7 @@ func (s *Store) ZGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 	eles := x.(rdb.ZSet)
 	rets := make([][]byte, len(eles)*2)
 	for i, e := range eles {
-		rets[i*2], rets[i*2+1] = e.Member, FormatFloat(e.Score)
+		rets[i*2], rets[i*2+1] = e.Member, FormatInt(int64(e.Score))
 	}
 	return rets, nil
 }
@@ -180,19 +195,23 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	var key []byte
-	var eles = make([]*rdb.ZSetElement, len(args)/2)
+	var eles = make([]struct {
+		Member []byte
+		Score  int64
+	}, len(args)/2)
 	if err := parseArgument(args[0], &key); err != nil {
 		return 0, errArguments("parse args[%d] failed, %s", 0, err)
 	}
 	for i := 0; i < len(eles); i++ {
-		e := &rdb.ZSetElement{}
+		e := &eles[i]
 		if err := parseArgument(args[i*2+1], &e.Score); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i*2+1, err)
+		} else if !isValidScore(e.Score) {
+			return 0, errArguments("parse args[%d] failed, invalid score %d", i*2+1, e.Score)
 		}
 		if err := parseArgument(args[i*2+2], &e.Member); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i*2+2, err)
 		}
-		eles[i] = e
 	}
 
 	if err := s.acquire(); err != nil {
@@ -212,7 +231,7 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	ms := &markSet{}
 	bt := engine.NewBatch()
 	for _, e := range eles {
-		o.Member, o.Score = e.Member, e.Score
+		o.Member, o.Score = e.Member, int64(e.Score)
 		exists, err := o.TestDataValue(s)
 		if err != nil {
 			return 0, err
@@ -287,7 +306,7 @@ func (s *Store) ZRem(db uint32, args ...interface{}) (int64, error) {
 }
 
 // ZSCORE key member
-func (s *Store) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
+func (s *Store) ZScore(db uint32, args ...interface{}) (int64, bool, error) {
 	if len(args) != 2 {
 		return 0, false, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -319,13 +338,13 @@ func (s *Store) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
 }
 
 // ZINCRBY key delta member
-func (s *Store) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
+func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 2", len(args))
 	}
 
 	var key, member []byte
-	var delta float64
+	var delta int64
 	for i, ref := range []interface{}{&key, &delta, &member} {
 		if err := parseArgument(args[i], ref); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i, err)
@@ -362,6 +381,10 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
 	o.Score = delta
+	if !isValidScore(o.Score) {
+		return 0, errors.Errorf("invalid score %d, must in [%d, %d]", o.Score, MinScore, MaxScore)
+	}
+
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "ZIncrBy", Args: args}
 	return delta, s.commit(bt, fw)
