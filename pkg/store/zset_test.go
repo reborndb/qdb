@@ -155,7 +155,7 @@ func TestZRestore(t *testing.T) {
 	kpttl(t, 0, "zset", -1)
 
 	for i := 0; i < len(ms); i += 2 {
-		ms[i], ms[i+1] = strconv.Itoa(rand.Int()), rand.Int63()%MaxScore
+		ms[i], ms[i+1] = strconv.Itoa(rand.Int()), rand.Int63()%int64(MaxScore)
 	}
 	zrestore(t, 0, "zset", 500, ms...)
 	zcard(t, 0, "zset", 32)

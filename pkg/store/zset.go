@@ -11,12 +11,14 @@ import (
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
+type ScoreInt int64
+
 const (
 	// we will use int64 as the score for backend binary sort
 	// but redis rdb will use float64
 	// to avoid data precison lost, the int64 range must be in [- 2**53, 2**53] like javascript
-	MaxScore = int64(1) << 53
-	MinScore = -(int64(1) << 53)
+	MaxScore = ScoreInt(1 << 53)
+	MinScore = -(ScoreInt(1 << 53))
 )
 
 type zsetRow struct {
@@ -24,7 +26,7 @@ type zsetRow struct {
 
 	Size   int64
 	Member []byte
-	Score  int64
+	Score  ScoreInt
 }
 
 func newZSetRow(db uint32, key []byte) *zsetRow {
@@ -33,7 +35,7 @@ func newZSetRow(db uint32, key []byte) *zsetRow {
 	return o
 }
 
-func isValidScore(score int64) bool {
+func isValidScore(score ScoreInt) bool {
 	return score >= MinScore && score <= MaxScore
 }
 
@@ -74,7 +76,7 @@ func (o *zsetRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj i
 
 	ms := &markSet{}
 	for _, e := range zset {
-		o.Member, o.Score = e.Member, int64(e.Score)
+		o.Member, o.Score = e.Member, ScoreInt(e.Score)
 		if !isValidScore(o.Score) {
 			return errors.Errorf("invalid score %v, must in [%d, %d]", e.Score, MinScore, MaxScore)
 		}
@@ -206,7 +208,7 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 		e := &eles[i]
 		if err := parseArgument(args[i*2+1], &e.Score); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i*2+1, err)
-		} else if !isValidScore(e.Score) {
+		} else if !isValidScore(ScoreInt(e.Score)) {
 			return 0, errArguments("parse args[%d] failed, invalid score %d", i*2+1, e.Score)
 		}
 		if err := parseArgument(args[i*2+2], &e.Member); err != nil {
@@ -231,7 +233,7 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	ms := &markSet{}
 	bt := engine.NewBatch()
 	for _, e := range eles {
-		o.Member, o.Score = e.Member, int64(e.Score)
+		o.Member, o.Score = e.Member, ScoreInt(e.Score)
 		exists, err := o.TestDataValue(s)
 		if err != nil {
 			return 0, err
@@ -333,7 +335,7 @@ func (s *Store) ZScore(db uint32, args ...interface{}) (int64, bool, error) {
 	if err != nil || !exists {
 		return 0, false, err
 	} else {
-		return o.Score, true, nil
+		return int64(o.Score), true, nil
 	}
 }
 
@@ -375,12 +377,12 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 
 	bt := engine.NewBatch()
 	if exists {
-		delta += o.Score
+		delta += int64(o.Score)
 	} else {
 		o.Size++
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
-	o.Score = delta
+	o.Score = ScoreInt(delta)
 	if !isValidScore(o.Score) {
 		return 0, errors.Errorf("invalid score %d, must in [%d, %d]", o.Score, MinScore, MaxScore)
 	}

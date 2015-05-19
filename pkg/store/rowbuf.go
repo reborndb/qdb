@@ -72,6 +72,14 @@ func (r *BufReader) ReadFloat64() (float64, error) {
 	return math.Float64frombits(bits), nil
 }
 
+func (r *BufReader) ReadInt64() (int64, error) {
+	p, err := r.ReadBytes(8)
+	if err != nil {
+		return 0, err
+	}
+	return int64(binary.BigEndian.Uint64(p)), nil
+}
+
 func (r *BufReader) Len() int {
 	return r.r.Len()
 }
@@ -126,6 +134,13 @@ func (w *BufWriter) WriteFloat64(f float64) error {
 	p := make([]byte, 8)
 	bits := math.Float64bits(f)
 	binary.LittleEndian.PutUint64(p, bits)
+	_, err := ioutils.WriteFull(w.w, p)
+	return err
+}
+
+func (w *BufWriter) WriteInt64(s int64) error {
+	p := make([]byte, 8)
+	binary.BigEndian.PutUint64(p, uint64(s))
 	_, err := ioutils.WriteFull(w.w, p)
 	return err
 }
