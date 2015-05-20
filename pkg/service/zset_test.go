@@ -90,3 +90,24 @@ func (s *testServiceSuite) TestZLexCount(c *C) {
 	s.checkInt(c, 3, "zlexcount", k, "-", "+")
 	s.checkInt(c, 0, "zlexcount", k, "-", "-")
 }
+
+func (s *testServiceSuite) checkZRange(c *C, expect []string, key string, args ...interface{}) {
+	a := append([]interface{}{key}, args...)
+	ay := s.checkBytesArray(c, "zrange", a...)
+	if expect == nil {
+		c.Assert(ay, IsNil)
+	} else {
+		for i := range expect {
+			c.Assert(expect[i], Equals, string(ay[i]))
+		}
+	}
+}
+
+func (s *testServiceSuite) TestZRange(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 0, "a", 1, "b", 2, "c")
+	s.checkZRange(c, []string{"b", "c"}, k, 1, 2)
+	s.checkZRange(c, []string{"b", "1", "c", "2"}, k, 1, 2, "WITHSCORES")
+	s.checkZRange(c, nil, k, 3, 3)
+	s.checkZRange(c, []string{"b", "c"}, k, -2, -1)
+}

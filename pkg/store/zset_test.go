@@ -227,3 +227,35 @@ func TestZLexCount(t *testing.T) {
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
 }
+
+func zrange(t *testing.T, db uint32, key string, start int64, stop int64, withScore bool, expect ...string) {
+	var x [][]byte
+	var err error
+
+	if withScore {
+		x, err = testStore.ZRange(db, key, start, stop, "WITHSCORES")
+	} else {
+		x, err = testStore.ZRange(db, key, start, stop)
+	}
+
+	checkerror(t, err, true)
+	checkerror(t, nil, len(x) == len(expect))
+	for i, _ := range expect {
+		checkerror(t, nil, string(x[i]) == expect[i])
+	}
+}
+
+func TestZRange(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 1)
+	zadd(t, 0, "zset", 1, "b", 2)
+	zadd(t, 0, "zset", 1, "c", 3)
+
+	zrange(t, 0, "zset", 0, 3, false, "a", "b", "c")
+	zrange(t, 0, "zset", 0, -1, false, "a", "b", "c")
+	zrange(t, 0, "zset", 2, 3, false, "c")
+	zrange(t, 0, "zset", -2, -1, false, "b", "c")
+	zrange(t, 0, "zset", 0, 1, true, "a", "1", "b", "2")
+
+	zdel(t, 0, "zset", 1)
+	checkempty(t)
+}

@@ -157,3 +157,25 @@ func (h *Handler) ZLexCount(arg0 interface{}, args [][]byte) (redis.Resp, error)
 		return redis.NewInt(v), nil
 	}
 }
+
+// ZRANGE key start stop [WITHSCORES]
+func (h *Handler) ZRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 && len(args) != 4 {
+		return toRespErrorf("len(args) = %d, expect = 3 or 4", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRange(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}

@@ -643,7 +643,9 @@ func (o *zsetRow) travelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error
 		}
 
 		if r.InRange(o.Score) {
-			if err := f(o); err != nil {
+			if err := f(o); err == errTravelBreak {
+				return nil
+			} else if err != nil {
 				return errors.Trace(err)
 			}
 		} else if !r.LteMax(o.Score) {
@@ -889,4 +891,96 @@ func (s *Store) ZLexCount(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// ZRANGE key start stop [WITHSCORES]
+func (s *Store) ZRange(db uint32, args ...interface{}) ([][]byte, error) {
+	if len(args) != 3 && len(args) != 4 {
+		return nil, errArguments("len(args) = %d, expect = 3/4", len(args))
+	}
+
+	var key []byte
+	var start int64
+	var stop int64
+	for i, ref := range []interface{}{&key, &start, &stop} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return nil, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	withScore := 1
+	if len(args) == 4 {
+		if strings.ToUpper(FormatString(args[3])) != "WITHSCORES" {
+			return nil, errArguments("parse args[3] failed, must WITHSCORES")
+		}
+		withScore = 2
+	}
+
+	if err := s.acquire(); err != nil {
+		return nil, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return nil, err
+	}
+
+	var rangeLen int64
+	start, stop, rangeLen = sanitizeIndexes(start, stop, o.Size)
+	if rangeLen == 0 {
+		// empty
+		return [][]byte{}, nil
+	}
+
+	r := &rangeSpec{Min: MinScore, Max: MaxScore, MinEx: false, MaxEx: false}
+
+	res := make([][]byte, 0, rangeLen*int64(withScore))
+	offset := int64(0)
+	f := func(o *zsetRow) error {
+		if offset >= start {
+			res = append(res, o.Member)
+			if withScore == 2 {
+				res = append(res, FormatInt(int64(o.Score)))
+			}
+
+			rangeLen--
+			if rangeLen <= 0 {
+				return errTravelBreak
+			}
+
+		}
+		offset++
+		return nil
+	}
+
+	if err := o.travelInRange(s, r, f); err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	return res, nil
+}
+
+func sanitizeIndexes(start int64, stop int64, size int64) (int64, int64, int64) {
+	if start < 0 {
+		start = size + start
+	}
+	if stop < 0 {
+		stop = size + stop
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if start > stop || start >= size {
+		// empty
+		return start, stop, 0
+	}
+
+	if stop >= size {
+		stop = size - 1
+	}
+
+	return start, stop, (stop - start) + 1
 }
