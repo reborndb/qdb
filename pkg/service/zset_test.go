@@ -72,3 +72,12 @@ func (s *testServiceSuite) TestZIncrBy(c *C) {
 	s.checkFloat(c, 2, "zincrby", k, 1, "two")
 	s.checkZSet(c, k, map[string]int64{"one": 1, "two": 2})
 }
+
+func (s *testServiceSuite) TestZCount(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 1, "1", 2, "2", 3, "3")
+	s.checkInt(c, 3, "zcount", k, "1", "3")
+	s.checkInt(c, 2, "zcount", k, "(1", "3")
+	s.checkInt(c, 1, "zcount", k, "(1", "(3")
+	s.checkInt(c, 3, "zcount", k, "-inf", "+inf")
+}

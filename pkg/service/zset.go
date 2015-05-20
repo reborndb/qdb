@@ -121,3 +121,21 @@ func (h *Handler) ZIncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return redis.NewBulkBytes(store.FormatInt(v)), nil
 	}
 }
+
+// ZCOUNT key min max
+func (h *Handler) ZCount(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect = 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZCount(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}

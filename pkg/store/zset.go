@@ -5,6 +5,10 @@ package store
 
 import (
 	"bytes"
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
 
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/redis/rdb"
@@ -19,6 +23,9 @@ const (
 	// to avoid data precison lost, the int64 range must be in [- 2**53, 2**53] like javascript
 	MaxScore = ScoreInt(1 << 53)
 	MinScore = -(ScoreInt(1 << 53))
+
+	negativeInfScore = ScoreInt(math.MinInt64)
+	positiveInfScore = ScoreInt(math.MaxInt64)
 )
 
 // the binary bigendian for negative score is bigger than positive score
@@ -440,7 +447,7 @@ func (s *Store) ZScore(db uint32, args ...interface{}) (int64, bool, error) {
 // ZINCRBY key delta member
 func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
-		return 0, errArguments("len(args) = %d, expect = 2", len(args))
+		return 0, errArguments("len(args) = %d, expect = 3", len(args))
 	}
 
 	var key, member []byte
@@ -493,4 +500,222 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 
 	fw := &Forward{DB: db, Op: "ZIncrBy", Args: args}
 	return delta, s.commit(bt, fw)
+}
+
+// holds a inclusive/exclusive range spec by score comparison
+type rangeSpec struct {
+	Min ScoreInt
+	Max ScoreInt
+
+	// are min or max score exclusive
+	MinEx bool
+	MaxEx bool
+}
+
+func (score ScoreInt) String() string {
+	if score == negativeInfScore {
+		return "-inf"
+	} else if score == positiveInfScore {
+		return "+inf"
+	} else {
+		return strconv.FormatInt(int64(score), 10)
+	}
+}
+
+func (r *rangeSpec) String() string {
+	minExStr := "["
+	if r.MinEx {
+		minExStr = "("
+	}
+
+	maxExStr := "]"
+	if r.MaxEx {
+		maxExStr = ")"
+	}
+	return fmt.Sprintf("%s%s, %s%s", minExStr, r.Min, r.Max, maxExStr)
+}
+
+func (r *rangeSpec) GteMin(v ScoreInt) bool {
+	if r.MinEx {
+		return v > r.Min
+	} else {
+		return v >= r.Min
+	}
+}
+
+func (r *rangeSpec) LteMax(v ScoreInt) bool {
+	if r.MaxEx {
+		return v < r.Max
+	} else {
+		return v <= r.Max
+	}
+}
+
+func (r *rangeSpec) InRange(v ScoreInt) bool {
+	if r.Min > r.Max || (r.Min == r.Max && (r.MinEx || r.MaxEx)) {
+		return false
+	}
+
+	if !r.GteMin(v) {
+		return false
+	}
+
+	if !r.LteMax(v) {
+		return false
+	}
+	return true
+}
+
+func parseRangeScore(buf []byte) (ScoreInt, bool, error) {
+	if len(buf) == 0 {
+		return 0, false, errors.Errorf("empty range score argument")
+	}
+
+	ex := false
+	if buf[0] == '(' {
+		buf = buf[1:]
+		ex = true
+	}
+
+	str := strings.ToLower(string(buf))
+	switch str {
+	case "-inf":
+		return negativeInfScore, ex, nil
+	case "+inf":
+		return positiveInfScore, ex, nil
+	default:
+		if score, err := strconv.ParseInt(str, 10, 64); err != nil {
+			return 0, ex, errors.Trace(err)
+		} else if !isValidScore(ScoreInt(score)) {
+			return 0, ex, errors.Errorf("invalid score %v, must in [%d, %d]", score, MinScore, MaxScore)
+		} else {
+			return ScoreInt(score), ex, nil
+		}
+	}
+}
+
+func parseRange(min []byte, max []byte) (*rangeSpec, error) {
+	var r rangeSpec
+	var err error
+
+	if r.Min, r.MinEx, err = parseRangeScore(min); err != nil {
+		return nil, err
+	}
+
+	if r.Max, r.MaxEx, err = parseRangeScore(max); err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
+
+// Seek to the last node that is contained in the specified range.
+// return true for successful found
+func (o *zsetRow) seekFirstInRange(s *Store, it *storeIterator, r *rangeSpec) (bool, error) {
+	o.Score = r.Min
+	o.Member = []byte{}
+
+	it.SeekTo(o.IndexKey())
+	prefixKey := o.IndexKeyPrefix()
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		if !bytes.HasPrefix(key, prefixKey) {
+			return false, nil
+		}
+
+		key = key[len(prefixKey):]
+
+		if err := o.ParseIndexKeySuffix(key); err != nil {
+			return false, errors.Trace(err)
+		} else if r.GteMin(o.Score) {
+			break
+		}
+	}
+
+	if err := it.Error(); err != nil {
+		return false, errors.Trace(err)
+	}
+
+	// check score <= max
+	return r.LteMax(o.Score), nil
+}
+
+// travel zset in range, call f in every iteration.
+func (o *zsetRow) travelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
+
+	o.Score = r.Min
+	o.Member = []byte{}
+
+	it.SeekTo(o.IndexKey())
+	prefixKey := o.IndexKeyPrefix()
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		if !bytes.HasPrefix(key, prefixKey) {
+			return nil
+		}
+
+		key = key[len(prefixKey):]
+
+		if err := o.ParseIndexKeySuffix(key); err != nil {
+			return errors.Trace(err)
+		}
+
+		if r.InRange(o.Score) {
+			if err := f(o); err != nil {
+				return errors.Trace(err)
+			}
+		} else if !r.LteMax(o.Score) {
+			return nil
+		}
+	}
+
+	if err := it.Error(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
+// ZCOUNT key min max
+func (s *Store) ZCount(db uint32, args ...interface{}) (int64, error) {
+	if len(args) != 3 {
+		return 0, errArguments("len(args) = %d, expect = 3", len(args))
+	}
+
+	var key []byte
+	var min []byte
+	var max []byte
+	for i, ref := range []interface{}{&key, &min, &max} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return 0, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	r, err := parseRange(min, max)
+	if err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64 = 0
+	f := func(o *zsetRow) error {
+		count++
+		return nil
+	}
+
+	if err = o.travelInRange(s, r, f); err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	return count, nil
 }

@@ -164,3 +164,30 @@ func TestZRestore(t *testing.T) {
 	zdel(t, 0, "zset", 0)
 	checkempty(t)
 }
+
+func zcount(t *testing.T, db uint32, key string, min string, max string, expect int64) {
+	x, err := testStore.ZCount(db, key, min, max)
+	checkerror(t, err, x == expect)
+}
+
+func TestZCount(t *testing.T) {
+	zadd(t, 0, "zset", 1, "0", 0)
+	zadd(t, 0, "zset", 1, "1", 1)
+	zadd(t, 0, "zset", 1, "2", 2)
+	zadd(t, 0, "zset", 1, "3", 3)
+	zadd(t, 0, "zset", 1, "-1", -1)
+	zadd(t, 0, "zset", 1, "-2", -2)
+	zadd(t, 0, "zset", 1, "-3", -3)
+
+	zcount(t, 0, "zset", "0", "1", 2)
+	zcount(t, 0, "zset", "(0", "1", 1)
+	zcount(t, 0, "zset", "0", "(2", 2)
+	zcount(t, 0, "zset", "-2", "-1", 2)
+	zcount(t, 0, "zset", "(-2", "-1", 1)
+	zcount(t, 0, "zset", "-3", "(-1", 2)
+	zcount(t, 0, "zset", "2", "1", 0)
+	zcount(t, 0, "zset", "-1", "-2", 0)
+	zcount(t, 0, "zset", "-inf", "+inf", 7)
+	zcount(t, 0, "zset", "0", "+inf", 4)
+	zcount(t, 0, "zset", "-inf", "0", 4)
+}
