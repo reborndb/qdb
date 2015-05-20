@@ -201,3 +201,25 @@ func (h *Handler) ZRangeByLex(arg0 interface{}, args [][]byte) (redis.Resp, erro
 		return resp, nil
 	}
 }
+
+// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (h *Handler) ZRangeByScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) < 3 {
+		return toRespErrorf("len(args) = %d, expect >= 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRangeByScore(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}

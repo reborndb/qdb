@@ -119,3 +119,12 @@ func (s *testServiceSuite) TestZRangeByLex(c *C) {
 	s.checkZRange(c, "zrangebylex", nil, k, "-", "-")
 	s.checkZRange(c, "zrangebylex", []string{"a"}, k, "[a", "[c", "LIMIT", 0, 1)
 }
+
+func (s *testServiceSuite) TestZRangeByScore(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 1, "a", 2, "b", 3, "c")
+	s.checkZRange(c, "zrangebyscore", []string{"a", "b", "c"}, k, "1", "3")
+	s.checkZRange(c, "zrangebyscore", nil, k, "-inf", "-1")
+	s.checkZRange(c, "zrangebyscore", []string{"a"}, k, "1", "3", "LIMIT", 0, 1)
+	s.checkZRange(c, "zrangebyscore", []string{"b", "2"}, k, "1", "3", "LIMIT", 1, 1, "WITHSCORES")
+}

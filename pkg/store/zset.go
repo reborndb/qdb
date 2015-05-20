@@ -1053,3 +1053,85 @@ func (s *Store) ZRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
 
 	return res, nil
 }
+
+// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) {
+	if len(args) < 3 {
+		return nil, errArguments("len(args) = %d, expect >= 3", len(args))
+	}
+
+	var key []byte
+	var min []byte
+	var max []byte
+	for i, ref := range []interface{}{&key, &min, &max} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return nil, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	r, err := parseRange(min, max)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	withScore := 1
+	var offset int64 = 0
+	var count int64 = -1
+	for i := 3; i < len(args); {
+		switch strings.ToUpper(FormatString(args[i])) {
+		case "WITHSCORES":
+			withScore = 2
+			i++
+		case "LIMIT":
+			if i+2 >= len(args) {
+				return nil, errArguments("parse args[%d] failed, invalid limit format", i)
+			}
+
+			if offset, err = ParseInt(args[i+1]); err != nil {
+				return nil, errArguments("parse args[%d] failed, %v", i+1, err)
+			}
+			if count, err = ParseInt(args[i+2]); err != nil {
+				return nil, errArguments("parse args[%d] failed, %v", i+2, err)
+			}
+			i += 3
+		default:
+			return nil, errArguments("parse args[%d] failed, %s", i, args[i])
+		}
+	}
+
+	res := make([][]byte, 0, 4)
+	n := int64(0)
+	f := func(o *zsetRow) error {
+		if n >= offset {
+			if count == 0 {
+				return errTravelBreak
+			}
+
+			res = append(res, o.Member)
+			if withScore == 2 {
+				res = append(res, FormatInt(int64(o.Score)))
+			}
+
+			count--
+		}
+
+		n++
+		return nil
+	}
+
+	if err := s.acquire(); err != nil {
+		return nil, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := o.travelInRange(s, r, f); err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	return res, nil
+}
