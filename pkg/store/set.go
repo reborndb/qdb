@@ -20,11 +20,11 @@ type setRow struct {
 
 func newSetRow(db uint32, key []byte) *setRow {
 	o := &setRow{}
-	o.lazyInit(newStoreRowHelper(db, key, SetCode))
+	o.lazyInit(db, key, newStoreRowHelper(db, key, SetCode))
 	return o
 }
 
-func (o *setRow) lazyInit(h *storeRowHelper) {
+func (o *setRow) lazyInit(db uint32, key []byte, h *storeRowHelper) {
 	o.storeRowHelper = h
 	o.dataKeyRefs = []interface{}{&o.Member}
 	o.metaValueRefs = []interface{}{&o.Size}

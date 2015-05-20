@@ -21,17 +21,34 @@ const (
 	MinScore = -(ScoreInt(1 << 53))
 )
 
+// the binary bigendian for negative score is bigger than positive score
+// so we must we a flag before the binary buffer for lexicographical sort
+const (
+	negativeScoreFlag byte = '<'
+	positiveScoreFlag byte = '>'
+)
+
 type zsetRow struct {
 	*storeRowHelper
 
 	Size   int64
 	Member []byte
 	Score  ScoreInt
+
+	indexKeyPrefix []byte
+	indexKeyRefs   []interface{}
+	indexValueRefs []interface{}
+}
+
+func encodeIndexKeyPrefix(db uint32, key []byte) []byte {
+	w := NewBufWriter(nil)
+	encodeRawBytes(w, indexCode, &db, &key)
+	return w.Bytes()
 }
 
 func newZSetRow(db uint32, key []byte) *zsetRow {
 	o := &zsetRow{}
-	o.lazyInit(newStoreRowHelper(db, key, ZSetCode))
+	o.lazyInit(db, key, newStoreRowHelper(db, key, ZSetCode))
 	return o
 }
 
@@ -39,11 +56,73 @@ func isValidScore(score ScoreInt) bool {
 	return score >= MinScore && score <= MaxScore
 }
 
-func (o *zsetRow) lazyInit(h *storeRowHelper) {
+func (o *zsetRow) lazyInit(db uint32, key []byte, h *storeRowHelper) {
 	o.storeRowHelper = h
-	o.dataKeyRefs = []interface{}{&o.Member}
 	o.metaValueRefs = []interface{}{&o.Size}
+
+	o.dataKeyRefs = []interface{}{&o.Member}
 	o.dataValueRefs = []interface{}{&o.Score}
+
+	o.indexKeyPrefix = encodeIndexKeyPrefix(db, key)
+	o.indexKeyRefs = []interface{}{&o.Score, &o.Member}
+	o.indexValueRefs = nil
+}
+
+func (o *zsetRow) IndexKeyPrefix() []byte {
+	return o.indexKeyPrefix
+}
+
+func (o *zsetRow) IndexKey() []byte {
+	w := NewBufWriter(o.IndexKeyPrefix())
+
+	if o.Score >= 0 {
+		encodeRawBytes(w, positiveScoreFlag)
+	} else {
+		encodeRawBytes(w, negativeScoreFlag)
+	}
+
+	encodeRawBytes(w, o.indexKeyRefs...)
+	return w.Bytes()
+}
+
+func (o *zsetRow) IndexValue() []byte {
+	w := NewBufWriter(nil)
+	encodeRawBytes(w, o.code)
+	encodeRawBytes(w, o.indexValueRefs...)
+	return w.Bytes()
+}
+
+func (o *zsetRow) ParseIndexKeySuffix(p []byte) (err error) {
+	r := NewBufReader(p)
+	var scoreFlag byte
+	err = decodeRawBytes(r, err, &scoreFlag)
+	err = decodeRawBytes(r, err, o.indexKeyRefs...)
+	err = decodeRawBytes(r, err)
+	return
+}
+
+func (o *zsetRow) ParseIndexValue(p []byte) (err error) {
+	r := NewBufReader(p)
+	err = decodeRawBytes(r, err, o.code)
+	err = decodeRawBytes(r, err, o.indexValueRefs...)
+	err = decodeRawBytes(r, err)
+	return
+}
+
+func (o *zsetRow) LoadIndexValue(r storeReader) (bool, error) {
+	p, err := r.getRowValue(o.IndexKey())
+	if err != nil || p == nil {
+		return false, err
+	}
+	return true, o.ParseIndexValue(p)
+}
+
+func (o *zsetRow) TestIndexValue(r storeReader) (bool, error) {
+	p, err := r.getRowValue(o.IndexKey())
+	if err != nil || p == nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (o *zsetRow) deleteObject(s *Store, bt *engine.Batch) error {
@@ -56,6 +135,15 @@ func (o *zsetRow) deleteObject(s *Store, bt *engine.Batch) error {
 		}
 		bt.Del(key)
 	}
+
+	for pfx := it.SeekTo(o.IndexKeyPrefix()); it.Valid(); it.Next() {
+		key := it.Key()
+		if !bytes.HasPrefix(key, pfx) {
+			break
+		}
+		bt.Del(key)
+	}
+
 	bt.Del(o.MetaKey())
 	return it.Error()
 }
@@ -80,8 +168,10 @@ func (o *zsetRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj i
 		if !isValidScore(o.Score) {
 			return errors.Errorf("invalid score %v, must in [%d, %d]", e.Score, MinScore, MaxScore)
 		}
+
 		ms.Set(o.Member)
 		bt.Set(o.DataKey(), o.DataValue())
+		bt.Set(o.IndexKey(), o.IndexValue())
 	}
 	o.Size, o.ExpireAt = ms.Len(), expireat
 	bt.Set(o.MetaKey(), o.MetaValue())
@@ -233,15 +323,22 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	ms := &markSet{}
 	bt := engine.NewBatch()
 	for _, e := range eles {
-		o.Member, o.Score = e.Member, ScoreInt(e.Score)
-		exists, err := o.TestDataValue(s)
+		o.Member = e.Member
+		exists, err := o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
 		}
 		if !exists {
 			ms.Set(o.Member)
+		} else {
+			// if old exists, remove index key first
+			bt.Del(o.IndexKey())
 		}
+
+		o.Score = ScoreInt(e.Score)
+
 		bt.Set(o.DataKey(), o.DataValue())
+		bt.Set(o.IndexKey(), o.IndexValue())
 	}
 
 	n := ms.Len()
@@ -284,12 +381,13 @@ func (s *Store) ZRem(db uint32, args ...interface{}) (int64, error) {
 	bt := engine.NewBatch()
 	for _, o.Member = range members {
 		if !ms.Has(o.Member) {
-			exists, err := o.TestDataValue(s)
+			exists, err := o.LoadDataValue(s)
 			if err != nil {
 				return 0, err
 			}
 			if exists {
 				bt.Del(o.DataKey())
+				bt.Del(o.IndexKey())
 				ms.Set(o.Member)
 			}
 		}
@@ -363,19 +461,22 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 		return 0, err
 	}
 
+	bt := engine.NewBatch()
+
 	var exists bool = false
 	if o != nil {
 		o.Member = member
 		exists, err = o.LoadDataValue(s)
 		if err != nil {
 			return 0, err
+		} else if exists {
+			bt.Del(o.IndexKey())
 		}
 	} else {
 		o = newZSetRow(db, key)
 		o.Member = member
 	}
 
-	bt := engine.NewBatch()
 	if exists {
 		delta += int64(o.Score)
 	} else {
@@ -388,6 +489,8 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	bt.Set(o.DataKey(), o.DataValue())
+	bt.Set(o.IndexKey(), o.IndexValue())
+
 	fw := &Forward{DB: db, Op: "ZIncrBy", Args: args}
 	return delta, s.commit(bt, fw)
 }
