@@ -984,3 +984,72 @@ func sanitizeIndexes(start int64, stop int64, size int64) (int64, int64, int64) 
 
 	return start, stop, (stop - start) + 1
 }
+
+// ZRANGEBYLEX key min max [LIMIT offset count]
+func (s *Store) ZRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
+	if len(args) != 3 && len(args) != 6 {
+		return nil, errArguments("len(args) = %d, expect = 3 or 6", len(args))
+	}
+
+	var key []byte
+	var min []byte
+	var max []byte
+	for i, ref := range []interface{}{&key, &min, &max} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return nil, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	var offset int64 = 0
+	var count int64 = -1
+	var err error
+	if len(args) == 6 {
+		if strings.ToUpper(FormatString(args[3])) != "LIMIT" {
+			return nil, errArguments("parse args[3] failed, no limit")
+		}
+		if offset, err = ParseInt(args[4]); err != nil {
+			return nil, errArguments("parse args[4] failed, %v", err)
+		}
+		if count, err = ParseInt(args[5]); err != nil {
+			return nil, errArguments("parse args[5] failed, %v", err)
+		}
+	}
+
+	r, err := parseLexRangeSpec(min, max)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	if err := s.acquire(); err != nil {
+		return nil, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([][]byte, 0, 4)
+	n := int64(0)
+	f := func(o *zsetRow) error {
+		if n >= offset {
+			if count == 0 {
+				return errTravelBreak
+			}
+
+			res = append(res, o.Member)
+
+			count--
+		}
+
+		n++
+		return nil
+	}
+
+	if err := o.travelInLexRange(s, r, f); err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	return res, nil
+}

@@ -179,3 +179,25 @@ func (h *Handler) ZRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return resp, nil
 	}
 }
+
+// ZRANGEBYLEX key start stop [LIMIT offset count]
+func (h *Handler) ZRangeByLex(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 && len(args) != 6 {
+		return toRespErrorf("len(args) = %d, expect = 3 or 6", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRangeByLex(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}

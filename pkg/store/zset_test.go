@@ -259,3 +259,31 @@ func TestZRange(t *testing.T) {
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
 }
+
+func zrangebylex(t *testing.T, db uint32, key string, min string, max string, offset int64, count int64, expect ...string) {
+	x, err := testStore.ZRangeByLex(db, key, min, max, "LIMIT", offset, count)
+
+	checkerror(t, err, true)
+	checkerror(t, nil, len(x) == len(expect))
+	for i, _ := range expect {
+		checkerror(t, nil, string(x[i]) == expect[i])
+	}
+}
+
+func TestZRangeByLex(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 0)
+	zadd(t, 0, "zset", 1, "b", 0)
+	zadd(t, 0, "zset", 1, "c", 0)
+	zadd(t, 0, "zset", 1, "d", 0)
+	zadd(t, 0, "zset", 1, "e", 0)
+	zadd(t, 0, "zset", 1, "f", 0)
+	zadd(t, 0, "zset", 1, "g", 0)
+
+	zrangebylex(t, 0, "zset", "-", "+", 0, 0)
+	zrangebylex(t, 0, "zset", "-", "+", 0, 1, "a")
+	zrangebylex(t, 0, "zset", "-", "(c", 0, -1, "a", "b")
+	zrangebylex(t, 0, "zset", "[c", "+", 0, 2, "c", "d")
+
+	zdel(t, 0, "zset", 1)
+	checkempty(t)
+}
