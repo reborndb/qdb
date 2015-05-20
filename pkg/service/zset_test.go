@@ -81,3 +81,12 @@ func (s *testServiceSuite) TestZCount(c *C) {
 	s.checkInt(c, 1, "zcount", k, "(1", "(3")
 	s.checkInt(c, 3, "zcount", k, "-inf", "+inf")
 }
+
+func (s *testServiceSuite) TestZLexCount(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 0, "a", 0, "b", 0, "c")
+	s.checkInt(c, 1, "zlexcount", k, "[a", "(b")
+	s.checkInt(c, 2, "zlexcount", k, "[a", "[b")
+	s.checkInt(c, 3, "zlexcount", k, "-", "+")
+	s.checkInt(c, 0, "zlexcount", k, "-", "-")
+}

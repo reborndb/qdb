@@ -190,4 +190,40 @@ func TestZCount(t *testing.T) {
 	zcount(t, 0, "zset", "-inf", "+inf", 7)
 	zcount(t, 0, "zset", "0", "+inf", 4)
 	zcount(t, 0, "zset", "-inf", "0", 4)
+	zcount(t, 0, "zset", "+inf", "-inf", 0)
+	zcount(t, 0, "zset", "+inf", "+inf", 0)
+	zcount(t, 0, "zset", "-inf", "-inf", 0)
+
+	zdel(t, 0, "zset", 1)
+	checkempty(t)
+
+}
+
+func zlexcount(t *testing.T, db uint32, key string, min string, max string, expect int64) {
+	x, err := testStore.ZLexCount(db, key, min, max)
+	checkerror(t, err, x == expect)
+}
+
+func TestZLexCount(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 0)
+	zadd(t, 0, "zset", 1, "b", 0)
+	zadd(t, 0, "zset", 1, "c", 0)
+	zadd(t, 0, "zset", 1, "d", 0)
+	zadd(t, 0, "zset", 1, "e", 0)
+	zadd(t, 0, "zset", 1, "f", 0)
+	zadd(t, 0, "zset", 1, "g", 0)
+
+	zlexcount(t, 0, "zset", "-", "+", 7)
+	zlexcount(t, 0, "zset", "(a", "[c", 2)
+	zlexcount(t, 0, "zset", "[b", "+", 6)
+	zlexcount(t, 0, "zset", "(d", "(a", 0)
+	zlexcount(t, 0, "zset", "+", "-", 0)
+	zlexcount(t, 0, "zset", "+", "[c", 0)
+	zlexcount(t, 0, "zset", "[c", "-", 0)
+	zlexcount(t, 0, "zset", "[c", "[c", 1)
+	zlexcount(t, 0, "zset", "+", "+", 0)
+	zlexcount(t, 0, "zset", "-", "-", 0)
+
+	zdel(t, 0, "zset", 1)
+	checkempty(t)
 }

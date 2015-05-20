@@ -139,3 +139,21 @@ func (h *Handler) ZCount(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return redis.NewInt(v), nil
 	}
 }
+
+// ZLEXCOUNT key min max
+func (h *Handler) ZLexCount(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect = 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZLexCount(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}

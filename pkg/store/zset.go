@@ -5,7 +5,6 @@ package store
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -34,6 +33,8 @@ const (
 	negativeScoreFlag byte = '<'
 	positiveScoreFlag byte = '>'
 )
+
+var errTravelBreak = errors.New("break current travel")
 
 type zsetRow struct {
 	*storeRowHelper
@@ -310,6 +311,8 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 		}
 		if err := parseArgument(args[i*2+2], &e.Member); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i*2+2, err)
+		} else if len(e.Member) == 0 {
+			return 0, errArguments("parse args[%d] failed, empty empty", i*2+2)
 		}
 	}
 
@@ -512,29 +515,6 @@ type rangeSpec struct {
 	MaxEx bool
 }
 
-func (score ScoreInt) String() string {
-	if score == negativeInfScore {
-		return "-inf"
-	} else if score == positiveInfScore {
-		return "+inf"
-	} else {
-		return strconv.FormatInt(int64(score), 10)
-	}
-}
-
-func (r *rangeSpec) String() string {
-	minExStr := "["
-	if r.MinEx {
-		minExStr = "("
-	}
-
-	maxExStr := "]"
-	if r.MaxEx {
-		maxExStr = ")"
-	}
-	return fmt.Sprintf("%s%s, %s%s", minExStr, r.Min, r.Max, maxExStr)
-}
-
 func (r *rangeSpec) GteMin(v ScoreInt) bool {
 	if r.MinEx {
 		return v > r.Min
@@ -714,6 +694,197 @@ func (s *Store) ZCount(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	if err = o.travelInRange(s, r, f); err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	return count, nil
+}
+
+type lexRangeSpec struct {
+	Min   []byte //use nil for min string
+	Max   []byte //use empty slice for max string
+	MinEx bool
+	MaxEx bool
+}
+
+func (r *lexRangeSpec) GteMin(v []byte) bool {
+	if r.Min == nil {
+		return true
+	} else if len(r.Min) == 0 {
+		return false
+	}
+
+	if r.MinEx {
+		return bytes.Compare(v, r.Min) > 0
+	} else {
+		return bytes.Compare(v, r.Min) >= 0
+	}
+}
+
+func (r *lexRangeSpec) LteMax(v []byte) bool {
+	if r.Max == nil {
+		return false
+	} else if len(r.Max) == 0 {
+		return true
+	}
+
+	if r.MaxEx {
+		return bytes.Compare(r.Max, v) > 0
+	} else {
+		return bytes.Compare(r.Max, v) >= 0
+	}
+}
+
+func (r *lexRangeSpec) InRange(v []byte) bool {
+	if bytes.Compare(r.Min, r.Max) == 0 && (r.MinEx || r.MaxEx) {
+		return false
+	} else if len(r.Min) > 0 && len(r.Max) > 0 && bytes.Compare(r.Min, r.Max) > 0 {
+		return false
+	}
+
+	if !r.GteMin(v) {
+		return false
+	}
+
+	if !r.LteMax(v) {
+		return false
+	}
+
+	return true
+}
+
+func parseLexRangeItem(buf []byte) ([]byte, bool, error) {
+	if len(buf) == 0 {
+		return nil, false, errors.Errorf("empty lex range item")
+	}
+
+	ex := false
+	var dest []byte
+
+	switch buf[0] {
+	case '+':
+		if len(buf) > 1 {
+			return nil, false, errors.Errorf("invalid lex range item, only +  allowed, but %s", buf)
+		}
+		dest = []byte{}
+	case '-':
+		if len(buf) > 1 {
+			return nil, false, errors.Errorf("invalid lex range item, only - allowed, but %s", buf)
+		}
+		dest = nil
+	case '(', '[':
+		dest = buf[1:]
+		if len(dest) == 0 {
+			return nil, false, errors.Errorf("invalid empty lex range item %s", buf)
+		}
+		ex = buf[0] == '('
+	default:
+		return nil, false, errors.Errorf("invalid lex range item at first byte, %s", buf)
+	}
+
+	return dest, ex, nil
+}
+
+func parseLexRangeSpec(min []byte, max []byte) (*lexRangeSpec, error) {
+	var r lexRangeSpec
+	var err error
+
+	r.Min, r.MinEx, err = parseLexRangeItem(min)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Max, r.MaxEx, err = parseLexRangeItem(max)
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
+
+// travel zset in lex range, call f in every iteration.
+func (o *zsetRow) travelInLexRange(s *Store, r *lexRangeSpec, f func(o *zsetRow) error) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
+
+	o.Score = MinScore
+	o.Member = r.Min
+
+	it.SeekTo(o.IndexKey())
+	prefixKey := o.IndexKeyPrefix()
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		if !bytes.HasPrefix(key, prefixKey) {
+			return nil
+		}
+
+		key = key[len(prefixKey):]
+
+		if err := o.ParseIndexKeySuffix(key); err != nil {
+			return errors.Trace(err)
+		}
+
+		if r.InRange(o.Member) {
+			if err := f(o); err == errTravelBreak {
+				return nil
+			} else if err != nil {
+				return errors.Trace(err)
+			}
+		} else if !r.LteMax(o.Member) {
+			return nil
+		}
+	}
+
+	if err := it.Error(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
+// ZLEXCOUNT key min max
+func (s *Store) ZLexCount(db uint32, args ...interface{}) (int64, error) {
+	if len(args) != 3 {
+		return 0, errArguments("len(args) = %d, expect = 3", len(args))
+	}
+
+	var key []byte
+	var min []byte
+	var max []byte
+	for i, ref := range []interface{}{&key, &min, &max} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return 0, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	r, err := parseLexRangeSpec(min, max)
+	if err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64 = 0
+	firstScore := negativeInfScore
+	f := func(o *zsetRow) error {
+		count++
+		if firstScore == negativeInfScore {
+			firstScore = o.Score
+		}
+		if firstScore != o.Score {
+			return errTravelBreak
+		}
+		return nil
+	}
+
+	if err = o.travelInLexRange(s, r, f); err != nil {
 		return 0, errors.Trace(err)
 	}
 
