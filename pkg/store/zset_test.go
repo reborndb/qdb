@@ -316,3 +316,28 @@ func TestZRangeByScore(t *testing.T) {
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
 }
+
+func zrank(t *testing.T, db uint32, key string, member string, expect int64) {
+	x, err := testStore.ZRank(db, key, member)
+
+	checkerror(t, err, x == expect)
+}
+
+func TestZRank(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 1)
+	zadd(t, 0, "zset", 1, "b", 2)
+	zadd(t, 0, "zset", 1, "c", 3)
+	zadd(t, 0, "zset", 1, "d", 4)
+	zadd(t, 0, "zset", 1, "e", 5)
+	zadd(t, 0, "zset", 1, "f", 6)
+	zadd(t, 0, "zset", 1, "g", 7)
+
+	zrank(t, 0, "zset", "a", 0)
+	zrank(t, 0, "zset", "aa", -1)
+	zrank(t, 0, "zset", "d", 3)
+	zrank(t, 0, "zset", "g", 6)
+	zrank(t, 0, "zset_dummy", "a", -1)
+
+	zdel(t, 0, "zset", 1)
+	checkempty(t)
+}

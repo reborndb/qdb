@@ -1135,3 +1135,55 @@ func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) 
 
 	return res, nil
 }
+
+// ZRANK key member
+func (s *Store) ZRank(db uint32, args ...interface{}) (int64, error) {
+	if len(args) != 2 {
+		return 0, errArguments("len(args) = %d, expect 2", len(args))
+	}
+
+	var key []byte
+	var memeber []byte
+
+	for i, ref := range []interface{}{&key, &memeber} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return 0, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return 0, err
+	} else if o == nil {
+		return -1, nil
+	}
+
+	o.Member = memeber
+	exists, err := o.LoadDataValue(s)
+	if err != nil {
+		return 0, errors.Trace(err)
+	} else if !exists {
+		return -1, nil
+	}
+
+	r := &rangeSpec{Min: MinScore, Max: ScoreInt(o.Score), MinEx: false, MaxEx: false}
+	n := int64(1)
+	checkScore := o.Score
+	f := func(o *zsetRow) error {
+		if checkScore > o.Score {
+			n++
+		}
+		return nil
+	}
+
+	if err := o.travelInRange(s, r, f); err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	return n - 1, nil
+}

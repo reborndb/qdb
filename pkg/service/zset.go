@@ -223,3 +223,23 @@ func (h *Handler) ZRangeByScore(arg0 interface{}, args [][]byte) (redis.Resp, er
 		return resp, nil
 	}
 }
+
+// ZRANK key member
+func (h *Handler) ZRank(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 2 {
+		return toRespErrorf("len(args) = %d, expect 2", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRank(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else if v >= 0 {
+		return redis.NewInt(v), nil
+	} else {
+		return redis.NewBulkBytes(nil), nil
+	}
+}

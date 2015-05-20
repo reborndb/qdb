@@ -128,3 +128,12 @@ func (s *testServiceSuite) TestZRangeByScore(c *C) {
 	s.checkZRange(c, "zrangebyscore", []string{"a"}, k, "1", "3", "LIMIT", 0, 1)
 	s.checkZRange(c, "zrangebyscore", []string{"b", "2"}, k, "1", "3", "LIMIT", 1, 1, "WITHSCORES")
 }
+
+func (s *testServiceSuite) TestZRank(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 1, "a", 2, "b", 3, "c")
+
+	s.checkInt(c, 1, "zrank", k, "b")
+	s.checkInt(c, 2, "zrank", k, "c")
+	s.checkBytes(c, nil, "zrank", k, "d")
+}
