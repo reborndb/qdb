@@ -110,6 +110,9 @@ func (s *testServiceSuite) TestZRange(c *C) {
 	s.checkZRange(c, "zrange", []string{"b", "1", "c", "2"}, k, 1, 2, "WITHSCORES")
 	s.checkZRange(c, "zrange", nil, k, 3, 3)
 	s.checkZRange(c, "zrange", []string{"b", "c"}, k, -2, -1)
+	s.checkZRange(c, "zrevrange", []string{"c", "b", "a"}, k, 0, -1)
+	s.checkZRange(c, "zrevrange", []string{"a"}, k, 2, 3)
+	s.checkZRange(c, "zrevrange", []string{"b", "a"}, k, -2, -1)
 }
 
 func (s *testServiceSuite) TestZRangeByLex(c *C) {
@@ -118,6 +121,9 @@ func (s *testServiceSuite) TestZRangeByLex(c *C) {
 	s.checkZRange(c, "zrangebylex", []string{"a", "b", "c"}, k, "[a", "[c")
 	s.checkZRange(c, "zrangebylex", nil, k, "-", "-")
 	s.checkZRange(c, "zrangebylex", []string{"a"}, k, "[a", "[c", "LIMIT", 0, 1)
+	s.checkZRange(c, "zrevrangebylex", []string{"c"}, k, "[c", "[b", "LIMIT", 0, 1)
+	s.checkZRange(c, "zrevrangebylex", []string{"b", "a"}, k, "(c", "[a", "LIMIT", 0, -1)
+	s.checkZRange(c, "zrevrangebylex", []string{"c"}, k, "+", "-", "LIMIT", 0, 1)
 }
 
 func (s *testServiceSuite) TestZRangeByScore(c *C) {
@@ -127,6 +133,8 @@ func (s *testServiceSuite) TestZRangeByScore(c *C) {
 	s.checkZRange(c, "zrangebyscore", nil, k, "-inf", "-1")
 	s.checkZRange(c, "zrangebyscore", []string{"a"}, k, "1", "3", "LIMIT", 0, 1)
 	s.checkZRange(c, "zrangebyscore", []string{"b", "2"}, k, "1", "3", "LIMIT", 1, 1, "WITHSCORES")
+	s.checkZRange(c, "zrevrangebyscore", []string{"c"}, k, "3", "1", "LIMIT", 0, 1)
+	s.checkZRange(c, "zrevrangebyscore", []string{"b", "2"}, k, "3", "1", "LIMIT", 1, 1, "WITHSCORES")
 }
 
 func (s *testServiceSuite) TestZRank(c *C) {
@@ -136,6 +144,9 @@ func (s *testServiceSuite) TestZRank(c *C) {
 	s.checkInt(c, 1, "zrank", k, "b")
 	s.checkInt(c, 2, "zrank", k, "c")
 	s.checkBytes(c, nil, "zrank", k, "d")
+	s.checkBytes(c, nil, "zrevrank", k, "d")
+	s.checkInt(c, 0, "zrevrank", k, "c")
+	s.checkInt(c, 2, "zrevrank", k, "a")
 }
 
 func (s *testServiceSuite) TestZRemRangeByLex(c *C) {

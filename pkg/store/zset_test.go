@@ -228,14 +228,14 @@ func TestZLexCount(t *testing.T) {
 	checkempty(t)
 }
 
-func zrange(t *testing.T, db uint32, key string, start int64, stop int64, withScore bool, expect ...string) {
+func zrange(t *testing.T, db uint32, key string, start int64, stop int64, reverse bool, expect ...string) {
 	var x [][]byte
 	var err error
 
-	if withScore {
-		x, err = testStore.ZRange(db, key, start, stop, "WITHSCORES")
-	} else {
+	if !reverse {
 		x, err = testStore.ZRange(db, key, start, stop)
+	} else {
+		x, err = testStore.ZRevRange(db, key, start, stop)
 	}
 
 	checkerror(t, err, true)
@@ -254,14 +254,25 @@ func TestZRange(t *testing.T) {
 	zrange(t, 0, "zset", 0, -1, false, "a", "b", "c")
 	zrange(t, 0, "zset", 2, 3, false, "c")
 	zrange(t, 0, "zset", -2, -1, false, "b", "c")
-	zrange(t, 0, "zset", 0, 1, true, "a", "1", "b", "2")
+	zrange(t, 0, "zset", 2, 3, true, "a")
+	zrange(t, 0, "zset", 0, -1, true, "c", "b", "a")
+
+	zadd(t, 0, "zseu", 1, "a", 1)
+	zrange(t, 0, "zset", -2, -1, true, "b", "a")
 
 	zdel(t, 0, "zset", 1)
+	zdel(t, 0, "zseu", 1)
 	checkempty(t)
 }
 
-func zrangebylex(t *testing.T, db uint32, key string, min string, max string, offset int64, count int64, expect ...string) {
-	x, err := testStore.ZRangeByLex(db, key, min, max, "LIMIT", offset, count)
+func zrangebylex(t *testing.T, db uint32, key string, min string, max string, offset int64, count int64, reverse bool, expect ...string) {
+	var x [][]byte
+	var err error
+	if !reverse {
+		x, err = testStore.ZRangeByLex(db, key, min, max, "LIMIT", offset, count)
+	} else {
+		x, err = testStore.ZRevRangeByLex(db, key, min, max, "LIMIT", offset, count)
+	}
 
 	checkerror(t, err, true)
 	checkerror(t, nil, len(x) == len(expect))
@@ -279,18 +290,29 @@ func TestZRangeByLex(t *testing.T) {
 	zadd(t, 0, "zset", 1, "f", 0)
 	zadd(t, 0, "zset", 1, "g", 0)
 
-	zrangebylex(t, 0, "zset", "-", "+", 0, 0)
-	zrangebylex(t, 0, "zset", "-", "+", 0, 1, "a")
-	zrangebylex(t, 0, "zset", "-", "(c", 0, -1, "a", "b")
-	zrangebylex(t, 0, "zset", "[c", "+", 0, 2, "c", "d")
-	zrangebylex(t, 0, "zset", "[c", "+", 1, 2, "d", "e")
+	zrangebylex(t, 0, "zset", "-", "+", 0, 0, false)
+	zrangebylex(t, 0, "zset", "-", "+", 0, 1, false, "a")
+	zrangebylex(t, 0, "zset", "-", "(c", 0, -1, false, "a", "b")
+	zrangebylex(t, 0, "zset", "[c", "+", 0, 2, false, "c", "d")
+	zrangebylex(t, 0, "zset", "[c", "+", 1, 2, false, "d", "e")
+	zrangebylex(t, 0, "zset", "[c", "-", 0, -1, true, "c", "b", "a")
+	zrangebylex(t, 0, "zset", "(c", "-", 0, -1, true, "b", "a")
+	zrangebylex(t, 0, "zset", "(g", "[aaa", 0, -1, true, "f", "e", "d", "c", "b")
+	zrangebylex(t, 0, "zset", "(g", "[aaa", 1, -1, true, "e", "d", "c", "b")
 
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
 }
 
-func zrangebyscore(t *testing.T, db uint32, key string, min string, max string, offset int64, count int64, expect ...string) {
-	x, err := testStore.ZRangeByScore(db, key, min, max, "LIMIT", offset, count)
+func zrangebyscore(t *testing.T, db uint32, key string, min string, max string, offset int64, count int64, reverse bool, expect ...string) {
+	var x [][]byte
+	var err error
+	if !reverse {
+		x, err = testStore.ZRangeByScore(db, key, min, max, "LIMIT", offset, count)
+	} else {
+		x, err = testStore.ZRevRangeByScore(db, key, min, max, "LIMIT", offset, count)
+
+	}
 
 	checkerror(t, err, true)
 	checkerror(t, nil, len(x) == len(expect))
@@ -308,19 +330,28 @@ func TestZRangeByScore(t *testing.T) {
 	zadd(t, 0, "zset", 1, "f", 6)
 	zadd(t, 0, "zset", 1, "g", 7)
 
-	zrangebyscore(t, 0, "zset", "0", "7", 0, 2, "a", "b")
-	zrangebyscore(t, 0, "zset", "-inf", "7", 0, 1, "a")
-	zrangebyscore(t, 0, "zset", "-inf", "7", 1, 1, "b")
-	zrangebyscore(t, 0, "zset", "8", "9", 1, 1)
+	zrangebyscore(t, 0, "zset", "0", "7", 0, 2, false, "a", "b")
+	zrangebyscore(t, 0, "zset", "-inf", "7", 0, 1, false, "a")
+	zrangebyscore(t, 0, "zset", "-inf", "7", 1, 1, false, "b")
+	zrangebyscore(t, 0, "zset", "(1", "(2", 1, 1, false)
+	zrangebyscore(t, 0, "zset", "8", "9", 1, 1, false)
+
+	zrangebyscore(t, 0, "zset", "+inf", "-inf", 0, 1, true, "g")
+	zrangebyscore(t, 0, "zset", "3", "(1", 0, -1, true, "c", "b")
+	zrangebyscore(t, 0, "zset", "(2", "(1", 0, -1, true)
 
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
 }
 
-func zrank(t *testing.T, db uint32, key string, member string, expect int64) {
-	x, err := testStore.ZRank(db, key, member)
-
-	checkerror(t, err, x == expect)
+func zrank(t *testing.T, db uint32, key string, member string, reverse bool, expect int64) {
+	if !reverse {
+		x, err := testStore.ZRank(db, key, member)
+		checkerror(t, err, x == expect)
+	} else {
+		x, err := testStore.ZRevRank(db, key, member)
+		checkerror(t, err, x == expect)
+	}
 }
 
 func TestZRank(t *testing.T) {
@@ -332,11 +363,16 @@ func TestZRank(t *testing.T) {
 	zadd(t, 0, "zset", 1, "f", 6)
 	zadd(t, 0, "zset", 1, "g", 7)
 
-	zrank(t, 0, "zset", "a", 0)
-	zrank(t, 0, "zset", "aa", -1)
-	zrank(t, 0, "zset", "d", 3)
-	zrank(t, 0, "zset", "g", 6)
-	zrank(t, 0, "zset_dummy", "a", -1)
+	zrank(t, 0, "zset", "a", false, 0)
+	zrank(t, 0, "zset", "aa", false, -1)
+	zrank(t, 0, "zset", "d", false, 3)
+	zrank(t, 0, "zset", "g", false, 6)
+	zrank(t, 0, "zset", "abc", false, -1)
+	zrank(t, 0, "zset_dummy", "a", false, -1)
+	zrank(t, 0, "zset", "g", true, 0)
+	zrank(t, 0, "zset", "a", true, 6)
+	zrank(t, 0, "zset_dummy", "a", true, -1)
+	zrank(t, 0, "zset", "abc", true, -1)
 
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
@@ -358,7 +394,7 @@ func TestZRemRangeByLex(t *testing.T) {
 
 	zremrangebylex(t, 0, "zset", "[a", "(c", 2)
 	zcard(t, 0, "zset", 5)
-	zrangebylex(t, 0, "zset", "-", "+", 0, -1, "c", "d", "e", "f", "g")
+	zrangebylex(t, 0, "zset", "-", "+", 0, -1, false, "c", "d", "e", "f", "g")
 	zremrangebylex(t, 0, "zset", "-", "+", 5)
 	zcard(t, 0, "zset", 0)
 
@@ -383,7 +419,7 @@ func TestZRemRangeByRank(t *testing.T) {
 	zremrangebyrank(t, 0, "zset", 0, 1, 2)
 	zcard(t, 0, "zset", 5)
 	zremrangebyrank(t, 0, "zset", 1, 2, 2)
-	zrangebylex(t, 0, "zset", "-", "+", 0, -1, "c", "f", "g")
+	zrangebylex(t, 0, "zset", "-", "+", 0, -1, false, "c", "f", "g")
 	zremrangebyrank(t, 0, "zset", 0, -1, 3)
 	zcard(t, 0, "zset", 0)
 
@@ -408,7 +444,7 @@ func TestZRemRangeByScore(t *testing.T) {
 	zremrangebyscore(t, 0, "zset", "1", "2", 2)
 	zcard(t, 0, "zset", 5)
 	zremrangebyscore(t, 0, "zset", "(3", "5", 2)
-	zrangebylex(t, 0, "zset", "-", "+", 0, -1, "c", "f", "g")
+	zrangebylex(t, 0, "zset", "-", "+", 0, -1, false, "c", "f", "g")
 	zremrangebyscore(t, 0, "zset", "-inf", "+inf", 3)
 	zcard(t, 0, "zset", 0)
 

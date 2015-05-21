@@ -628,6 +628,62 @@ func (o *zsetRow) travelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error
 	return nil
 }
 
+func (o *zsetRow) seekToLastInRange(it *storeIterator, r *rangeSpec) {
+	if r.Max == positiveInfScore {
+		o.Score = positiveInfScore
+	} else {
+		o.Score = r.Max + 1
+	}
+	o.Member = []byte{}
+
+	it.SeekTo(o.IndexKey())
+	if !it.Valid() {
+		// try seek to last
+		it.SeekToLast()
+	} else {
+		// there exists a data but is not mine
+		it.Prev()
+	}
+}
+
+// reverse travel zset in range, call f in every iteration.
+func (o *zsetRow) reverseTravelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
+
+	prefixKey := o.IndexKeyPrefix()
+
+	o.seekToLastInRange(it, r)
+
+	for ; it.Valid(); it.Prev() {
+		key := it.Key()
+		if !bytes.HasPrefix(key, prefixKey) {
+			return nil
+		}
+
+		key = key[len(prefixKey):]
+
+		if err := o.ParseIndexKeySuffix(key); err != nil {
+			return errors.Trace(err)
+		}
+
+		if r.InRange(o.Score) {
+			if err := f(o); err == errTravelBreak {
+				return nil
+			} else if err != nil {
+				return errors.Trace(err)
+			}
+		} else if !r.GteMin(o.Score) {
+			return nil
+		}
+	}
+
+	if err := it.Error(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
 // ZCOUNT key min max
 func (s *Store) ZCount(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
@@ -812,6 +868,58 @@ func (o *zsetRow) travelInLexRange(s *Store, r *lexRangeSpec, f func(o *zsetRow)
 	return nil
 }
 
+func (o *zsetRow) seekToLastInLexRange(it *storeIterator, r *lexRangeSpec) {
+	o.Score = positiveInfScore
+	o.Member = r.Max
+
+	it.SeekTo(o.IndexKey())
+	if !it.Valid() {
+		// we will try to use SeekToLast
+		it.SeekToLast()
+	} else {
+		// there is a data but not mine, step prev
+		it.Prev()
+	}
+}
+
+// reverse travel zset in lex range, call f in every iteration.
+func (o *zsetRow) reverseTravelInLexRange(s *Store, r *lexRangeSpec, f func(o *zsetRow) error) error {
+	it := s.getIterator()
+	defer s.putIterator(it)
+
+	prefixKey := o.IndexKeyPrefix()
+
+	o.seekToLastInLexRange(it, r)
+
+	for ; it.Valid(); it.Prev() {
+		key := it.Key()
+		if !bytes.HasPrefix(key, prefixKey) {
+			return nil
+		}
+
+		key = key[len(prefixKey):]
+
+		if err := o.ParseIndexKeySuffix(key); err != nil {
+			return errors.Trace(err)
+		}
+
+		if r.InRange(o.Member) {
+			if err := f(o); err == errTravelBreak {
+				return nil
+			} else if err != nil {
+				return errors.Trace(err)
+			}
+		} else if !r.GteMin(o.Member) {
+			return nil
+		}
+	}
+
+	if err := it.Error(); err != nil {
+		return errors.Trace(err)
+	}
+	return nil
+}
+
 // ZLEXCOUNT key min max
 func (s *Store) ZLexCount(db uint32, args ...interface{}) (int64, error) {
 	if len(args) != 3 {
@@ -855,8 +963,7 @@ func (s *Store) ZLexCount(db uint32, args ...interface{}) (int64, error) {
 	return count, nil
 }
 
-// ZRANGE key start stop [WITHSCORES]
-func (s *Store) ZRange(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) genericZRange(db uint32, args []interface{}, reverse bool) ([][]byte, error) {
 	if len(args) != 3 && len(args) != 4 {
 		return nil, errArguments("len(args) = %d, expect = 3/4", len(args))
 	}
@@ -916,11 +1023,23 @@ func (s *Store) ZRange(db uint32, args ...interface{}) ([][]byte, error) {
 		return nil
 	}
 
-	if err := o.travelInRange(s, r, f); err != nil {
-		return nil, errors.Trace(err)
+	if !reverse {
+		err = o.travelInRange(s, r, f)
+	} else {
+		err = o.reverseTravelInRange(s, r, f)
 	}
 
-	return res, nil
+	return res, errors.Trace(err)
+}
+
+// ZRANGE key start stop [WITHSCORES]
+func (s *Store) ZRange(db uint32, args ...interface{}) ([][]byte, error) {
+	return s.genericZRange(db, args, false)
+}
+
+// ZREVRANGE key start stop [WITHSCORES]
+func (s *Store) ZRevRange(db uint32, args ...interface{}) ([][]byte, error) {
+	return s.genericZRange(db, args, true)
 }
 
 func sanitizeIndexes(start int64, stop int64, size int64) (int64, int64, int64) {
@@ -947,8 +1066,7 @@ func sanitizeIndexes(start int64, stop int64, size int64) (int64, int64, int64) 
 	return start, stop, (stop - start) + 1
 }
 
-// ZRANGEBYLEX key min max [LIMIT offset count]
-func (s *Store) ZRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
+func (s *Store) genericZRangeBylex(db uint32, args []interface{}, reverse bool) ([][]byte, error) {
 	if len(args) != 3 && len(args) != 6 {
 		return nil, errArguments("len(args) = %d, expect = 3 or 6", len(args))
 	}
@@ -960,6 +1078,10 @@ func (s *Store) ZRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
 		if err := parseArgument(args[i], ref); err != nil {
 			return nil, errArguments("parse args[%d] failed, %s", i, err)
 		}
+	}
+
+	if reverse {
+		min, max = max, min
 	}
 
 	var offset int64 = 0
@@ -1009,15 +1131,26 @@ func (s *Store) ZRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
 		return nil
 	}
 
-	if err := o.travelInLexRange(s, r, f); err != nil {
-		return nil, errors.Trace(err)
+	if !reverse {
+		err = o.travelInLexRange(s, r, f)
+	} else {
+		err = o.reverseTravelInLexRange(s, r, f)
 	}
 
-	return res, nil
+	return res, errors.Trace(err)
 }
 
-// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
-func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) {
+// ZRANGEBYLEX key min max [LIMIT offset count]
+func (s *Store) ZRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
+	return s.genericZRangeBylex(db, args, false)
+}
+
+// ZRevRANGEBYLEX key min max [LIMIT offset count]
+func (s *Store) ZRevRangeByLex(db uint32, args ...interface{}) ([][]byte, error) {
+	return s.genericZRangeBylex(db, args, true)
+}
+
+func (s *Store) genericZRangeByScore(db uint32, args []interface{}, reverse bool) ([][]byte, error) {
 	if len(args) < 3 {
 		return nil, errArguments("len(args) = %d, expect >= 3", len(args))
 	}
@@ -1029,6 +1162,10 @@ func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) 
 		if err := parseArgument(args[i], ref); err != nil {
 			return nil, errArguments("parse args[%d] failed, %s", i, err)
 		}
+	}
+
+	if reverse {
+		min, max = max, min
 	}
 
 	r, err := parseRangeSpec(min, max)
@@ -1091,15 +1228,26 @@ func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) 
 		return nil, err
 	}
 
-	if err := o.travelInRange(s, r, f); err != nil {
-		return nil, errors.Trace(err)
+	if !reverse {
+		err = o.travelInRange(s, r, f)
+	} else {
+		err = o.reverseTravelInRange(s, r, f)
 	}
 
-	return res, nil
+	return res, errors.Trace(err)
 }
 
-// ZRANK key member
-func (s *Store) ZRank(db uint32, args ...interface{}) (int64, error) {
+// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) {
+	return s.genericZRangeByScore(db, args, false)
+}
+
+// ZREVRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (s *Store) ZRevRangeByScore(db uint32, args ...interface{}) ([][]byte, error) {
+	return s.genericZRangeByScore(db, args, true)
+}
+
+func (s *Store) genericZRank(db uint32, args []interface{}, reverse bool) (int64, error) {
 	if len(args) != 2 {
 		return 0, errArguments("len(args) = %d, expect 2", len(args))
 	}
@@ -1147,7 +1295,21 @@ func (s *Store) ZRank(db uint32, args ...interface{}) (int64, error) {
 		return 0, errors.Trace(err)
 	}
 
-	return n - 1, nil
+	if !reverse {
+		return n - 1, nil
+	} else {
+		return o.Size - n, nil
+	}
+}
+
+// ZRANK key member
+func (s *Store) ZRank(db uint32, args ...interface{}) (int64, error) {
+	return s.genericZRank(db, args, false)
+}
+
+// ZREVRANK key member
+func (s *Store) ZRevRank(db uint32, args ...interface{}) (int64, error) {
+	return s.genericZRank(db, args, true)
 }
 
 // ZREMRANGEBYLEX key min max
