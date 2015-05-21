@@ -6,8 +6,10 @@ package store
 import (
 	"bytes"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/redis/rdb"
@@ -727,17 +729,41 @@ func (s *Store) ZCount(db uint32, args ...interface{}) (int64, error) {
 	return count, nil
 }
 
+var (
+	minString []byte = make([]byte, 9)
+	maxString []byte = make([]byte, 9)
+)
+
+// we can only use internal pointer to check whether slice is min/max string or not.
+func isSameSlice(a []byte, b []byte) bool {
+	pa := (*reflect.SliceHeader)(unsafe.Pointer(&a))
+	pb := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	return pa.Data == pb.Data
+}
+
+func isMinString(a []byte) bool {
+	return isSameSlice(a, minString)
+}
+
+func isMaxString(a []byte) bool {
+	return isSameSlice(a, maxString)
+}
+
+func isInfSting(a []byte) bool {
+	return isMinString(a) || isMaxString(a)
+}
+
 type lexRangeSpec struct {
-	Min   []byte //use nil for min string
-	Max   []byte //use empty slice for max string
+	Min   []byte
+	Max   []byte
 	MinEx bool
 	MaxEx bool
 }
 
 func (r *lexRangeSpec) GteMin(v []byte) bool {
-	if r.Min == nil {
+	if isMinString(r.Min) {
 		return true
-	} else if len(r.Min) == 0 {
+	} else if isMaxString(r.Min) {
 		return false
 	}
 
@@ -749,10 +775,10 @@ func (r *lexRangeSpec) GteMin(v []byte) bool {
 }
 
 func (r *lexRangeSpec) LteMax(v []byte) bool {
-	if r.Max == nil {
-		return false
-	} else if len(r.Max) == 0 {
+	if isMaxString(r.Max) {
 		return true
+	} else if isMinString(r.Max) {
+		return false
 	}
 
 	if r.MaxEx {
@@ -763,10 +789,12 @@ func (r *lexRangeSpec) LteMax(v []byte) bool {
 }
 
 func (r *lexRangeSpec) InRange(v []byte) bool {
-	if bytes.Compare(r.Min, r.Max) == 0 && (r.MinEx || r.MaxEx) {
-		return false
-	} else if len(r.Min) > 0 && len(r.Max) > 0 && bytes.Compare(r.Min, r.Max) > 0 {
-		return false
+	if !isInfSting(r.Min) && !isInfSting(r.Max) {
+		if bytes.Compare(r.Min, r.Max) == 0 && (r.MinEx || r.MaxEx) {
+			return false
+		} else if bytes.Compare(r.Min, r.Max) > 0 {
+			return false
+		}
 	}
 
 	if !r.GteMin(v) {
@@ -793,12 +821,12 @@ func parseLexRangeItem(buf []byte) ([]byte, bool, error) {
 		if len(buf) > 1 {
 			return nil, false, errors.Errorf("invalid lex range item, only +  allowed, but %s", buf)
 		}
-		dest = []byte{}
+		dest = maxString
 	case '-':
 		if len(buf) > 1 {
 			return nil, false, errors.Errorf("invalid lex range item, only - allowed, but %s", buf)
 		}
-		dest = nil
+		dest = minString
 	case '(', '[':
 		dest = buf[1:]
 		if len(dest) == 0 {
