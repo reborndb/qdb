@@ -37,12 +37,20 @@ func (it *Iterator) SeekToFirst() {
 	it.iter.SeekToFirst()
 }
 
+func (it *Iterator) SeekToLast() {
+	it.iter.SeekToLast()
+}
+
 func (it *Iterator) Valid() bool {
 	return it.err == nil && it.iter.Valid()
 }
 
 func (it *Iterator) Next() {
 	it.iter.Next()
+}
+
+func (it *Iterator) Prev() {
+	it.iter.Prev()
 }
 
 func (it *Iterator) Key() []byte {
