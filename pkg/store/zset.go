@@ -589,37 +589,6 @@ func parseRange(min []byte, max []byte) (*rangeSpec, error) {
 	return &r, nil
 }
 
-// Seek to the last node that is contained in the specified range.
-// return true for successful found
-func (o *zsetRow) seekFirstInRange(s *Store, it *storeIterator, r *rangeSpec) (bool, error) {
-	o.Score = r.Min
-	o.Member = []byte{}
-
-	it.SeekTo(o.IndexKey())
-	prefixKey := o.IndexKeyPrefix()
-	for ; it.Valid(); it.Next() {
-		key := it.Key()
-		if !bytes.HasPrefix(key, prefixKey) {
-			return false, nil
-		}
-
-		key = key[len(prefixKey):]
-
-		if err := o.ParseIndexKeySuffix(key); err != nil {
-			return false, errors.Trace(err)
-		} else if r.GteMin(o.Score) {
-			break
-		}
-	}
-
-	if err := it.Error(); err != nil {
-		return false, errors.Trace(err)
-	}
-
-	// check score <= max
-	return r.LteMax(o.Score), nil
-}
-
 // travel zset in range, call f in every iteration.
 func (o *zsetRow) travelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error) error {
 	it := s.getIterator()
@@ -1186,4 +1155,63 @@ func (s *Store) ZRank(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	return n - 1, nil
+}
+
+// ZREMRANGEBYLEX key min max
+func (s *Store) ZRemRangeByLex(db uint32, args ...interface{}) (int64, error) {
+	if len(args) != 3 {
+		return 0, errArguments("len(args) = %d, expect 3", len(args))
+	}
+
+	var key []byte
+	var min []byte
+	var max []byte
+
+	for i, ref := range []interface{}{&key, &min, &max} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return 0, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	r, err := parseLexRangeSpec(min, max)
+	if err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return 0, err
+	} else if o == nil {
+		return 0, nil
+	}
+
+	bt := engine.NewBatch()
+	n := int64(0)
+
+	f := func(o *zsetRow) error {
+		bt.Del(o.DataKey())
+		bt.Del(o.IndexKey())
+		n++
+		return nil
+	}
+
+	if err := o.travelInLexRange(s, r, f); err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if n > 0 {
+		if o.Size -= n; o.Size > 0 {
+			bt.Set(o.MetaKey(), o.MetaValue())
+		} else {
+			bt.Del(o.MetaKey())
+		}
+	}
+
+	fw := &Forward{DB: db, Op: "ZRemRangeByLex", Args: args}
+	return n, s.commit(bt, fw)
 }

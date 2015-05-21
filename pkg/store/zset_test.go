@@ -341,3 +341,27 @@ func TestZRank(t *testing.T) {
 	zdel(t, 0, "zset", 1)
 	checkempty(t)
 }
+
+func zremrangebylex(t *testing.T, db uint32, key string, min string, max string, expect int64) {
+	x, err := testStore.ZRemRangeByLex(db, key, min, max)
+	checkerror(t, err, x == expect)
+}
+
+func TestZRemRangeByLex(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 0)
+	zadd(t, 0, "zset", 1, "b", 0)
+	zadd(t, 0, "zset", 1, "c", 0)
+	zadd(t, 0, "zset", 1, "d", 0)
+	zadd(t, 0, "zset", 1, "e", 0)
+	zadd(t, 0, "zset", 1, "f", 0)
+	zadd(t, 0, "zset", 1, "g", 0)
+
+	zremrangebylex(t, 0, "zset", "[a", "(c", 2)
+	zcard(t, 0, "zset", 5)
+	zrangebylex(t, 0, "zset", "-", "+", 0, -1, "c", "d", "e", "f", "g")
+	zremrangebylex(t, 0, "zset", "-", "+", 5)
+	zcard(t, 0, "zset", 0)
+
+	zdel(t, 0, "zset", 0)
+	checkempty(t)
+}

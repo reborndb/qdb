@@ -137,3 +137,13 @@ func (s *testServiceSuite) TestZRank(c *C) {
 	s.checkInt(c, 2, "zrank", k, "c")
 	s.checkBytes(c, nil, "zrank", k, "d")
 }
+
+func (s *testServiceSuite) TestZRemRangeByLex(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 0, "a", 0, "b", 0, "c")
+
+	s.checkInt(c, 1, "zremrangebylex", k, "[a", "(b")
+	s.checkInt(c, 0, "zremrangebylex", k, "[a", "(b")
+	s.checkInt(c, 2, "zremrangebylex", k, "-", "+")
+	s.checkInt(c, 0, "zremrangebylex", k, "-", "+")
+}
