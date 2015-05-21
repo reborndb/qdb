@@ -21,11 +21,11 @@ type hashRow struct {
 
 func newHashRow(db uint32, key []byte) *hashRow {
 	o := &hashRow{}
-	o.lazyInit(newStoreRowHelper(db, key, HashCode))
+	o.lazyInit(db, key, newStoreRowHelper(db, key, HashCode))
 	return o
 }
 
-func (o *hashRow) lazyInit(h *storeRowHelper) {
+func (o *hashRow) lazyInit(db uint32, key []byte, h *storeRowHelper) {
 	o.storeRowHelper = h
 	o.dataKeyRefs = []interface{}{&o.Field}
 	o.metaValueRefs = []interface{}{&o.Size}

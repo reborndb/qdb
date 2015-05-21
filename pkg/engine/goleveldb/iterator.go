@@ -24,12 +24,20 @@ func (it *Iterator) SeekToFirst() {
 	it.iter.First()
 }
 
+func (it *Iterator) SeekToLast() {
+	it.iter.Last()
+}
+
 func (it *Iterator) Valid() bool {
 	return it.iter.Valid()
 }
 
 func (it *Iterator) Next() {
 	it.iter.Next()
+}
+
+func (it *Iterator) Prev() {
+	it.iter.Prev()
 }
 
 func (it *Iterator) Key() []byte {

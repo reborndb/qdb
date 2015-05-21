@@ -17,11 +17,11 @@ type stringRow struct {
 
 func newStringRow(db uint32, key []byte) *stringRow {
 	o := &stringRow{}
-	o.lazyInit(newStoreRowHelper(db, key, StringCode))
+	o.lazyInit(db, key, newStoreRowHelper(db, key, StringCode))
 	return o
 }
 
-func (o *stringRow) lazyInit(h *storeRowHelper) {
+func (o *stringRow) lazyInit(db uint32, key []byte, h *storeRowHelper) {
 	o.storeRowHelper = h
 	o.dataKeyRefs = nil
 	o.metaValueRefs = nil

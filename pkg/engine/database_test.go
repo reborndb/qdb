@@ -98,6 +98,21 @@ func (s *testEngineSuite) testIterator(c *C, db Database) {
 
 	it.Next()
 	c.Assert(it.Valid(), Equals, false)
+
+	it.SeekToLast()
+	c.Assert(it.Valid(), Equals, true)
+	c.Assert(string(it.Key()), Equals, "key_9")
+	c.Assert(string(it.Value()), Equals, "value_9")
+
+	for i := 1; i < 10; i++ {
+		it.Prev()
+		c.Assert(it.Valid(), Equals, true)
+		c.Assert(string(it.Key()), Equals, fmt.Sprintf("key_%d", 9-i))
+		c.Assert(string(it.Value()), Equals, fmt.Sprintf("value_%d", 9-i))
+	}
+
+	it.Prev()
+	c.Assert(it.Valid(), Equals, false)
 }
 
 func (s *testEngineSuite) testSnapshot(c *C, db Database) {

@@ -27,11 +27,11 @@ type listRow struct {
 
 func newListRow(db uint32, key []byte) *listRow {
 	o := &listRow{}
-	o.lazyInit(newStoreRowHelper(db, key, ListCode))
+	o.lazyInit(db, key, newStoreRowHelper(db, key, ListCode))
 	return o
 }
 
-func (o *listRow) lazyInit(h *storeRowHelper) {
+func (o *listRow) lazyInit(db uint32, key []byte, h *storeRowHelper) {
 	o.storeRowHelper = h
 	o.dataKeyRefs = []interface{}{&o.Index}
 	o.metaValueRefs = []interface{}{&o.Lindex, &o.Rindex}

@@ -98,7 +98,7 @@ type storeRow interface {
 	SetExpireAt(expireat uint64)
 	IsExpired() bool
 
-	lazyInit(h *storeRowHelper)
+	lazyInit(db uint32, key []byte, h *storeRowHelper)
 	storeObject(s *Store, bt *engine.Batch, expireat uint64, obj interface{}) error
 	deleteObject(s *Store, bt *engine.Batch) error
 	loadObjectValue(r storeReader) (interface{}, error)
@@ -141,7 +141,7 @@ func loadStoreRow(r storeReader, db uint32, key []byte) (storeRow, error) {
 	case SetCode:
 		o = new(setRow)
 	}
-	o.lazyInit(&storeRowHelper{
+	o.lazyInit(db, key, &storeRowHelper{
 		code:          code,
 		metaKey:       metaKey,
 		dataKeyPrefix: EncodeDataKeyPrefix(db, key),
@@ -251,6 +251,9 @@ func IsExpired(expireat uint64) bool {
 const (
 	MetaCode = byte('#')
 	DataCode = byte('&')
+
+	// for zset
+	indexCode = byte('+')
 )
 
 type ObjectCode byte
@@ -300,6 +303,8 @@ func encodeRawBytes(w *BufWriter, refs ...interface{}) {
 			err = w.WriteFloat64(*x)
 		case *[]byte:
 			err = w.WriteVarbytes(*x)
+		case *ScoreInt:
+			err = w.WriteInt64(int64(*x))
 		default:
 			log.Panicf("unsupported type in row value: %+v", x)
 		}
@@ -359,6 +364,18 @@ func decodeRawBytes(r *BufReader, err error, refs ...interface{}) error {
 			*x = v
 		case *float64:
 			v, err := r.ReadFloat64()
+			if err != nil {
+				return err
+			}
+			*x = v
+		case *ScoreInt:
+			v, err := r.ReadInt64()
+			if err != nil {
+				return err
+			}
+			*x = ScoreInt(v)
+		case *byte:
+			v, err := r.ReadByte()
 			if err != nil {
 				return err
 			}

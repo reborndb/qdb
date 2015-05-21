@@ -131,6 +131,17 @@ func ParseInt(i interface{}) (int64, error) {
 	return v, errors.Trace(err)
 }
 
+func FormatString(i interface{}) string {
+	switch y := i.(type) {
+	case []byte:
+		return string(y)
+	case string:
+		return y
+	default:
+		return fmt.Sprintf("%v", y)
+	}
+}
+
 func FormatFloat(v float64) []byte {
 	return []byte(FormatFloatString(v))
 }

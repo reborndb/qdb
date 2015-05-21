@@ -100,7 +100,7 @@ func (h *Handler) ZScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	} else if !ok {
 		return redis.NewBulkBytes(nil), nil
 	} else {
-		return redis.NewString(store.FormatFloatString(v)), nil
+		return redis.NewBulkBytes(store.FormatInt(v)), nil
 	}
 }
 
@@ -118,6 +118,268 @@ func (h *Handler) ZIncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if v, err := s.Store().ZIncrBy(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
-		return redis.NewString(store.FormatFloatString(v)), nil
+		return redis.NewBulkBytes(store.FormatInt(v)), nil
+	}
+}
+
+// ZCOUNT key min max
+func (h *Handler) ZCount(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect = 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZCount(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}
+
+// ZLEXCOUNT key min max
+func (h *Handler) ZLexCount(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect = 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZLexCount(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}
+
+// ZRANGE key start stop [WITHSCORES]
+func (h *Handler) ZRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 && len(args) != 4 {
+		return toRespErrorf("len(args) = %d, expect = 3 or 4", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRange(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}
+
+// ZREVRANGE key start stop [WITHSCORES]
+func (h *Handler) ZRevRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 && len(args) != 4 {
+		return toRespErrorf("len(args) = %d, expect = 3 or 4", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRevRange(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}
+
+// ZRANGEBYLEX key start stop [LIMIT offset count]
+func (h *Handler) ZRangeByLex(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 && len(args) != 6 {
+		return toRespErrorf("len(args) = %d, expect = 3 or 6", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRangeByLex(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}
+
+// ZREVRANGEBYLEX key start stop [LIMIT offset count]
+func (h *Handler) ZRevRangeByLex(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 && len(args) != 6 {
+		return toRespErrorf("len(args) = %d, expect = 3 or 6", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRevRangeByLex(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}
+
+// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (h *Handler) ZRangeByScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) < 3 {
+		return toRespErrorf("len(args) = %d, expect >= 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRangeByScore(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}
+
+// ZREVRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+func (h *Handler) ZRevRangeByScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) < 3 {
+		return toRespErrorf("len(args) = %d, expect >= 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if ay, err := s.Store().ZRevRangeByScore(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		resp := redis.NewArray()
+		for _, v := range ay {
+			resp.AppendBulkBytes(v)
+		}
+		return resp, nil
+	}
+}
+
+// ZRANK key member
+func (h *Handler) ZRank(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 2 {
+		return toRespErrorf("len(args) = %d, expect 2", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRank(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else if v >= 0 {
+		return redis.NewInt(v), nil
+	} else {
+		return redis.NewBulkBytes(nil), nil
+	}
+}
+
+// ZREVRANK key member
+func (h *Handler) ZRevRank(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 2 {
+		return toRespErrorf("len(args) = %d, expect 2", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRevRank(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else if v >= 0 {
+		return redis.NewInt(v), nil
+	} else {
+		return redis.NewBulkBytes(nil), nil
+	}
+}
+
+// ZREMRANGEBYLEX key min max
+func (h *Handler) ZRemRangeByLex(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRemRangeByLex(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}
+
+// ZREMRANGEBYRANK key start stop
+func (h *Handler) ZRemRangeByRank(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRemRangeByRank(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}
+
+// ZREMRANGEBYSCORE key min max
+func (h *Handler) ZRemRangeByScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRemRangeByScore(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
 	}
 }
