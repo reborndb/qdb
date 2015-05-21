@@ -261,3 +261,39 @@ func (h *Handler) ZRemRangeByLex(arg0 interface{}, args [][]byte) (redis.Resp, e
 		return redis.NewInt(v), nil
 	}
 }
+
+// ZREMRANGEBYRANK key start stop
+func (h *Handler) ZRemRangeByRank(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRemRangeByRank(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}
+
+// ZREMRANGEBYSCORE key min max
+func (h *Handler) ZRemRangeByScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 3 {
+		return toRespErrorf("len(args) = %d, expect 3", len(args))
+	}
+
+	s, err := session(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if v, err := s.Store().ZRemRangeByScore(s.DB(), iconvert(args)...); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(v), nil
+	}
+}

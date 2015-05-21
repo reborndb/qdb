@@ -365,3 +365,53 @@ func TestZRemRangeByLex(t *testing.T) {
 	zdel(t, 0, "zset", 0)
 	checkempty(t)
 }
+
+func zremrangebyrank(t *testing.T, db uint32, key string, start int64, stop int64, expect int64) {
+	x, err := testStore.ZRemRangeByRank(db, key, start, stop)
+	checkerror(t, err, x == expect)
+}
+
+func TestZRemRangeByRank(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 1)
+	zadd(t, 0, "zset", 1, "b", 2)
+	zadd(t, 0, "zset", 1, "c", 3)
+	zadd(t, 0, "zset", 1, "d", 4)
+	zadd(t, 0, "zset", 1, "e", 5)
+	zadd(t, 0, "zset", 1, "f", 6)
+	zadd(t, 0, "zset", 1, "g", 7)
+
+	zremrangebyrank(t, 0, "zset", 0, 1, 2)
+	zcard(t, 0, "zset", 5)
+	zremrangebyrank(t, 0, "zset", 1, 2, 2)
+	zrangebylex(t, 0, "zset", "-", "+", 0, -1, "c", "f", "g")
+	zremrangebyrank(t, 0, "zset", 0, -1, 3)
+	zcard(t, 0, "zset", 0)
+
+	zdel(t, 0, "zset", 0)
+	checkempty(t)
+}
+
+func zremrangebyscore(t *testing.T, db uint32, key string, min string, max string, expect int64) {
+	x, err := testStore.ZRemRangeByScore(db, key, min, max)
+	checkerror(t, err, x == expect)
+}
+
+func TestZRemRangeByScore(t *testing.T) {
+	zadd(t, 0, "zset", 1, "a", 1)
+	zadd(t, 0, "zset", 1, "b", 2)
+	zadd(t, 0, "zset", 1, "c", 3)
+	zadd(t, 0, "zset", 1, "d", 4)
+	zadd(t, 0, "zset", 1, "e", 5)
+	zadd(t, 0, "zset", 1, "f", 6)
+	zadd(t, 0, "zset", 1, "g", 7)
+
+	zremrangebyscore(t, 0, "zset", "1", "2", 2)
+	zcard(t, 0, "zset", 5)
+	zremrangebyscore(t, 0, "zset", "(3", "5", 2)
+	zrangebylex(t, 0, "zset", "-", "+", 0, -1, "c", "f", "g")
+	zremrangebyscore(t, 0, "zset", "-inf", "+inf", 3)
+	zcard(t, 0, "zset", 0)
+
+	zdel(t, 0, "zset", 0)
+	checkempty(t)
+}

@@ -147,3 +147,21 @@ func (s *testServiceSuite) TestZRemRangeByLex(c *C) {
 	s.checkInt(c, 2, "zremrangebylex", k, "-", "+")
 	s.checkInt(c, 0, "zremrangebylex", k, "-", "+")
 }
+
+func (s *testServiceSuite) TestZRemRangeByRank(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 1, "a", 2, "b", 3, "c")
+
+	s.checkInt(c, 1, "zremrangebyrank", k, "0", "0")
+	s.checkInt(c, 2, "zremrangebyrank", k, "0", "2")
+	s.checkInt(c, 0, "zremrangebyrank", k, "3", "2")
+}
+
+func (s *testServiceSuite) TestZRemRangeByScore(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 3, "zadd", k, 1, "a", 2, "b", 3, "c")
+
+	s.checkInt(c, 1, "zremrangebyscore", k, "1", "(2")
+	s.checkInt(c, 2, "zremrangebyscore", k, "2", "+inf")
+	s.checkInt(c, 0, "zremrangebyscore", k, "-inf", "+inf")
+}

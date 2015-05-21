@@ -574,7 +574,7 @@ func parseRangeScore(buf []byte) (ScoreInt, bool, error) {
 	}
 }
 
-func parseRange(min []byte, max []byte) (*rangeSpec, error) {
+func parseRangeSpec(min []byte, max []byte) (*rangeSpec, error) {
 	var r rangeSpec
 	var err error
 
@@ -643,7 +643,7 @@ func (s *Store) ZCount(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	r, err := parseRange(min, max)
+	r, err := parseRangeSpec(min, max)
 	if err != nil {
 		return 0, errors.Trace(err)
 	}
@@ -1038,7 +1038,7 @@ func (s *Store) ZRangeByScore(db uint32, args ...interface{}) ([][]byte, error) 
 		}
 	}
 
-	r, err := parseRange(min, max)
+	r, err := parseRangeSpec(min, max)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -1213,5 +1213,137 @@ func (s *Store) ZRemRangeByLex(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	fw := &Forward{DB: db, Op: "ZRemRangeByLex", Args: args}
+	return n, s.commit(bt, fw)
+}
+
+// ZREMRANGEBYRANK key start stop
+func (s *Store) ZRemRangeByRank(db uint32, args ...interface{}) (int64, error) {
+	if len(args) != 3 {
+		return 0, errArguments("len(args) = %d, expect 3", len(args))
+	}
+
+	var key []byte
+	var start int64
+	var stop int64
+
+	for i, ref := range []interface{}{&key, &start, &stop} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return 0, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	r := &rangeSpec{Min: MinScore, Max: MaxScore, MinEx: false, MaxEx: false}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return 0, err
+	} else if o == nil {
+		return 0, nil
+	}
+
+	var rangeLen int64
+	start, stop, rangeLen = sanitizeIndexes(start, stop, o.Size)
+
+	if rangeLen == 0 {
+		return 0, nil
+	}
+
+	bt := engine.NewBatch()
+	n := int64(0)
+
+	offset := int64(0)
+
+	f := func(o *zsetRow) error {
+		if offset >= start {
+			bt.Del(o.DataKey())
+			bt.Del(o.IndexKey())
+			n++
+			rangeLen--
+			if rangeLen <= 0 {
+				return errTravelBreak
+			}
+
+		}
+		offset++
+		return nil
+	}
+
+	if err := o.travelInRange(s, r, f); err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if n > 0 {
+		if o.Size -= n; o.Size > 0 {
+			bt.Set(o.MetaKey(), o.MetaValue())
+		} else {
+			bt.Del(o.MetaKey())
+		}
+	}
+
+	fw := &Forward{DB: db, Op: "ZRemRangeByRank", Args: args}
+	return n, s.commit(bt, fw)
+}
+
+// ZREMRANGEBYSCORE key min max
+func (s *Store) ZRemRangeByScore(db uint32, args ...interface{}) (int64, error) {
+	if len(args) != 3 {
+		return 0, errArguments("len(args) = %d, expect 3", len(args))
+	}
+
+	var key []byte
+	var min []byte
+	var max []byte
+
+	for i, ref := range []interface{}{&key, &min, &max} {
+		if err := parseArgument(args[i], ref); err != nil {
+			return 0, errArguments("parse args[%d] failed, %s", i, err)
+		}
+	}
+
+	r, err := parseRangeSpec(min, max)
+	if err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadZSetRow(db, key, true)
+	if err != nil {
+		return 0, err
+	} else if o == nil {
+		return 0, nil
+	}
+
+	bt := engine.NewBatch()
+	n := int64(0)
+
+	f := func(o *zsetRow) error {
+		bt.Del(o.DataKey())
+		bt.Del(o.IndexKey())
+		n++
+		return nil
+	}
+
+	if err := o.travelInRange(s, r, f); err != nil {
+		return 0, errors.Trace(err)
+	}
+
+	if n > 0 {
+		if o.Size -= n; o.Size > 0 {
+			bt.Set(o.MetaKey(), o.MetaValue())
+		} else {
+			bt.Del(o.MetaKey())
+		}
+	}
+
+	fw := &Forward{DB: db, Op: "ZRemRangeByScore", Args: args}
 	return n, s.commit(bt, fw)
 }
