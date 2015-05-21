@@ -843,15 +843,8 @@ func (s *Store) ZLexCount(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	var count int64 = 0
-	firstScore := negativeInfScore
 	f := func(o *zsetRow) error {
 		count++
-		if firstScore == negativeInfScore {
-			firstScore = o.Score
-		}
-		if firstScore != o.Score {
-			return errTravelBreak
-		}
 		return nil
 	}
 
