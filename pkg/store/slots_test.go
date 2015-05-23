@@ -11,95 +11,17 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
-	"testing"
 	"time"
 
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
+	. "gopkg.in/check.v1"
 )
 
-func TestSlotNum(t *testing.T) {
-	tests := [][]string{
-		[]string{"", ""},
-		[]string{"{", "{"},
-		[]string{"{test", "{test"},
-		[]string{"{test{0}", "test{0"},
-		[]string{"test{a}", "a"},
-		[]string{"{b}test", "b"},
-		[]string{"}test{c}", "c"},
-		[]string{"}test", "}test"},
-		[]string{"}test1{test2{d}}{e}", "test2{d"},
-	}
-	for _, p := range tests {
-		key, tag := []byte(p[0]), []byte(p[1])
-		checkerror(t, nil, bytes.Equal(HashTag(key), tag))
-	}
-	const n = MaxSlotNum * 32
-	for i := 0; i < n; i++ {
-		key := []byte(fmt.Sprintf("key_%d_%d", rand.Int(), rand.Int()))
-		checkerror(t, nil, bytes.Equal(HashTag(key), key))
-	}
-	for i := 0; i < n; i++ {
-		v := rand.Int()
-		tag := []byte(fmt.Sprintf("%d", v))
-		key := []byte(fmt.Sprintf("key_{%d}_%d", v, rand.Int()))
-		checkerror(t, nil, bytes.Equal(HashTag(key), tag))
-	}
-}
-
-func xslotsrestore(t *testing.T, db uint32, args ...interface{}) {
-	x := []interface{}{}
-	for i, a := range args {
-		switch i % 3 {
-		case 0, 1:
-			x = append(x, a)
-		case 2:
-			dump, err := rdb.EncodeDump(rdb.String([]byte(a.(string))))
-			checkerror(t, err, true)
-			x = append(x, dump)
-		}
-	}
-	err := testStore.SlotsRestore(db, x...)
-	checkerror(t, err, true)
-}
-
-func slotsinfo(t *testing.T, db uint32, sum int64) {
-	m, err := testStore.SlotsInfo(db)
-	checkerror(t, err, m != nil)
-	a := int64(0)
-	for _, v := range m {
-		a += v
-	}
-	checkerror(t, nil, a == sum)
-}
-
-func TestSlotsRestore(t *testing.T) {
-	xslotsrestore(t, 0, "key", 1000, "hello")
-	xget(t, 0, "key", "hello")
-	kpttl(t, 0, "key", 1000)
-
-	xslotsrestore(t, 0, "key", 8000, "world")
-	xget(t, 0, "key", "world")
-	kpttl(t, 0, "key", 8000)
-
-	xslotsrestore(t, 0, "key", 2000, "abc0", "key", 6000, "abc2")
-	xget(t, 0, "key", "abc2")
-	kpttl(t, 0, "key", 6000)
-
-	xslotsrestore(t, 0, "key", 1000, "abc3", "key", 1000, "abc1")
-	xget(t, 0, "key", "abc1")
-	kpttl(t, 0, "key", 1000)
-
-	slotsinfo(t, 0, 1)
-	xdel(t, 0, "key", 1)
-	slotsinfo(t, 0, 0)
-	checkempty(t)
-}
-
-func checkconn(t *testing.T) (*net.TCPAddr, net.Conn) {
+func (s *testStoreSuite) checkConn(c *C) (*net.TCPAddr, net.Conn) {
 	l, err := net.Listen("tcp4", ":0")
-	checkerror(t, err, true)
+	c.Assert(err, IsNil)
 	defer l.Close()
 
 	addr := l.Addr().(*net.TCPAddr)
@@ -116,29 +38,40 @@ func checkconn(t *testing.T) (*net.TCPAddr, net.Conn) {
 	}()
 
 	conn, err := getSockConn(addr.String(), time.Second)
-	checkerror(t, err, true)
+	c.Assert(err, IsNil)
+
 	putSockConn(addr.String(), conn)
 
 	o := <-x
 	if err, ok := o.(error); ok {
-		checkerror(t, err, false)
+		if c.Check(err, NotNil) {
+			c.Fatal(err)
+		}
 	}
 	return addr, o.(net.Conn)
 }
 
-func checkslotsmgrt(t *testing.T, r *bufio.Reader, w *bufio.Writer, c chan error, expect ...interface{}) {
+func (s *testStoreSuite) checkSlotsMgrt(c *C, r *bufio.Reader, w *bufio.Writer, cc chan error, expect ...interface{}) {
 	if len(expect) != 0 {
 		req1, err := redis.Decode(r)
-		checkerror(t, err, true)
-		cmd1, args1, err := redis.ParseArgs(req1)
-		checkerror(t, err, cmd1 == "select" && len(args1) == 1)
+		c.Assert(err, IsNil)
 
-		checkerror(t, redis.Encode(w, redis.NewString("OK")), true)
-		checkerror(t, w.Flush(), true)
+		cmd1, args1, err := redis.ParseArgs(req1)
+		c.Assert(err, IsNil)
+		c.Assert(cmd1, Equals, "select")
+		c.Assert(len(args1), Equals, 1)
+
+		err = redis.Encode(w, redis.NewString("OK"))
+		c.Assert(err, IsNil)
+
+		err = w.Flush()
+		c.Assert(err, IsNil)
 
 		req2, err := redis.Decode(r)
 		cmd2, args2, err := redis.ParseArgs(req2)
-		checkerror(t, err, cmd2 == "slotsrestore" && len(args2) == len(expect))
+		c.Assert(err, IsNil)
+		c.Assert(cmd2, Equals, "slotsrestore")
+		c.Assert(len(args2), Equals, len(expect))
 
 		m := make(map[string]*struct {
 			key, value string
@@ -150,7 +83,7 @@ func checkslotsmgrt(t *testing.T, r *bufio.Reader, w *bufio.Writer, c chan error
 				ttlms      uint64
 			}{key: expect[i*3].(string), value: expect[i*3+2].(string)}
 			v.ttlms, err = ParseUint(expect[i*3+1])
-			checkerror(t, err, true)
+			c.Assert(err, IsNil)
 			m[v.key] = v
 		}
 
@@ -160,38 +93,74 @@ func checkslotsmgrt(t *testing.T, r *bufio.Reader, w *bufio.Writer, c chan error
 			value := args2[i*3+2]
 
 			v := m[string(key)]
-			checkerror(t, nil, v != nil)
-			checkerror(t, nil, string(key) == v.key)
+			c.Assert(v, NotNil)
+			c.Assert(string(key), Equals, v.key)
 
 			b, err := rdb.DecodeDump(value)
-			checkerror(t, err, string(b.(rdb.String)) == v.value)
+			c.Assert(err, IsNil)
+			c.Assert(string(b.(rdb.String)), Equals, v.value)
+
 			x, err := strconv.Atoi(string(ttlms))
-			checkerror(t, err, true)
+			c.Assert(err, IsNil)
+
 			if v.ttlms == 0 {
-				checkerror(t, nil, x == 0)
+				c.Assert(x, Equals, 0)
 			} else {
-				checkerror(t, nil, x != 0)
-				checkerror(t, nil, math.Abs(float64(x)-float64(v.ttlms)) < 1000)
+				c.Assert(x, Not(Equals), 0)
+				c.Assert(math.Abs(float64(x)-float64(v.ttlms)) < 1000, Equals, true)
 			}
 		}
 
-		checkerror(t, redis.Encode(w, redis.NewString("OK")), true)
-		checkerror(t, w.Flush(), true)
+		err = redis.Encode(w, redis.NewString("OK"))
+		c.Assert(err, IsNil)
+
+		err = w.Flush()
+		c.Assert(err, IsNil)
 	}
 
 	select {
-	case err := <-c:
-		checkerror(t, err, true)
+	case err := <-cc:
+		c.Assert(err, IsNil)
 	case <-time.After(time.Second):
-		checkerror(t, nil, false)
+		c.Fatal("timeout error")
 	}
 }
 
-func slotsmgrtslot(addr *net.TCPAddr, db uint32, tag string, expect int64) chan error {
+func (s *testStoreSuite) xslotsrestore(c *C, db uint32, args ...interface{}) {
+	x := []interface{}{}
+	for i, a := range args {
+		switch i % 3 {
+		case 0, 1:
+			x = append(x, a)
+		case 2:
+			dump, err := rdb.EncodeDump(rdb.String([]byte(a.(string))))
+			c.Assert(err, IsNil)
+
+			x = append(x, dump)
+		}
+	}
+
+	err := s.s.SlotsRestore(db, x...)
+	c.Assert(err, IsNil)
+}
+
+func (s *testStoreSuite) slotsinfo(c *C, db uint32, sum int64) {
+	m, err := s.s.SlotsInfo(db)
+	c.Assert(err, IsNil)
+	c.Assert(m, NotNil)
+
+	a := int64(0)
+	for _, v := range m {
+		a += v
+	}
+	c.Assert(a, Equals, sum)
+}
+
+func (s *testStoreSuite) slotsmgrtslot(addr *net.TCPAddr, db uint32, tag string, expect int64) chan error {
 	c := make(chan error, 1)
 	go func() {
 		host, port := addr.IP.String(), addr.Port
-		n, err := testStore.SlotsMgrtSlot(db, host, port, 1000, HashTagToSlot([]byte(tag)))
+		n, err := s.s.SlotsMgrtSlot(db, host, port, 1000, HashTagToSlot([]byte(tag)))
 		if err != nil {
 			c <- err
 		} else if n != expect {
@@ -203,11 +172,11 @@ func slotsmgrtslot(addr *net.TCPAddr, db uint32, tag string, expect int64) chan 
 	return c
 }
 
-func slotsmgrttagslot(addr *net.TCPAddr, db uint32, tag string, expect int64) chan error {
+func (s *testStoreSuite) slotsmgrttagslot(addr *net.TCPAddr, db uint32, tag string, expect int64) chan error {
 	c := make(chan error, 1)
 	go func() {
 		host, port := addr.IP.String(), addr.Port
-		n, err := testStore.SlotsMgrtTagSlot(db, host, port, 1000, HashTagToSlot([]byte(tag)))
+		n, err := s.s.SlotsMgrtTagSlot(db, host, port, 1000, HashTagToSlot([]byte(tag)))
 		if err != nil {
 			c <- err
 		} else if n != expect {
@@ -219,11 +188,11 @@ func slotsmgrttagslot(addr *net.TCPAddr, db uint32, tag string, expect int64) ch
 	return c
 }
 
-func slotsmgrtone(addr *net.TCPAddr, db uint32, key string, expect int64) chan error {
+func (s *testStoreSuite) slotsmgrtone(addr *net.TCPAddr, db uint32, key string, expect int64) chan error {
 	c := make(chan error, 1)
 	go func() {
 		host, port := addr.IP.String(), addr.Port
-		n, err := testStore.SlotsMgrtOne(db, host, port, 1000, []byte(key))
+		n, err := s.s.SlotsMgrtOne(db, host, port, 1000, []byte(key))
 		if err != nil {
 			c <- err
 		} else if n != expect {
@@ -235,11 +204,11 @@ func slotsmgrtone(addr *net.TCPAddr, db uint32, key string, expect int64) chan e
 	return c
 }
 
-func slotsmgrttagone(addr *net.TCPAddr, db uint32, key string, expect int64) chan error {
+func (s *testStoreSuite) slotsmgrttagone(addr *net.TCPAddr, db uint32, key string, expect int64) chan error {
 	c := make(chan error, 1)
 	go func() {
 		host, port := addr.IP.String(), addr.Port
-		n, err := testStore.SlotsMgrtTagOne(db, host, port, 1000, []byte(key))
+		n, err := s.s.SlotsMgrtTagOne(db, host, port, 1000, []byte(key))
 		if err != nil {
 			c <- err
 		} else if n != expect {
@@ -251,106 +220,160 @@ func slotsmgrttagone(addr *net.TCPAddr, db uint32, key string, expect int64) cha
 	return c
 }
 
-func TestSlotsMgrtSlot(t *testing.T) {
-	xslotsrestore(t, 0, "key", 1000, "hello", "key", 8000, "world")
+func (s *testStoreSuite) TestSlotNum(c *C) {
+	tests := [][]string{
+		[]string{"", ""},
+		[]string{"{", "{"},
+		[]string{"{test", "{test"},
+		[]string{"{test{0}", "test{0"},
+		[]string{"test{a}", "a"},
+		[]string{"{b}test", "b"},
+		[]string{"}test{c}", "c"},
+		[]string{"}test", "}test"},
+		[]string{"}test1{test2{d}}{e}", "test2{d"},
+	}
+	for _, p := range tests {
+		key, tag := []byte(p[0]), []byte(p[1])
+		c.Assert(bytes.Equal(HashTag(key), tag), Equals, true)
+	}
 
-	addr, c := checkconn(t)
-	defer c.Close()
+	const n = MaxSlotNum * 32
+	for i := 0; i < n; i++ {
+		key := []byte(fmt.Sprintf("key_%d_%d", rand.Int(), rand.Int()))
+		c.Assert(bytes.Equal(HashTag(key), key), Equals, true)
+	}
 
-	r, w := bufio.NewReader(c), bufio.NewWriter(c)
-
-	slotsinfo(t, 0, 1)
-	checkslotsmgrt(t, r, w, slotsmgrtslot(addr, 0, "key", 1), "key", 8000, "world")
-	slotsinfo(t, 0, 0)
-	checkslotsmgrt(t, r, w, slotsmgrtslot(addr, 0, "key", 0))
-	slotsinfo(t, 0, 0)
-
-	slotsinfo(t, 1, 0)
-	checkslotsmgrt(t, r, w, slotsmgrtslot(addr, 1, "key", 0))
-
-	xslotsrestore(t, 1, "key", 0, "world2")
-	slotsinfo(t, 1, 1)
-
-	checkslotsmgrt(t, r, w, slotsmgrtslot(addr, 1, "key", 1), "key", 0, "world2")
-	slotsinfo(t, 1, 0)
-
-	checkempty(t)
+	for i := 0; i < n; i++ {
+		v := rand.Int()
+		tag := []byte(fmt.Sprintf("%d", v))
+		key := []byte(fmt.Sprintf("key_{%d}_%d", v, rand.Int()))
+		c.Assert(bytes.Equal(HashTag(key), tag), Equals, true)
+	}
 }
 
-func TestSlotsMgrtTagSlot(t *testing.T) {
+func (s *testStoreSuite) TestSlotsRestore(c *C) {
+	s.xslotsrestore(c, 0, "key", 1000, "hello")
+	s.xget(c, 0, "key", "hello")
+	s.kpttl(c, 0, "key", 1000)
+
+	s.xslotsrestore(c, 0, "key", 8000, "world")
+	s.xget(c, 0, "key", "world")
+	s.kpttl(c, 0, "key", 8000)
+
+	s.xslotsrestore(c, 0, "key", 2000, "abc0", "key", 6000, "abc2")
+	s.xget(c, 0, "key", "abc2")
+	s.kpttl(c, 0, "key", 6000)
+
+	s.xslotsrestore(c, 0, "key", 1000, "abc3", "key", 1000, "abc1")
+	s.xget(c, 0, "key", "abc1")
+	s.kpttl(c, 0, "key", 1000)
+
+	s.slotsinfo(c, 0, 1)
+	s.xdel(c, 0, "key", 1)
+	s.slotsinfo(c, 0, 0)
+	s.checkEmpty(c)
+}
+
+func (s *testStoreSuite) TestSlotsMgrtSlot(c *C) {
+	s.xslotsrestore(c, 0, "key", 1000, "hello", "key", 8000, "world")
+
+	addr, cc := s.checkConn(c)
+	defer cc.Close()
+
+	r, w := bufio.NewReader(cc), bufio.NewWriter(cc)
+
+	s.slotsinfo(c, 0, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtslot(addr, 0, "key", 1), "key", 8000, "world")
+	s.slotsinfo(c, 0, 0)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtslot(addr, 0, "key", 0))
+	s.slotsinfo(c, 0, 0)
+
+	s.slotsinfo(c, 1, 0)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtslot(addr, 1, "key", 0))
+
+	s.xslotsrestore(c, 1, "key", 0, "world2")
+	s.slotsinfo(c, 1, 1)
+
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtslot(addr, 1, "key", 1), "key", 0, "world2")
+	s.slotsinfo(c, 1, 0)
+
+	s.checkEmpty(c)
+}
+
+func (s *testStoreSuite) TestSlotsMgrtTagSlot(c *C) {
 	args := []interface{}{}
 	for i := 0; i < 32; i++ {
 		key := "{}_" + strconv.Itoa(i)
 		value := "test_" + strconv.Itoa(i)
-		xset(t, 0, key, value)
-		kpexpire(t, 0, key, 1000, 1)
+		s.xset(c, 0, key, value)
+		s.kpexpire(c, 0, key, 1000, 1)
 		args = append(args, key, 1000, value)
 	}
 
-	addr, c := checkconn(t)
-	defer c.Close()
+	addr, cc := s.checkConn(c)
+	defer cc.Close()
 
-	r, w := bufio.NewReader(c), bufio.NewWriter(c)
+	r, w := bufio.NewReader(cc), bufio.NewWriter(cc)
 
-	slotsinfo(t, 0, 1)
-	checkslotsmgrt(t, r, w, slotsmgrttagslot(addr, 0, "tag", 0))
-	checkslotsmgrt(t, r, w, slotsmgrttagslot(addr, 0, "", 32), args...)
-	checkslotsmgrt(t, r, w, slotsmgrttagslot(addr, 0, "", 0))
-	slotsinfo(t, 0, 0)
+	s.slotsinfo(c, 0, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagslot(addr, 0, "tag", 0))
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagslot(addr, 0, "", 32), args...)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagslot(addr, 0, "", 0))
+	s.slotsinfo(c, 0, 0)
 
-	checkempty(t)
+	s.checkEmpty(c)
 }
 
-func TestSlotsMgrtOne(t *testing.T) {
-	xset(t, 0, "key{tag}", "hello")
-	xset(t, 1, "key{tag}1", "hello")
-	xset(t, 1, "key{tag}2", "world")
+func (s *testStoreSuite) TestSlotsMgrtOne(c *C) {
+	s.xset(c, 0, "key{tag}", "hello")
+	s.xset(c, 1, "key{tag}1", "hello")
+	s.xset(c, 1, "key{tag}2", "world")
 
-	addr, c := checkconn(t)
-	defer c.Close()
+	addr, cc := s.checkConn(c)
+	defer cc.Close()
 
-	r, w := bufio.NewReader(c), bufio.NewWriter(c)
+	r, w := bufio.NewReader(cc), bufio.NewWriter(cc)
 
-	slotsinfo(t, 0, 1)
-	checkslotsmgrt(t, r, w, slotsmgrtone(addr, 0, "key{tag}", 1), "key{tag}", 0, "hello")
-	slotsinfo(t, 0, 0)
+	s.slotsinfo(c, 0, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtone(addr, 0, "key{tag}", 1), "key{tag}", 0, "hello")
+	s.slotsinfo(c, 0, 0)
 
-	slotsinfo(t, 1, 1)
-	checkslotsmgrt(t, r, w, slotsmgrtone(addr, 1, "key{tag}1", 1), "key{tag}1", 0, "hello")
-	slotsinfo(t, 1, 1)
-	checkslotsmgrt(t, r, w, slotsmgrtone(addr, 1, "key{tag}2", 1), "key{tag}2", 0, "world")
-	slotsinfo(t, 1, 0)
+	s.slotsinfo(c, 1, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtone(addr, 1, "key{tag}1", 1), "key{tag}1", 0, "hello")
+	s.slotsinfo(c, 1, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrtone(addr, 1, "key{tag}2", 1), "key{tag}2", 0, "world")
+	s.slotsinfo(c, 1, 0)
 
-	checkempty(t)
+	s.checkEmpty(c)
 }
 
-func TestSlotsMgrtTagOne(t *testing.T) {
-	xset(t, 0, "tag", "xxxx")
-	xset(t, 0, "key{tag}", "hello")
-	xset(t, 1, "key{tag}1", "hello")
-	xset(t, 1, "key{tag}2", "world")
+func (s *testStoreSuite) TestSlotsMgrtTagOne(c *C) {
+	s.xset(c, 0, "tag", "xxxx")
+	s.xset(c, 0, "key{tag}", "hello")
+	s.xset(c, 1, "key{tag}1", "hello")
+	s.xset(c, 1, "key{tag}2", "world")
 
-	addr, c := checkconn(t)
-	defer c.Close()
+	addr, cc := s.checkConn(c)
+	defer cc.Close()
 
-	r, w := bufio.NewReader(c), bufio.NewWriter(c)
+	r, w := bufio.NewReader(cc), bufio.NewWriter(cc)
 
-	slotsinfo(t, 0, 1)
-	checkslotsmgrt(t, r, w, slotsmgrttagone(addr, 0, "tag", 1), "tag", 0, "xxxx")
-	slotsinfo(t, 0, 1)
-	checkslotsmgrt(t, r, w, slotsmgrttagone(addr, 0, "key{tag}", 1), "key{tag}", 0, "hello")
-	slotsinfo(t, 0, 0)
+	s.slotsinfo(c, 0, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 0, "tag", 1), "tag", 0, "xxxx")
+	s.slotsinfo(c, 0, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 0, "key{tag}", 1), "key{tag}", 0, "hello")
+	s.slotsinfo(c, 0, 0)
 
-	slotsinfo(t, 1, 1)
-	checkslotsmgrt(t, r, w, slotsmgrttagone(addr, 1, "key{tag}1", 2), "key{tag}1", 0, "hello", "key{tag}2", 0, "world")
-	slotsinfo(t, 1, 0)
-	checkslotsmgrt(t, r, w, slotsmgrttagone(addr, 1, "key{tag}2", 0))
+	s.slotsinfo(c, 1, 1)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 1, "key{tag}1", 2), "key{tag}1", 0, "hello", "key{tag}2", 0, "world")
+	s.slotsinfo(c, 1, 0)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 1, "key{tag}2", 0))
 
-	xset(t, 2, "key{tag3}", "test")
-	kpexpire(t, 2, "key{tag3}", 10, 1)
+	s.xset(c, 2, "key{tag3}", "test")
+	s.kpexpire(c, 2, "key{tag3}", 10, 1)
 	sleepms(20)
-	checkslotsmgrt(t, r, w, slotsmgrttagone(addr, 2, "key{tag}3", 0))
-	xdel(t, 2, "key{tag3}", 0)
+	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 2, "key{tag}3", 0))
+	s.xdel(c, 2, "key{tag3}", 0)
 
-	checkempty(t)
+	s.checkEmpty(c)
 }

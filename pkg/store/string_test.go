@@ -7,510 +7,551 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
-	"testing"
 
 	"github.com/reborndb/go/redis/rdb"
+	. "gopkg.in/check.v1"
 )
 
-func xdel(t *testing.T, db uint32, key string, expect int64) {
-	kdel(t, expect, db, key)
+func (s *testStoreSuite) xdel(c *C, db uint32, key string, expect int64) {
+	s.kdel(c, db, expect, key)
 }
 
-func xdump(t *testing.T, db uint32, key string, expect string) {
-	kexists(t, db, key, 1)
-	v, err := testStore.Dump(db, key)
-	checkerror(t, err, v != nil)
+func (s *testStoreSuite) xdump(c *C, db uint32, key string, expect string) {
+	s.kexists(c, db, key, 1)
+
+	v, err := s.s.Dump(db, key)
+	c.Assert(err, IsNil)
+	c.Assert(v, NotNil)
+
 	x, ok := v.(rdb.String)
-	checkerror(t, nil, ok && string([]byte(x)) == expect)
-	xstrlen(t, db, key, int64(len(expect)))
+	c.Assert(ok, Equals, true)
+	c.Assert(string([]byte(x)), Equals, expect)
+
+	s.xstrlen(c, db, key, int64(len(expect)))
 }
 
-func xrestore(t *testing.T, db uint32, key string, ttlms uint64, value string) {
+func (s *testStoreSuite) xrestore(c *C, db uint32, key string, ttlms uint64, value string) {
 	var x rdb.String = []byte(value)
 	dump, err := rdb.EncodeDump(x)
-	checkerror(t, err, true)
-	err = testStore.Restore(db, key, ttlms, dump)
-	checkerror(t, err, true)
-	xdump(t, db, key, value)
+	c.Assert(err, IsNil)
+
+	err = s.s.Restore(db, key, ttlms, dump)
+	c.Assert(err, IsNil)
+
+	s.xdump(c, db, key, value)
 	if ttlms == 0 {
-		kpttl(t, db, key, -1)
+		s.kpttl(c, db, key, -1)
 	} else {
-		kpttl(t, db, key, int64(ttlms))
+		s.kpttl(c, db, key, int64(ttlms))
 	}
 }
 
-func xset(t *testing.T, db uint32, key, value string) {
-	err := testStore.Set(db, []byte(key), []byte(value))
-	checkerror(t, err, true)
-	kttl(t, db, key, -1)
-	xget(t, db, key, value)
+func (s *testStoreSuite) xset(c *C, db uint32, key, value string) {
+	err := s.s.Set(db, []byte(key), []byte(value))
+	c.Assert(err, IsNil)
+
+	s.kttl(c, db, key, -1)
+	s.xget(c, db, key, value)
 }
 
-func xget(t *testing.T, db uint32, key string, expect string) {
-	x, err := testStore.Get(db, []byte(key))
+func (s *testStoreSuite) xget(c *C, db uint32, key string, expect string) {
+	x, err := s.s.Get(db, []byte(key))
+	c.Assert(err, IsNil)
+
 	if expect == "" {
-		checkerror(t, err, x == nil)
-		xstrlen(t, db, key, 0)
+		c.Assert(x, IsNil)
+		s.xstrlen(c, db, key, 0)
 	} else {
-		checkerror(t, err, string(x) == expect)
-		xstrlen(t, db, key, int64(len(expect)))
+		c.Assert(string(x), Equals, expect)
+		s.xstrlen(c, db, key, int64(len(expect)))
 	}
 }
 
-func xappend(t *testing.T, db uint32, key, value string, expect int64) {
-	x, err := testStore.Append(db, key, value)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xappend(c *C, db uint32, key, value string, expect int64) {
+	x, err := s.s.Append(db, key, value)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xgetset(t *testing.T, db uint32, key, value string, expect string) {
-	x, err := testStore.GetSet(db, key, value)
+func (s *testStoreSuite) xgetset(c *C, db uint32, key, value string, expect string) {
+	x, err := s.s.GetSet(db, key, value)
+	c.Assert(err, IsNil)
+
 	if expect == "" {
-		checkerror(t, err, x == nil)
+		c.Assert(x, IsNil)
 	} else {
-		checkerror(t, err, string(x) == expect)
+		c.Assert(string(x), Equals, expect)
 	}
-	kttl(t, db, key, -1)
+
+	s.kttl(c, db, key, -1)
 }
 
-func xpsetex(t *testing.T, db uint32, key, value string, ttlms uint64) {
-	err := testStore.PSetEX(db, key, ttlms, value)
-	checkerror(t, err, true)
-	xdump(t, db, key, value)
-	kpttl(t, db, key, int64(ttlms))
+func (s *testStoreSuite) xpsetex(c *C, db uint32, key, value string, ttlms uint64) {
+	err := s.s.PSetEX(db, key, ttlms, value)
+	c.Assert(err, IsNil)
+
+	s.xdump(c, db, key, value)
+	s.kpttl(c, db, key, int64(ttlms))
 }
 
-func xsetex(t *testing.T, db uint32, key, value string, ttls uint64) {
-	err := testStore.SetEX(db, key, ttls, value)
-	checkerror(t, err, true)
-	xdump(t, db, key, value)
-	kpttl(t, db, key, int64(ttls*1e3))
+func (s *testStoreSuite) xsetex(c *C, db uint32, key, value string, ttls uint64) {
+	err := s.s.SetEX(db, key, ttls, value)
+	c.Assert(err, IsNil)
+
+	s.xdump(c, db, key, value)
+	s.kpttl(c, db, key, int64(ttls*1e3))
 }
 
-func xsetnx(t *testing.T, db uint32, key, value string, expect int64) {
-	x, err := testStore.SetNX(db, key, value)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xsetnx(c *C, db uint32, key, value string, expect int64) {
+	x, err := s.s.SetNX(db, key, value)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
+
 	if expect != 0 {
-		xdump(t, db, key, value)
-		kpttl(t, db, key, -1)
+		s.xdump(c, db, key, value)
+		s.kpttl(c, db, key, -1)
 	}
 }
 
-func xstrlen(t *testing.T, db uint32, key string, expect int64) {
+func (s *testStoreSuite) xstrlen(c *C, db uint32, key string, expect int64) {
 	if expect != 0 {
-		kexists(t, db, key, 1)
+		s.kexists(c, db, key, 1)
 	} else {
-		kexists(t, db, key, 0)
+		s.kexists(c, db, key, 0)
 	}
-	x, err := testStore.Strlen(db, key)
-	checkerror(t, err, x == expect)
+
+	x, err := s.s.Strlen(db, key)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xincr(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testStore.Incr(db, key)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xincr(c *C, db uint32, key string, expect int64) {
+	x, err := s.s.Incr(db, key)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xdecr(t *testing.T, db uint32, key string, expect int64) {
-	x, err := testStore.Decr(db, key)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xdecr(c *C, db uint32, key string, expect int64) {
+	x, err := s.s.Decr(db, key)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xincrby(t *testing.T, db uint32, key string, delta int64, expect int64) {
-	x, err := testStore.IncrBy(db, key, delta)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xincrby(c *C, db uint32, key string, delta int64, expect int64) {
+	x, err := s.s.IncrBy(db, key, delta)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xdecrby(t *testing.T, db uint32, key string, delta int64, expect int64) {
-	x, err := testStore.DecrBy(db, key, delta)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xdecrby(c *C, db uint32, key string, delta int64, expect int64) {
+	x, err := s.s.DecrBy(db, key, delta)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xincrbyfloat(t *testing.T, db uint32, key string, delta float64, expect float64) {
-	x, err := testStore.IncrByFloat(db, key, delta)
-	checkerror(t, err, math.Abs(x-expect) < 1e-9)
+func (s *testStoreSuite) xincrbyfloat(c *C, db uint32, key string, delta float64, expect float64) {
+	x, err := s.s.IncrByFloat(db, key, delta)
+	c.Assert(err, IsNil)
+	c.Assert(math.Abs(x-expect) < 1e-9, Equals, true)
 }
 
-func xsetbit(t *testing.T, db uint32, key string, offset uint, value int64, expect int64) {
-	x, err := testStore.SetBit(db, key, offset, value)
-	checkerror(t, err, x == expect)
-	xgetbit(t, db, key, offset, value)
+func (s *testStoreSuite) xsetbit(c *C, db uint32, key string, offset uint, value int64, expect int64) {
+	x, err := s.s.SetBit(db, key, offset, value)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
+
+	s.xgetbit(c, db, key, offset, value)
 }
 
-func xgetbit(t *testing.T, db uint32, key string, offset uint, expect int64) {
-	x, err := testStore.GetBit(db, key, offset)
-	checkerror(t, err, x == expect)
+func (s *testStoreSuite) xgetbit(c *C, db uint32, key string, offset uint, expect int64) {
+	x, err := s.s.GetBit(db, key, offset)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
 }
 
-func xsetrange(t *testing.T, db uint32, key string, offset uint, value string, expect int64) {
-	x, err := testStore.SetRange(db, key, offset, value)
-	checkerror(t, err, x == expect)
-	xgetrange(t, db, key, int(offset), int(offset)+len(value)-1, value)
+func (s *testStoreSuite) xsetrange(c *C, db uint32, key string, offset uint, value string, expect int64) {
+	x, err := s.s.SetRange(db, key, offset, value)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
+
+	s.xgetrange(c, db, key, int(offset), int(offset)+len(value)-1, value)
 }
 
-func xgetrange(t *testing.T, db uint32, key string, beg, end int, expect string) {
-	x, err := testStore.GetRange(db, key, beg, end)
-	checkerror(t, err, string(x) == expect)
+func (s *testStoreSuite) xgetrange(c *C, db uint32, key string, beg, end int, expect string) {
+	x, err := s.s.GetRange(db, key, beg, end)
+	c.Assert(err, IsNil)
+	c.Assert(string(x), Equals, expect)
 }
 
-func xmset(t *testing.T, db uint32, pairs ...string) {
+func (s *testStoreSuite) xmset(c *C, db uint32, pairs ...string) {
 	args := make([]interface{}, len(pairs))
 	for i, s := range pairs {
 		args[i] = s
 	}
-	err := testStore.MSet(db, args...)
-	checkerror(t, err, true)
+
+	err := s.s.MSet(db, args...)
+	c.Assert(err, IsNil)
+
 	m := make(map[string]string)
 	for i := 0; i < len(pairs); i += 2 {
 		m[pairs[i]] = pairs[i+1]
 	}
 	for key, value := range m {
-		xget(t, db, key, value)
-		kttl(t, db, key, -1)
+		s.xget(c, db, key, value)
+		s.kttl(c, db, key, -1)
 	}
 }
 
-func xmsetnx(t *testing.T, expect int64, db uint32, pairs ...string) {
+func (s *testStoreSuite) xmsetnx(c *C, db uint32, expect int64, pairs ...string) {
 	args := make([]interface{}, len(pairs))
 	for i, s := range pairs {
 		args[i] = s
 	}
-	x, err := testStore.MSetNX(db, args...)
-	checkerror(t, err, x == expect)
+
+	x, err := s.s.MSetNX(db, args...)
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
+
 	if expect == 0 {
 		return
 	}
+
 	m := make(map[string]string)
 	for i := 0; i < len(pairs); i += 2 {
 		m[pairs[i]] = pairs[i+1]
 	}
 	for key, value := range m {
-		xget(t, db, key, value)
-		kttl(t, db, key, -1)
+		s.xget(c, db, key, value)
+		s.kttl(c, db, key, -1)
 	}
 }
 
-func xmget(t *testing.T, db uint32, pairs ...string) {
-	checkerror(t, nil, len(pairs)%2 == 0)
+func (s *testStoreSuite) xmget(c *C, db uint32, pairs ...string) {
+	c.Assert(len(pairs)%2, Equals, 0)
+
 	var args []interface{}
 	for i := 0; i < len(pairs); i += 2 {
 		args = append(args, pairs[i])
 	}
-	x, err := testStore.MGet(db, args...)
-	checkerror(t, err, len(x) == len(args))
+
+	x, err := s.s.MGet(db, args...)
+	c.Assert(err, IsNil)
+	c.Assert(len(x), Equals, len(args))
+
 	for i := 0; i < len(pairs); i += 2 {
 		value := pairs[i+1]
 		if value == "" {
-			checkerror(t, nil, x[i/2] == nil)
+			c.Assert(x[i/2], IsNil)
 		} else {
-			checkerror(t, nil, string(x[i/2]) == value)
+			c.Assert(string(x[i/2]), Equals, value)
 		}
 	}
 }
 
-func TestXRestore(t *testing.T) {
-	xrestore(t, 0, "string", 0, "hello")
-	xrestore(t, 0, "string", 0, "world")
-	xget(t, 0, "string", "world")
-	xrestore(t, 0, "string", 10, "hello")
+func (s *testStoreSuite) TestXRestore(c *C) {
+	s.xrestore(c, 0, "string", 0, "hello")
+	s.xrestore(c, 0, "string", 0, "world")
+	s.xget(c, 0, "string", "world")
+	s.xrestore(c, 0, "string", 10, "hello")
 	sleepms(20)
-	kpttl(t, 0, "string", -2)
+	s.kpttl(c, 0, "string", -2)
 
-	xrestore(t, 0, "string", 10, "test")
-	xget(t, 0, "string", "test")
+	s.xrestore(c, 0, "string", 10, "test")
+	s.xget(c, 0, "string", "test")
 	sleepms(20)
-	xget(t, 0, "string", "")
-	checkempty(t)
+	s.xget(c, 0, "string", "")
+	s.checkEmpty(c)
 }
 
-func TestXSet(t *testing.T) {
-	xset(t, 0, "string", "hello")
-	xdel(t, 0, "string", 1)
-	xdel(t, 0, "string", 0)
-	xget(t, 0, "string", "")
+func (s *testStoreSuite) TestXSet(c *C) {
+	s.xset(c, 0, "string", "hello")
+	s.xdel(c, 0, "string", 1)
+	s.xdel(c, 0, "string", 0)
+	s.xget(c, 0, "string", "")
 
-	kpexpire(t, 0, "string", 100, 0)
-	kpttl(t, 0, "string", -2)
+	s.kpexpire(c, 0, "string", 100, 0)
+	s.kpttl(c, 0, "string", -2)
 
-	xset(t, 0, "string", "test")
-	kpttl(t, 0, "string", -1)
-	kpexpire(t, 0, "string", 1000, 1)
-	kpexpire(t, 0, "string", 2000, 1)
+	s.xset(c, 0, "string", "test")
+	s.kpttl(c, 0, "string", -1)
+	s.kpexpire(c, 0, "string", 1000, 1)
+	s.kpexpire(c, 0, "string", 2000, 1)
 
-	xset(t, 0, "string", "test")
-	kpersist(t, 0, "string", 0)
-	kpexpire(t, 0, "string", 1000, 1)
-	kpersist(t, 0, "string", 1)
+	s.xset(c, 0, "string", "test")
+	s.kpersist(c, 0, "string", 0)
+	s.kpexpire(c, 0, "string", 1000, 1)
+	s.kpersist(c, 0, "string", 1)
 
-	xset(t, 0, "string", "test2")
-	xdel(t, 0, "string", 1)
-	kpttl(t, 0, "string", -2)
-	checkempty(t)
+	s.xset(c, 0, "string", "test2")
+	s.xdel(c, 0, "string", 1)
+	s.kpttl(c, 0, "string", -2)
+	s.checkEmpty(c)
 }
 
-func TestXAppend(t *testing.T) {
-	xset(t, 0, "string", "hello")
-	xget(t, 0, "string", "hello")
-	xappend(t, 0, "string", " ", 6)
+func (s *testStoreSuite) TestXAppend(c *C) {
+	s.xset(c, 0, "string", "hello")
+	s.xget(c, 0, "string", "hello")
+	s.xappend(c, 0, "string", " ", 6)
 
-	xget(t, 0, "string", "hello ")
-	xappend(t, 0, "string", "world!!", 13)
+	s.xget(c, 0, "string", "hello ")
+	s.xappend(c, 0, "string", "world!!", 13)
 
-	xget(t, 0, "string", "hello world!!")
-	xdel(t, 0, "string", 1)
-	xget(t, 0, "string", "")
+	s.xget(c, 0, "string", "hello world!!")
+	s.xdel(c, 0, "string", 1)
+	s.xget(c, 0, "string", "")
 
-	xappend(t, 0, "string", "test", 4)
-	xget(t, 0, "string", "test")
+	s.xappend(c, 0, "string", "test", 4)
+	s.xget(c, 0, "string", "test")
 
-	xdel(t, 0, "string", 1)
+	s.xdel(c, 0, "string", 1)
 
 	expect := ""
 	for i := 0; i < 1024; i++ {
-		s := strconv.Itoa(i) + ","
-		expect += s
-		xappend(t, 0, "string", s, int64(len(expect)))
+		ss := strconv.Itoa(i) + ","
+		expect += ss
+		s.xappend(c, 0, "string", ss, int64(len(expect)))
 	}
-	xdump(t, 0, "string", expect)
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xdump(c, 0, "string", expect)
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXSetEX(t *testing.T) {
-	xsetex(t, 0, "string", "hello", 1)
-	kpttl(t, 0, "string", 1000)
+func (s *testStoreSuite) TestXSetEX(c *C) {
+	s.xsetex(c, 0, "string", "hello", 1)
+	s.kpttl(c, 0, "string", 1000)
 
-	xset(t, 0, "string", "hello")
-	kpttl(t, 0, "string", -1)
+	s.xset(c, 0, "string", "hello")
+	s.kpttl(c, 0, "string", -1)
 
-	xsetex(t, 0, "string", "world", 100)
-	xget(t, 0, "string", "world")
-	kpttl(t, 0, "string", 100000)
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xsetex(c, 0, "string", "world", 100)
+	s.xget(c, 0, "string", "world")
+	s.kpttl(c, 0, "string", 100000)
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXPSetEX(t *testing.T) {
-	xpsetex(t, 0, "string", "hello", 1000)
-	kpttl(t, 0, "string", 1000)
-	xpsetex(t, 0, "string", "world", 2000)
-	kpttl(t, 0, "string", 2000)
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+func (s *testStoreSuite) TestXPSetEX(c *C) {
+	s.xpsetex(c, 0, "string", "hello", 1000)
+	s.kpttl(c, 0, "string", 1000)
+	s.xpsetex(c, 0, "string", "world", 2000)
+	s.kpttl(c, 0, "string", 2000)
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXSetNX(t *testing.T) {
-	xset(t, 0, "string", "hello")
+func (s *testStoreSuite) TestXSetNX(c *C) {
+	s.xset(c, 0, "string", "hello")
 
-	xsetnx(t, 0, "string", "world", 0)
-	xget(t, 0, "string", "hello")
-	xdel(t, 0, "string", 1)
+	s.xsetnx(c, 0, "string", "world", 0)
+	s.xget(c, 0, "string", "hello")
+	s.xdel(c, 0, "string", 1)
 
-	xsetnx(t, 0, "string", "world", 1)
-	xdel(t, 0, "string", 1)
-	xdel(t, 0, "string", 0)
-	checkempty(t)
+	s.xsetnx(c, 0, "string", "world", 1)
+	s.xdel(c, 0, "string", 1)
+	s.xdel(c, 0, "string", 0)
+	s.checkEmpty(c)
 }
 
-func TestXGetSet(t *testing.T) {
-	xgetset(t, 0, "string", "hello", "")
-	xget(t, 0, "string", "hello")
-	kpttl(t, 0, "string", -1)
+func (s *testStoreSuite) TestXGetSet(c *C) {
+	s.xgetset(c, 0, "string", "hello", "")
+	s.xget(c, 0, "string", "hello")
+	s.kpttl(c, 0, "string", -1)
 
-	kpexpire(t, 0, "string", 1000, 1)
-	xgetset(t, 0, "string", "world", "hello")
-	kpttl(t, 0, "string", -1)
+	s.kpexpire(c, 0, "string", 1000, 1)
+	s.xgetset(c, 0, "string", "world", "hello")
+	s.kpttl(c, 0, "string", -1)
 
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXIncrDecr(t *testing.T) {
+func (s *testStoreSuite) TestXIncrDecr(c *C) {
 	for i := 0; i < 32; i++ {
-		xincr(t, 0, "string", int64(i)+1)
+		s.xincr(c, 0, "string", int64(i)+1)
 	}
-	xget(t, 0, "string", "32")
+	s.xget(c, 0, "string", "32")
 
-	kpexpire(t, 0, "string", 10000, 1)
+	s.kpexpire(c, 0, "string", 10000, 1)
 	for i := 0; i < 32; i++ {
-		xdecr(t, 0, "string", 31-int64(i))
+		s.xdecr(c, 0, "string", 31-int64(i))
 	}
-	xget(t, 0, "string", "0")
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xget(c, 0, "string", "0")
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXIncrBy(t *testing.T) {
+func (s *testStoreSuite) TestXIncrBy(c *C) {
 	sum := int64(0)
 	for i := 0; i < 32; i++ {
 		a := rand.Int63()
 		sum += a
-		xincrby(t, 0, "string", a, sum)
+		s.xincrby(c, 0, "string", a, sum)
 	}
 	for i := 0; i < 32; i++ {
 		a := rand.Int63()
 		sum -= a
-		xdecrby(t, 0, "string", a, sum)
+		s.xdecrby(c, 0, "string", a, sum)
 	}
-	xget(t, 0, "string", strconv.Itoa(int(sum)))
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xget(c, 0, "string", strconv.Itoa(int(sum)))
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 
 }
 
-func TestXIncrByFloat(t *testing.T) {
+func (s *testStoreSuite) TestXIncrByFloat(c *C) {
 	sum := float64(0)
 	for i := 0; i < 128; i++ {
 		a := rand.Float64()
 		sum += a
-		xincrbyfloat(t, 0, "string", a, sum)
+		s.xincrbyfloat(c, 0, "string", a, sum)
 	}
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXSetBit(t *testing.T) {
-	xsetbit(t, 0, "string", 0, 1, 0)
-	xget(t, 0, "string", "\x01")
-	xsetbit(t, 0, "string", 1, 1, 0)
-	xget(t, 0, "string", "\x03")
-	xsetbit(t, 0, "string", 2, 1, 0)
-	xget(t, 0, "string", "\x07")
-	xsetbit(t, 0, "string", 3, 1, 0)
-	xget(t, 0, "string", "\x0f")
-	xsetbit(t, 0, "string", 4, 1, 0)
-	xget(t, 0, "string", "\x1f")
-	xsetbit(t, 0, "string", 5, 1, 0)
-	xget(t, 0, "string", "\x3f")
-	xsetbit(t, 0, "string", 6, 1, 0)
-	xget(t, 0, "string", "\x7f")
-	xsetbit(t, 0, "string", 7, 1, 0)
-	xget(t, 0, "string", "\xff")
-	xsetbit(t, 0, "string", 8, 1, 0)
-	xget(t, 0, "string", "\xff\x01")
-	xsetbit(t, 0, "string", 0, 0, 1)
-	xget(t, 0, "string", "\xfe\x01")
-	xsetbit(t, 0, "string", 1, 0, 1)
-	xget(t, 0, "string", "\xfc\x01")
-	xsetbit(t, 0, "string", 2, 0, 1)
-	xget(t, 0, "string", "\xf8\x01")
-	xsetbit(t, 0, "string", 3, 0, 1)
-	xget(t, 0, "string", "\xf0\x01")
-	xsetbit(t, 0, "string", 4, 0, 1)
-	xget(t, 0, "string", "\xe0\x01")
-	xsetbit(t, 0, "string", 5, 0, 1)
-	xget(t, 0, "string", "\xc0\x01")
-	xsetbit(t, 0, "string", 6, 0, 1)
-	xget(t, 0, "string", "\x80\x01")
-	xsetbit(t, 0, "string", 7, 0, 1)
-	xget(t, 0, "string", "\x00\x01")
-	xsetbit(t, 0, "string", 8, 0, 1)
-	xget(t, 0, "string", "\x00\x00")
-	xsetbit(t, 0, "string", 16, 0, 0)
-	xget(t, 0, "string", "\x00\x00\x00")
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+func (s *testStoreSuite) TestXSetBit(c *C) {
+	s.xsetbit(c, 0, "string", 0, 1, 0)
+	s.xget(c, 0, "string", "\x01")
+	s.xsetbit(c, 0, "string", 1, 1, 0)
+	s.xget(c, 0, "string", "\x03")
+	s.xsetbit(c, 0, "string", 2, 1, 0)
+	s.xget(c, 0, "string", "\x07")
+	s.xsetbit(c, 0, "string", 3, 1, 0)
+	s.xget(c, 0, "string", "\x0f")
+	s.xsetbit(c, 0, "string", 4, 1, 0)
+	s.xget(c, 0, "string", "\x1f")
+	s.xsetbit(c, 0, "string", 5, 1, 0)
+	s.xget(c, 0, "string", "\x3f")
+	s.xsetbit(c, 0, "string", 6, 1, 0)
+	s.xget(c, 0, "string", "\x7f")
+	s.xsetbit(c, 0, "string", 7, 1, 0)
+	s.xget(c, 0, "string", "\xff")
+	s.xsetbit(c, 0, "string", 8, 1, 0)
+	s.xget(c, 0, "string", "\xff\x01")
+	s.xsetbit(c, 0, "string", 0, 0, 1)
+	s.xget(c, 0, "string", "\xfe\x01")
+	s.xsetbit(c, 0, "string", 1, 0, 1)
+	s.xget(c, 0, "string", "\xfc\x01")
+	s.xsetbit(c, 0, "string", 2, 0, 1)
+	s.xget(c, 0, "string", "\xf8\x01")
+	s.xsetbit(c, 0, "string", 3, 0, 1)
+	s.xget(c, 0, "string", "\xf0\x01")
+	s.xsetbit(c, 0, "string", 4, 0, 1)
+	s.xget(c, 0, "string", "\xe0\x01")
+	s.xsetbit(c, 0, "string", 5, 0, 1)
+	s.xget(c, 0, "string", "\xc0\x01")
+	s.xsetbit(c, 0, "string", 6, 0, 1)
+	s.xget(c, 0, "string", "\x80\x01")
+	s.xsetbit(c, 0, "string", 7, 0, 1)
+	s.xget(c, 0, "string", "\x00\x01")
+	s.xsetbit(c, 0, "string", 8, 0, 1)
+	s.xget(c, 0, "string", "\x00\x00")
+	s.xsetbit(c, 0, "string", 16, 0, 0)
+	s.xget(c, 0, "string", "\x00\x00\x00")
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXSetRange(t *testing.T) {
-	xsetrange(t, 0, "string", 1, "hello", 6)
-	xget(t, 0, "string", "\x00hello")
-	xsetrange(t, 0, "string", 7, "world", 12)
-	xget(t, 0, "string", "\x00hello\x00world")
-	xsetrange(t, 0, "string", 2, "test1test2test3", 17)
-	xget(t, 0, "string", "\x00htest1test2test3")
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+func (s *testStoreSuite) TestXSetRange(c *C) {
+	s.xsetrange(c, 0, "string", 1, "hello", 6)
+	s.xget(c, 0, "string", "\x00hello")
+	s.xsetrange(c, 0, "string", 7, "world", 12)
+	s.xget(c, 0, "string", "\x00hello\x00world")
+	s.xsetrange(c, 0, "string", 2, "test1test2test3", 17)
+	s.xget(c, 0, "string", "\x00htest1test2test3")
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestGetBit(t *testing.T) {
-	xgetbit(t, 0, "string", 0, 0)
-	xgetbit(t, 0, "string", 1000, 0)
-	xset(t, 0, "string", "\x01\x03")
-	xgetbit(t, 0, "string", 0, 1)
-	xgetbit(t, 0, "string", 1, 0)
-	xgetbit(t, 0, "string", 8, 1)
-	xgetbit(t, 0, "string", 9, 1)
-	xdel(t, 0, "string", 1)
+func (s *testStoreSuite) TestGetBit(c *C) {
+	s.xgetbit(c, 0, "string", 0, 0)
+	s.xgetbit(c, 0, "string", 1000, 0)
+	s.xset(c, 0, "string", "\x01\x03")
+	s.xgetbit(c, 0, "string", 0, 1)
+	s.xgetbit(c, 0, "string", 1, 0)
+	s.xgetbit(c, 0, "string", 8, 1)
+	s.xgetbit(c, 0, "string", 9, 1)
+	s.xdel(c, 0, "string", 1)
 
 	for i := 0; i < 32; i += 2 {
-		xsetbit(t, 0, "string", uint(i), 1, 0)
-		xsetbit(t, 0, "string", uint(i), 1, 1)
+		s.xsetbit(c, 0, "string", uint(i), 1, 0)
+		s.xsetbit(c, 0, "string", uint(i), 1, 1)
 	}
 	for i := 0; i < 32; i++ {
 		v := int64(1)
 		if i%2 != 0 {
 			v = 0
 		}
-		xgetbit(t, 0, "string", uint(i), v)
+		s.xgetbit(c, 0, "string", uint(i), v)
 	}
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestGetRange(t *testing.T) {
-	xgetrange(t, 0, "string", 0, 0, "")
-	xgetrange(t, 0, "string", 100, -100, "")
-	xgetrange(t, 0, "string", -100, 100, "")
-	xset(t, 0, "string", "hello world!!")
-	xgetrange(t, 0, "string", 0, 3, "hell")
-	xgetrange(t, 0, "string", 2, 1, "")
-	xgetrange(t, 0, "string", -12, 3, "ell")
-	xgetrange(t, 0, "string", -100, 3, "hell")
-	xgetrange(t, 0, "string", -1, 10000, "!")
-	xgetrange(t, 0, "string", -1, -1, "!")
-	xgetrange(t, 0, "string", -1, -2, "")
-	xgetrange(t, 0, "string", -1, -1000, "")
-	xgetrange(t, 0, "string", -100, 100, "hello world!!")
-	xdel(t, 0, "string", 1)
-	checkempty(t)
+func (s *testStoreSuite) TestGetRange(c *C) {
+	s.xgetrange(c, 0, "string", 0, 0, "")
+	s.xgetrange(c, 0, "string", 100, -100, "")
+	s.xgetrange(c, 0, "string", -100, 100, "")
+	s.xset(c, 0, "string", "hello world!!")
+	s.xgetrange(c, 0, "string", 0, 3, "hell")
+	s.xgetrange(c, 0, "string", 2, 1, "")
+	s.xgetrange(c, 0, "string", -12, 3, "ell")
+	s.xgetrange(c, 0, "string", -100, 3, "hell")
+	s.xgetrange(c, 0, "string", -1, 10000, "!")
+	s.xgetrange(c, 0, "string", -1, -1, "!")
+	s.xgetrange(c, 0, "string", -1, -2, "")
+	s.xgetrange(c, 0, "string", -1, -1000, "")
+	s.xgetrange(c, 0, "string", -100, 100, "hello world!!")
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
 }
 
-func TestXMSet(t *testing.T) {
-	xmset(t, 0, "a", "1", "b", "2", "c", "3", "a", "4", "b", "5", "c", "6")
-	xget(t, 0, "a", "4")
-	xget(t, 0, "b", "5")
-	xget(t, 0, "c", "6")
+func (s *testStoreSuite) TestXMSet(c *C) {
+	s.xmset(c, 0, "a", "1", "b", "2", "c", "3", "a", "4", "b", "5", "c", "6")
+	s.xget(c, 0, "a", "4")
+	s.xget(c, 0, "b", "5")
+	s.xget(c, 0, "c", "6")
 
-	kpexpire(t, 0, "a", 1000, 1)
-	xmset(t, 0, "a", "x")
-	kpttl(t, 0, "a", -1)
-	xget(t, 0, "a", "x")
+	s.kpexpire(c, 0, "a", 1000, 1)
+	s.xmset(c, 0, "a", "x")
+	s.kpttl(c, 0, "a", -1)
+	s.xget(c, 0, "a", "x")
 
-	xmset(t, 0, "a", "1", "a", "2", "a", "3", "b", "1", "b", "2")
-	kdel(t, 3, 0, "a", "b", "c")
-	checkempty(t)
+	s.xmset(c, 0, "a", "1", "a", "2", "a", "3", "b", "1", "b", "2")
+	s.kdel(c, 0, 3, "a", "b", "c")
+	s.checkEmpty(c)
 }
 
-func TestMSetNX(t *testing.T) {
-	xsetex(t, 0, "string", "hello", 100)
-	xmsetnx(t, 0, 0, "string", "world", "string2", "blabla")
-	xget(t, 0, "string", "hello")
+func (s *testStoreSuite) TestMSetNX(c *C) {
+	s.xsetex(c, 0, "string", "hello", 100)
+	s.xmsetnx(c, 0, 0, "string", "world", "string2", "blabla")
+	s.xget(c, 0, "string", "hello")
 
-	xsetex(t, 0, "string", "hello1", 1)
-	kpttl(t, 0, "string", 1000)
-	kpexpire(t, 0, "string", 10, 1)
+	s.xsetex(c, 0, "string", "hello1", 1)
+	s.kpttl(c, 0, "string", 1000)
+	s.kpexpire(c, 0, "string", 10, 1)
 	sleepms(20)
-	xget(t, 0, "string", "")
+	s.xget(c, 0, "string", "")
 
-	xmsetnx(t, 1, 0, "string", "world1")
-	xget(t, 0, "string", "world1")
-	kpttl(t, 0, "string", -1)
+	s.xmsetnx(c, 0, 1, "string", "world1")
+	s.xget(c, 0, "string", "world1")
+	s.kpttl(c, 0, "string", -1)
 
-	kpexpire(t, 0, "string", 10, 1)
-	sleepms(20)
-
-	xmsetnx(t, 1, 0, "string", "hello", "string", "world")
-	xget(t, 0, "string", "world")
-	xdel(t, 0, "string", 1)
-	checkempty(t)
-}
-
-func TestMGet(t *testing.T) {
-	xmsetnx(t, 1, 0, "a", "1", "b", "2", "c", "3")
-	kpexpire(t, 0, "a", 10, 1)
+	s.kpexpire(c, 0, "string", 10, 1)
 	sleepms(20)
 
-	xmget(t, 0, "a", "", "b", "2", "c", "3", "d", "")
-	kdel(t, 2, 0, "a", "b", "c")
-	checkempty(t)
+	s.xmsetnx(c, 0, 1, "string", "hello", "string", "world")
+	s.xget(c, 0, "string", "world")
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
+}
+
+func (s *testStoreSuite) TestMGet(c *C) {
+	s.xmsetnx(c, 0, 1, "a", "1", "b", "2", "c", "3")
+	s.kpexpire(c, 0, "a", 10, 1)
+	sleepms(20)
+
+	s.xmget(c, 0, "a", "", "b", "2", "c", "3", "d", "")
+	s.kdel(c, 0, 2, "a", "b", "c")
+	s.checkEmpty(c)
 }
