@@ -44,9 +44,7 @@ func (s *testStoreSuite) checkConn(c *C) (*net.TCPAddr, net.Conn) {
 
 	o := <-x
 	if err, ok := o.(error); ok {
-		if c.Check(err, NotNil) {
-			c.Fatal(err)
-		}
+		c.Fatal(err)
 	}
 	return addr, o.(net.Conn)
 }
