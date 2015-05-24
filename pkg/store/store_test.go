@@ -4,62 +4,71 @@
 package store
 
 import (
+	"fmt"
 	"os"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/reborndb/go/log"
-	"github.com/reborndb/go/testing/assert"
 	"github.com/reborndb/qdb/pkg/engine/rocksdb"
+	. "gopkg.in/check.v1"
 )
 
-var (
-	testStore *Store
-)
+func TestT(t *testing.T) {
+	TestingT(t)
+}
 
-func reinit() {
-	if testStore != nil {
-		testStore.Close()
-		testStore = nil
+var _ = Suite(&testStoreSuite{})
+
+type testStoreSuite struct {
+	s *Store
+}
+
+func (s *testStoreSuite) SetUpSuite(c *C) {
+	s.s = testCreateStore(c)
+}
+
+func (s *testStoreSuite) TearDownSuite(c *C) {
+	if s.s != nil {
+		s.s.Close()
+		s = nil
 	}
-	const path = "/tmp/test_qdb/store/testdb-rocksdb"
-	if err := os.RemoveAll(path); err != nil {
-		log.PanicErrorf(err, "remove '%s' failed", path)
-	} else {
-		conf := rocksdb.NewDefaultConfig()
-		if testdb, err := rocksdb.Open(path, conf, false); err != nil {
-			log.PanicError(err, "open rocksdb failed")
-		} else {
-			testStore = New(testdb)
-		}
-	}
+}
+
+func (s *testStoreSuite) checkCompact(c *C) {
+	err := s.s.CompactAll()
+	c.Assert(err, IsNil)
+}
+
+func (s *testStoreSuite) checkEmpty(c *C) {
+	it := s.s.getIterator()
+	defer s.s.putIterator(it)
+
+	it.SeekToFirst()
+	c.Assert(it.Error(), IsNil)
+	c.Assert(it.Valid(), Equals, false)
+}
+
+func testCreateStore(c *C) *Store {
+	base := fmt.Sprintf("/tmp/test_qdb/test_store")
+	err := os.RemoveAll(base)
+	c.Assert(err, IsNil)
+
+	err = os.MkdirAll(base, 0700)
+	c.Assert(err, IsNil)
+
+	conf := rocksdb.NewDefaultConfig()
+	testdb, err := rocksdb.Open(path.Join(base, "db"), conf, false)
+	c.Assert(err, IsNil)
+
+	s := New(testdb)
+	return s
 }
 
 func init() {
-	reinit()
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	log.SetLevel(log.LEVEL_ERROR)
-}
-
-func checkerror(t *testing.T, err error, exp bool) {
-	if err != nil || !exp {
-		reinit()
-	}
-	assert.ErrorIsNil(t, err)
-	assert.Must(t, exp)
-}
-
-func checkcompact(t *testing.T) {
-	err := testStore.CompactAll()
-	checkerror(t, err, true)
-}
-
-func checkempty(t *testing.T) {
-	it := testStore.getIterator()
-	it.SeekToFirst()
-	empty, err := !it.Valid(), it.Error()
-	testStore.putIterator(it)
-	checkerror(t, err, empty)
 }
 
 func sleepms(n int) {

@@ -5,15 +5,15 @@ package store
 
 import (
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/reborndb/go/redis/rdb"
+	. "gopkg.in/check.v1"
 )
 
-func TestSnapshot(t *testing.T) {
-	xsetex(t, 0, "string", "value", 10)
-	kpexpire(t, 0, "string", 10, 1)
+func (s *testStoreSuite) TestSnapshot(c *C) {
+	s.xsetex(c, 0, "string", "value", 10)
+	s.kpexpire(c, 0, "string", 10, 1)
 
 	now := nowms()
 
@@ -26,21 +26,22 @@ func TestSnapshot(t *testing.T) {
 		for k, v := range m {
 			ss = append(ss, k, v)
 		}
-		hmset(t, db, "hash", ss...)
-		kpexpireat(t, db, "hash", now+1000*uint64(db+37), 1)
+		s.hmset(c, db, "hash", ss...)
+		s.kpexpireat(c, db, "hash", now+1000*uint64(db+37), 1)
 	}
 
 	sleepms(20)
 
-	s, err := testStore.NewSnapshot()
-	checkerror(t, err, true)
+	ss, err := s.s.NewSnapshot()
+	c.Assert(err, IsNil)
 
-	objs, _, err := s.LoadObjCron(time.Hour, 4, 4096)
-	checkerror(t, err, len(objs) == 128)
+	objs, _, err := ss.LoadObjCron(time.Hour, 4, 4096)
+	c.Assert(err, IsNil)
+	c.Assert(len(objs), Equals, 128)
 
-	kpttl(t, 0, "string", -2)
+	s.kpttl(c, 0, "string", -2)
 
-	testStore.ReleaseSnapshot(s)
+	s.s.ReleaseSnapshot(ss)
 
 	for db := uint32(0); db < 128; db++ {
 		ok := false
@@ -49,24 +50,34 @@ func TestSnapshot(t *testing.T) {
 				continue
 			}
 			ok = true
-			checkerror(t, nil, string(obj.Key) == "hash")
-			checkerror(t, nil, obj.ExpireAt == now+uint64(db+37)*1000)
+			c.Assert(string(obj.Key), Equals, "hash")
+			c.Assert(obj.ExpireAt, Equals, now+uint64(db+37)*1000)
+
 			x := obj.Value.(rdb.Hash)
-			checkerror(t, err, len(x) == int(db+1))
+			c.Assert(err, IsNil)
+			c.Assert(len(x), Equals, int(db+1))
+
 			for _, e := range x {
-				checkerror(t, nil, m[string(e.Field)] == string(e.Value))
+				c.Assert(m[string(e.Field)], Equals, string(e.Value))
 			}
 		}
-		checkerror(t, err, ok)
-		hdelall(t, db, "hash", 1)
-	}
-	checkcompact(t)
-	checkempty(t)
 
-	s, err = testStore.NewSnapshot()
-	checkerror(t, err, true)
-	objs, _, err = s.LoadObjCron(time.Hour, 4, 4096)
-	checkerror(t, err, len(objs) == 0)
-	testStore.ReleaseSnapshot(s)
-	checkempty(t)
+		c.Assert(err, IsNil)
+		c.Assert(ok, Equals, true)
+
+		s.hdelall(c, db, "hash", 1)
+	}
+
+	s.checkCompact(c)
+	s.checkEmpty(c)
+
+	ss, err = s.s.NewSnapshot()
+	c.Assert(err, IsNil)
+
+	objs, _, err = ss.LoadObjCron(time.Hour, 4, 4096)
+	c.Assert(err, IsNil)
+	c.Assert(len(objs), Equals, 0)
+
+	s.s.ReleaseSnapshot(ss)
+	s.checkEmpty(c)
 }
