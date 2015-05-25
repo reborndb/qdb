@@ -220,7 +220,7 @@ func (h *Handler) IncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, erro
 	if v, err := s.Store().IncrByFloat(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
-		return redis.NewString(store.FormatFloatString(v)), nil
+		return redis.NewBulkBytesWithString(store.FormatFloatString(v)), nil
 	}
 }
 
