@@ -91,9 +91,9 @@ Options:
     --sync_file_path=PATH             path saving replication syncing data
     --sync_file_size=SIZE             maximum file(bytes) size for replication syncing 
     --sync_buff_size=SIZE             maximum memory buffer size(bytes) for replication syncing
-    --repl_backlog_path=PATH          path saving replication backlog data, if empty, use memory instead
+    --repl_backlog_file_path=PATH     path saving replication backlog data, if empty, use memory instead
     --repl_backlog_size=SIZE          maximum backlog size(bytes)
-    --repl_ping_slave_period=N        Master pings slave in a interval(seconds) when replication
+    --repl_ping_slave_period=N        Master pings slave in an interval(seconds) when replication
 `
 	d, err := docopt.Parse(usage, nil, true, "", false)
 	if err != nil {
@@ -136,7 +136,7 @@ Options:
 	setStringFromOpt(&conf.Service.SyncFilePath, d, "--sync_file_path")
 	setIntFromOpt(&conf.Service.SyncFileSize, d, "--sync_file_size")
 	setIntFromOpt(&conf.Service.SyncBuffSize, d, "--sync_buff_size")
-	setStringFromOpt(&conf.Service.ReplBacklogFilePath, d, "--repl_backlog_path")
+	setStringFromOpt(&conf.Service.ReplBacklogFilePath, d, "--repl_backlog_file_path")
 	setIntFromOpt(&conf.Service.ReplBacklogSize, d, "--repl_backlog_size")
 	setIntFromOpt(&conf.Service.ReplPingSlavePeriod, d, "--repl_ping_slave_period")
 
