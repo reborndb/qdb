@@ -36,7 +36,7 @@ func (h *Handler) Echo(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if err != nil {
 		return toRespError(err)
 	}
-	return redis.NewString(string(args[0])), nil
+	return redis.NewBulkBytes(args[0]), nil
 }
 
 // FLUSHALL

@@ -134,7 +134,7 @@ func (h *Handler) HIncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, err
 	if v, err := s.Store().HIncrByFloat(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
-		return redis.NewString(store.FormatFloatString(v)), nil
+		return redis.NewBulkBytesWithString(store.FormatFloatString(v)), nil
 	}
 }
 
