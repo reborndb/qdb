@@ -87,6 +87,12 @@ func (h *Handler) Shutdown(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 	}
 
 	s.Store().Close()
+
+	if len(h.config.PidFile) > 0 {
+		// shutdown gracefully, remove pidfile
+		os.Remove(h.config.PidFile)
+	}
+
 	os.Exit(0)
 	return nil, nil
 }

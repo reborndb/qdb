@@ -6,6 +6,7 @@ dbpath = "./var/testdb-rocksdb"
 [service]
 
 listen_address = "0.0.0.0:6380"
+pid_file = "./var/qdb.pid"
 dump_filepath = "./var/dump.rdb"
 conn_timeout = 900
 

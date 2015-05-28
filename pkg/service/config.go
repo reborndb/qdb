@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Listen      string `toml:"listen_address"`
+	PidFile     string `toml:"pid_file"`
 	DumpPath    string `toml:"dump_filepath"`
 	ConnTimeout int    `toml:"conn_timeout"`
 
@@ -31,6 +32,7 @@ type Config struct {
 func NewDefaultConfig() *Config {
 	return &Config{
 		Listen:      "0.0.0.0:6380",
+		PidFile:     "./var/qdb.pid",
 		DumpPath:    "dump.rdb",
 		ConnTimeout: 900,
 
