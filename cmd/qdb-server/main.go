@@ -5,8 +5,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -86,6 +88,7 @@ Options:
     --dbtype=TYPE                     dtabase type, like rocksdb, leveldb, goleveldb	
     --dbpath=PATH                     database store path						
     --addr=ADDR                       service listening address	
+    --pidfile=FILE                    service pid file 
     --conn_timeout=N                  connection timeout after N seconds
     --dump_path=PATH                  path saving snapshot rdb file
     --sync_file_path=PATH             path saving replication syncing data
@@ -131,6 +134,7 @@ Options:
 	setStringFromOpt(&conf.DBPath, d, "--dbpath")
 
 	setStringFromOpt(&conf.Service.Listen, d, "--addr")
+	setStringFromOpt(&conf.Service.PidFile, d, "--pidfile")
 	setIntFromOpt(&conf.Service.ConnTimeout, d, "--conn_timeout")
 	setStringFromOpt(&conf.Service.DumpPath, d, "--dump_path")
 	setStringFromOpt(&conf.Service.SyncFilePath, d, "--sync_file_path")
@@ -168,6 +172,9 @@ Options:
 		return
 	}
 
+	// create pid file
+	createPidFile(conf.Service.PidFile)
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
@@ -175,11 +182,28 @@ Options:
 		for _ = range c {
 			log.Infof("interrupt and shutdown")
 			bl.Close()
+
+			// shutdown gracefully, remove pidfile
+			os.Remove(conf.Service.PidFile)
+
 			os.Exit(0)
 		}
 	}()
 
 	if err := service.Serve(conf.Service, bl); err != nil {
 		log.ErrorErrorf(err, "service failed")
+	}
+}
+
+func createPidFile(name string) {
+	os.MkdirAll(path.Dir(name), 0755)
+	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.PanicErrorf(err, "create pid file %s err, panic", name)
+	}
+	defer f.Close()
+
+	if _, err = f.WriteString(fmt.Sprintf("%d", os.Getpid())); err != nil {
+		log.PanicErrorf(err, "write pid into pid file %s err, panic", name)
 	}
 }
