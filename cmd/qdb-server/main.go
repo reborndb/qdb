@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/BurntSushi/toml"
 	"github.com/docopt/docopt-go"
@@ -176,7 +177,7 @@ Options:
 	createPidFile(conf.Service.PidFile)
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM, os.Interrupt, os.Kill)
 
 	go func() {
 		for _ = range c {
