@@ -82,6 +82,7 @@ Usage:
     qdb-server [options]
 
 Options:
+    -L logfile                        log file path, if empty, use stdout
     -n N, --ncpu=N                    set runtime.GOMAXPROCS to N
     -c CONF, --config=CONF            specify the config file
     --repair                          repair database
@@ -102,6 +103,11 @@ Options:
 	if err != nil {
 		log.PanicErrorf(err, "parse arguments failed")
 	}
+
+	if s, ok := d["-L"].(string); ok && len(s) > 0 {
+		log.StdLog = log.MustFileLog(s)
+	}
+
 	if s, ok := d["--ncpu"].(string); ok && len(s) != 0 {
 		if n, err := strconv.ParseInt(s, 10, 64); err != nil {
 			log.PanicErrorf(err, "parse --ncpu failed")
