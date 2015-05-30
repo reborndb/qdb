@@ -41,7 +41,7 @@ func NewDefaultConfig() *Config {
 		SyncBuffSize: bytesize.MB * 32,
 
 		ReplPingSlavePeriod: 10,
-		ReplBacklogSize:     bytesize.MB * 1,
+		ReplBacklogSize:     bytesize.GB * 10,
 	}
 }
 
