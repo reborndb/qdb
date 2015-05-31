@@ -68,7 +68,12 @@ func (r *BufReader) ReadFloat64() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	bits := binary.LittleEndian.Uint64(p)
+	bits := binary.BigEndian.Uint64(p)
+	if bits&0x8000000000000000 > 0 {
+		bits &= ^uint64(0x8000000000000000)
+	} else {
+		bits = ^bits
+	}
 	return math.Float64frombits(bits), nil
 }
 
@@ -133,7 +138,12 @@ func (w *BufWriter) WriteVarbytes(p []byte) error {
 func (w *BufWriter) WriteFloat64(f float64) error {
 	p := make([]byte, 8)
 	bits := math.Float64bits(f)
-	binary.LittleEndian.PutUint64(p, bits)
+	if f >= 0 {
+		bits |= 0x8000000000000000
+	} else {
+		bits = ^bits
+	}
+	binary.BigEndian.PutUint64(p, bits)
 	_, err := ioutils.WriteFull(w.w, p)
 	return err
 }
