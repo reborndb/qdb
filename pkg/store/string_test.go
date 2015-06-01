@@ -405,6 +405,13 @@ func (s *testStoreSuite) TestXIncrByFloat(c *C) {
 		sum += a
 		s.xincrbyfloat(c, 0, "string", a, sum)
 	}
+
+	_, err := s.s.IncrByFloat(0, "string", math.Inf(1))
+	c.Assert(err, NotNil)
+
+	_, err = s.s.IncrByFloat(0, "string", math.Inf(-1))
+	c.Assert(err, NotNil)
+
 	s.xdel(c, 0, "string", 1)
 	s.checkEmpty(c)
 }

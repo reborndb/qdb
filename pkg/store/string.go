@@ -4,6 +4,8 @@
 package store
 
 import (
+	"math"
+
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
@@ -384,6 +386,11 @@ func (s *Store) incrFloat(db uint32, key []byte, delta float64) (float64, error)
 		o = newStringRow(db, key)
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
+
+	if math.IsNaN(delta) || math.IsInf(delta, 0) {
+		return 0, errors.Errorf("increment would produce NaN or Infinity")
+	}
+
 	o.Value = FormatFloat(delta)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "IncrByFloat", Args: []interface{}{key, delta}}

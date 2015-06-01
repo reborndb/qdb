@@ -354,6 +354,13 @@ func (s *testStoreSuite) TestHIncrFloat(c *C) {
 	s.hset(c, 0, "hash", "a", "300", 0)
 	s.hincrbyfloat(c, 0, "hash", "a", 3.14, 303.14)
 	s.hincrbyfloat(c, 0, "hash", "a", -303.14, 0)
+
+	_, err := s.s.HIncrByFloat(0, "hash", "a", math.Inf(1))
+	c.Assert(err, NotNil)
+
+	_, err = s.s.HIncrByFloat(0, "hash", "a", math.Inf(-1))
+	c.Assert(err, NotNil)
+
 	s.hdelall(c, 0, "hash", 1)
 	s.checkEmpty(c)
 }

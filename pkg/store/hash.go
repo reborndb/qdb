@@ -5,6 +5,7 @@ package store
 
 import (
 	"bytes"
+	"math"
 
 	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/redis/rdb"
@@ -444,6 +445,11 @@ func (s *Store) HIncrByFloat(db uint32, args ...interface{}) (float64, error) {
 		o.Size++
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
+
+	if math.IsNaN(delta) || math.IsInf(delta, 0) {
+		return 0, errors.Errorf("increment would produce NaN or Infinity")
+	}
+
 	o.Value = FormatFloat(delta)
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "HIncrByFloat", Args: args}
