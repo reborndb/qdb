@@ -6,7 +6,6 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
 
 	"github.com/reborndb/go/bytesize"
 	"github.com/reborndb/go/errors"
@@ -69,12 +68,7 @@ func (r *BufReader) ReadFloat64() (float64, error) {
 		return 0, err
 	}
 	bits := binary.BigEndian.Uint64(p)
-	if bits&0x8000000000000000 > 0 {
-		bits &= ^uint64(0x8000000000000000)
-	} else {
-		bits = ^bits
-	}
-	return math.Float64frombits(bits), nil
+	return uint64ToFloat64(bits), nil
 }
 
 func (r *BufReader) ReadInt64() (int64, error) {
@@ -83,6 +77,14 @@ func (r *BufReader) ReadInt64() (int64, error) {
 		return 0, err
 	}
 	return int64(binary.BigEndian.Uint64(p)), nil
+}
+
+func (r *BufReader) ReadUint64() (uint64, error) {
+	p, err := r.ReadBytes(8)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(binary.BigEndian.Uint64(p)), nil
 }
 
 func (r *BufReader) Len() int {
@@ -137,18 +139,20 @@ func (w *BufWriter) WriteVarbytes(p []byte) error {
 
 func (w *BufWriter) WriteFloat64(f float64) error {
 	p := make([]byte, 8)
-	bits := math.Float64bits(f)
-	if f >= 0 {
-		bits |= 0x8000000000000000
-	} else {
-		bits = ^bits
-	}
+	bits := float64ToUint64(f)
 	binary.BigEndian.PutUint64(p, bits)
 	_, err := ioutils.WriteFull(w.w, p)
 	return err
 }
 
 func (w *BufWriter) WriteInt64(s int64) error {
+	p := make([]byte, 8)
+	binary.BigEndian.PutUint64(p, uint64(s))
+	_, err := ioutils.WriteFull(w.w, p)
+	return err
+}
+
+func (w *BufWriter) WriteUint64(s uint64) error {
 	p := make([]byte, 8)
 	binary.BigEndian.PutUint64(p, uint64(s))
 	_, err := ioutils.WriteFull(w.w, p)

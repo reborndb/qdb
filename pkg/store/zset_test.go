@@ -26,16 +26,16 @@ func (s *testStoreSuite) zdump(c *C, db uint32, key string, expect ...interface{
 	c.Assert(ok, Equals, true)
 	c.Assert(len(expect)%2, Equals, 0)
 
-	m := make(map[string]int64)
+	m := make(map[string]float64)
 	for i := 0; i < len(expect); i += 2 {
-		score, err := ParseInt(expect[i+1])
+		score, err := ParseFloat(expect[i+1])
 		c.Assert(err, IsNil)
 		m[fmt.Sprint(expect[i])] = score
 	}
 	c.Assert(len(x), Equals, len(m))
 
 	for _, e := range x {
-		c.Assert(m[string(e.Member)], Equals, int64(e.Score))
+		c.Assert(m[string(e.Member)], Equals, e.Score)
 	}
 
 	s.zcard(c, db, key, int64(len(m)))
@@ -44,9 +44,9 @@ func (s *testStoreSuite) zdump(c *C, db uint32, key string, expect ...interface{
 	c.Assert(len(p), Equals, len(m)*2)
 
 	for i := 0; i < len(p); i += 2 {
-		s, err := ParseInt(string(p[i+1]))
+		s, err := ParseFloat(string(p[i+1]))
 		c.Assert(err, IsNil)
-		c.Assert(m[string(p[i])], Equals, s)
+		c.Assert((m[string(p[i])]-s) < 1e-9, Equals, true)
 	}
 }
 
@@ -55,7 +55,7 @@ func (s *testStoreSuite) zrestore(c *C, db uint32, key string, ttlms int64, expe
 
 	var x rdb.ZSet
 	for i := 0; i < len(expect); i += 2 {
-		score, err := ParseInt(expect[i+1])
+		score, err := ParseFloat(expect[i+1])
 		c.Assert(err, IsNil)
 		x = append(x, &rdb.ZSetElement{Member: []byte(fmt.Sprint(expect[i])), Score: float64(score)})
 	}
@@ -107,20 +107,20 @@ func (s *testStoreSuite) zadd(c *C, db uint32, key string, expect int64, pairs .
 	c.Assert(x, Equals, expect)
 
 	for i := 0; i < len(pairs); i += 2 {
-		score, err := ParseInt(pairs[i+1])
+		score, err := ParseFloat(pairs[i+1])
 		c.Assert(err, IsNil)
 		s.zscore(c, db, key, fmt.Sprint(pairs[i]), score)
 	}
 }
 
-func (s *testStoreSuite) zscore(c *C, db uint32, key string, member string, expect int64) {
+func (s *testStoreSuite) zscore(c *C, db uint32, key string, member string, expect float64) {
 	x, ok, err := s.s.ZScore(db, key, member)
 	c.Assert(err, IsNil)
 	c.Assert(ok, Equals, true)
 	c.Assert(x, Equals, expect)
 }
 
-func (s *testStoreSuite) zincrby(c *C, db uint32, key string, member string, delta int64, expect int64) {
+func (s *testStoreSuite) zincrby(c *C, db uint32, key string, member string, delta int64, expect float64) {
 	x, err := s.s.ZIncrBy(db, key, delta, member)
 	c.Assert(err, IsNil)
 	c.Assert(x, Equals, expect)
@@ -272,7 +272,7 @@ func (s *testStoreSuite) TestZRestore(c *C) {
 	s.kpttl(c, 0, "zset", -1)
 
 	for i := 0; i < len(ms); i += 2 {
-		ms[i], ms[i+1] = strconv.Itoa(rand.Int()), rand.Int63()%int64(MaxScore)
+		ms[i], ms[i+1] = strconv.Itoa(rand.Int()), rand.NormFloat64()
 	}
 	s.zrestore(c, 0, "zset", 500, ms...)
 	s.zcard(c, 0, "zset", 32)
