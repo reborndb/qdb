@@ -54,8 +54,6 @@ func ParseFloat(i interface{}) (float64, error) {
 		switch {
 		case math.IsNaN(x):
 			return 0, errors.New("float is NaN")
-		case math.IsInf(x, 0):
-			return 0, errors.New("float is Inf")
 		}
 		return float64(x), nil
 	case string:
