@@ -45,6 +45,8 @@ type conn struct {
 
 	// replication ACK time, using unix time
 	backlogACKTime atomic2.Int64
+
+	authenticated bool
 }
 
 func newConn(nc net.Conn, bl *store.Store, timeout int) *conn {
@@ -56,6 +58,8 @@ func newConn(nc net.Conn, bl *store.Store, timeout int) *conn {
 	c.w = bufio.NewWriter(nc)
 	c.summ = fmt.Sprintf("<local> %s -- %s <remote>", nc.LocalAddr(), nc.RemoteAddr())
 	c.timeout = time.Duration(timeout) * time.Second
+	c.authenticated = false
+
 	return c
 }
 
@@ -119,6 +123,11 @@ func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
 	if err != nil {
 		return toRespError(err)
 	}
+
+	if len(h.config.Password) > 0 && !c.authenticated && strings.ToLower(cmd) != "auth" {
+		return toRespErrorf("NOAUTH Authentication required")
+	}
+
 	if f := h.htable[cmd]; f == nil {
 		return toRespErrorf("unknown command %s", cmd)
 	} else {

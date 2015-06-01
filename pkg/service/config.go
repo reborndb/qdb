@@ -27,6 +27,9 @@ type Config struct {
 	// If no slaves after time, backlog will be released.
 	// 0 means to no release at all.
 	ReplBacklogTTL int `toml:"repl_backlog_ttl"`
+
+	Password       string `toml:"password"`
+	MasterPassword string `toml:"master_password"`
 }
 
 func NewDefaultConfig() *Config {

@@ -166,9 +166,15 @@ func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
 		return nil, errors.Trace(err)
 	}
 
-	// maybe do AUTH later here.
-
+	// do AUTH if possible
 	c := newConn(nc, h.store, 0)
+	if len(h.config.MasterPassword) > 0 {
+		if err = c.doMustOK("AUTH", h.config.MasterPassword); err != nil {
+			c.Close()
+			return nil, errors.Trace(err)
+		}
+	}
+
 	if err := c.ping(); err != nil {
 		c.Close()
 		return nil, errors.Trace(err)
@@ -444,6 +450,8 @@ func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
 }
 
 func (h *Handler) doSyncFromMater(c *conn, counter *atomic2.Int64) error {
+	c.authenticated = true
+
 	lastACKTime := time.Now()
 	for {
 		readTotalSize := counter.Get()

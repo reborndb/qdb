@@ -13,6 +13,28 @@ import (
 	redis "github.com/reborndb/go/redis/resp"
 )
 
+// AUTH
+func (h *Handler) Auth(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 1 {
+		return toRespErrorf("len(args) = %d, expect = 1", len(args))
+	}
+
+	c, err := checkConn(arg0, args)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if len(h.config.Password) == 0 {
+		return toRespErrorf("Client sent AUTH, but no password is set")
+	} else if h.config.Password == string(args[0]) {
+		c.authenticated = true
+		return redis.NewString("OK"), nil
+	} else {
+		c.authenticated = false
+		return toRespErrorf("invalid password")
+	}
+}
+
 // PING
 func (h *Handler) Ping(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
