@@ -100,7 +100,7 @@ func (h *Handler) ZScore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	} else if !ok {
 		return redis.NewBulkBytes(nil), nil
 	} else {
-		return redis.NewBulkBytes(store.FormatInt(v)), nil
+		return redis.NewBulkBytes(store.FormatFloat(v)), nil
 	}
 }
 
@@ -118,7 +118,7 @@ func (h *Handler) ZIncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if v, err := s.Store().ZIncrBy(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
-		return redis.NewBulkBytes(store.FormatInt(v)), nil
+		return redis.NewBulkBytes(store.FormatFloat(v)), nil
 	}
 }
 

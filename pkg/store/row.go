@@ -303,8 +303,8 @@ func encodeRawBytes(w *BufWriter, refs ...interface{}) {
 			err = w.WriteFloat64(*x)
 		case *[]byte:
 			err = w.WriteVarbytes(*x)
-		case *ScoreInt:
-			err = w.WriteInt64(int64(*x))
+		case *scoreInt:
+			err = w.WriteUint64(uint64(*x))
 		default:
 			log.Panicf("unsupported type in row value: %+v", x)
 		}
@@ -368,12 +368,12 @@ func decodeRawBytes(r *BufReader, err error, refs ...interface{}) error {
 				return err
 			}
 			*x = v
-		case *ScoreInt:
-			v, err := r.ReadInt64()
+		case *scoreInt:
+			v, err := r.ReadUint64()
 			if err != nil {
 				return err
 			}
-			*x = ScoreInt(v)
+			*x = scoreInt(v)
 		case *byte:
 			v, err := r.ReadByte()
 			if err != nil {

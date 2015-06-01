@@ -9,7 +9,7 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-func (s *testServiceSuite) checkZSet(c *C, k string, expect map[string]int64) {
+func (s *testServiceSuite) checkZSet(c *C, k string, expect map[string]float64) {
 	ay := s.checkBytesArray(c, "zgetall", k)
 	if expect == nil {
 		c.Assert(ay, IsNil)
@@ -18,9 +18,9 @@ func (s *testServiceSuite) checkZSet(c *C, k string, expect map[string]int64) {
 		for i := 0; i < len(expect); i++ {
 			k := string(ay[i*2])
 			v := string(ay[i*2+1])
-			f, err := strconv.ParseInt(v, 10, 64)
+			f, err := strconv.ParseFloat(v, 64)
 			c.Assert(err, IsNil)
-			c.Assert(expect[k], Equals, f)
+			c.Assert((expect[k]-f) < 1e-9, Equals, true)
 		}
 	}
 }
@@ -30,9 +30,9 @@ func (s *testServiceSuite) TestZAdd(c *C) {
 	s.checkInt(c, 1, "zadd", k, 1, "one")
 	s.checkInt(c, 2, "zadd", k, 2, "two", 3, "three")
 	s.checkInt(c, 1, "zadd", k, 1, "one", 4, "four", 5, "four")
-	s.checkZSet(c, k, map[string]int64{"one": 1, "two": 2, "three": 3, "four": 5})
+	s.checkZSet(c, k, map[string]float64{"one": 1, "two": 2, "three": 3, "four": 5})
 	s.checkInt(c, 0, "zadd", k, 1, "one", 4, "four")
-	s.checkZSet(c, k, map[string]int64{"one": 1, "two": 2, "three": 3, "four": 4})
+	s.checkZSet(c, k, map[string]float64{"one": 1, "two": 2, "three": 3, "four": 4})
 }
 
 func (s *testServiceSuite) TestZCard(c *C) {
@@ -59,7 +59,7 @@ func (s *testServiceSuite) TestZRem(c *C) {
 	s.checkInt(c, 3, "zadd", k, 1, "key1", 2, "key2", 3, "key3")
 	s.checkInt(c, 0, "zrem", k, "key")
 	s.checkInt(c, 1, "zrem", k, "key1")
-	s.checkZSet(c, k, map[string]int64{"key2": 2, "key3": 3})
+	s.checkZSet(c, k, map[string]float64{"key2": 2, "key3": 3})
 	s.checkInt(c, 2, "zrem", k, "key1", "key2", "key3")
 	s.checkZSet(c, k, nil)
 	s.checkInt(c, -2, "ttl", k)
@@ -70,7 +70,7 @@ func (s *testServiceSuite) TestZIncrBy(c *C) {
 	s.checkFloat(c, 1, "zincrby", k, 1, "one")
 	s.checkFloat(c, 1, "zincrby", k, 1, "two")
 	s.checkFloat(c, 2, "zincrby", k, 1, "two")
-	s.checkZSet(c, k, map[string]int64{"one": 1, "two": 2})
+	s.checkZSet(c, k, map[string]float64{"one": 1, "two": 2})
 }
 
 func (s *testServiceSuite) TestZCount(c *C) {
