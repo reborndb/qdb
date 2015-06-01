@@ -145,7 +145,16 @@ func FormatFloat(v float64) []byte {
 }
 
 func FormatFloatString(v float64) string {
-	return strconv.FormatFloat(v, 'f', 17, 64)
+	s := strconv.FormatFloat(v, 'f', 17, 64)
+	// redis use inf and -inf for float bulk string returns
+	switch s {
+	case "+Inf":
+		return "inf"
+	case "-Inf":
+		return "-inf"
+	default:
+		return s
+	}
 }
 
 func FormatUint(u uint64) []byte {
