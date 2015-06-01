@@ -66,6 +66,8 @@ func (s *testStoreSuite) TestFloatCodec(c *C) {
 	testFloatCodec(c, -math.MaxFloat64)
 	testFloatCodec(c, math.SmallestNonzeroFloat64)
 	testFloatCodec(c, -math.SmallestNonzeroFloat64)
+	testFloatCodec(c, math.Inf(1))
+	testFloatCodec(c, math.Inf(-1))
 }
 
 func (s *testStoreSuite) TestFloatLexCodec(c *C) {
@@ -84,4 +86,8 @@ func (s *testStoreSuite) TestFloatLexCodec(c *C) {
 	testFloatLexSort(c,
 		[]float64{1.0, 0, -10.0, math.MaxFloat64, -math.MaxFloat64},
 		[]float64{-math.MaxFloat64, -10.0, 0, 1.0, math.MaxFloat64})
+
+	testFloatLexSort(c,
+		[]float64{math.Inf(1), math.Inf(-1), 1.1, -1.1},
+		[]float64{math.Inf(-1), -1.1, 1.1, math.Inf(1)})
 }
