@@ -219,7 +219,7 @@ func (h *Handler) Config(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	sub, args := strings.ToLower(string(args[0])), args[1:]
+	sub := strings.ToLower(string(args[0]))
 
 	switch sub {
 	default:
