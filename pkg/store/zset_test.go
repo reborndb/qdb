@@ -225,7 +225,7 @@ func (s *testStoreSuite) zremrangebyscore(c *C, db uint32, key string, min strin
 func (s *testStoreSuite) TestZAdd(c *C) {
 	s.zadd(c, 0, "zset", 1, "0", 0)
 	for i := 0; i < 32; i++ {
-		s.zadd(c, 0, "zset", 1, strconv.Itoa(i), int64(i), strconv.Itoa(i+1), int64(i+1))
+		s.zadd(c, 0, "zset", 1, strconv.Itoa(i), int64(i), strconv.Itoa(i+1), float64(i+1))
 	}
 	s.zcard(c, 0, "zset", 33)
 	ms := []interface{}{}
@@ -284,21 +284,21 @@ func (s *testStoreSuite) TestZRestore(c *C) {
 
 func (s *testStoreSuite) TestZCount(c *C) {
 	s.zadd(c, 0, "zset", 1, "0", 0)
-	s.zadd(c, 0, "zset", 1, "1", 1)
-	s.zadd(c, 0, "zset", 1, "2", 2)
-	s.zadd(c, 0, "zset", 1, "3", 3)
-	s.zadd(c, 0, "zset", 1, "-1", -1)
-	s.zadd(c, 0, "zset", 1, "-2", -2)
-	s.zadd(c, 0, "zset", 1, "-3", -3)
+	s.zadd(c, 0, "zset", 1, "1", 1.1)
+	s.zadd(c, 0, "zset", 1, "2", 2.2)
+	s.zadd(c, 0, "zset", 1, "3", 3.3)
+	s.zadd(c, 0, "zset", 1, "-1", -1.1)
+	s.zadd(c, 0, "zset", 1, "-2", -2.2)
+	s.zadd(c, 0, "zset", 1, "-3", -3.3)
 
-	s.zcount(c, 0, "zset", "0", "1", 2)
-	s.zcount(c, 0, "zset", "(0", "1", 1)
-	s.zcount(c, 0, "zset", "0", "(2", 2)
-	s.zcount(c, 0, "zset", "-2", "-1", 2)
-	s.zcount(c, 0, "zset", "(-2", "-1", 1)
-	s.zcount(c, 0, "zset", "-3", "(-1", 2)
-	s.zcount(c, 0, "zset", "2", "1", 0)
-	s.zcount(c, 0, "zset", "-1", "-2", 0)
+	s.zcount(c, 0, "zset", "0", "1.1", 2)
+	s.zcount(c, 0, "zset", "(0", "1.1", 1)
+	s.zcount(c, 0, "zset", "0", "(2.2", 2)
+	s.zcount(c, 0, "zset", "-2.2", "-1.1", 2)
+	s.zcount(c, 0, "zset", "(-2.2", "-1.1", 1)
+	s.zcount(c, 0, "zset", "-3.3", "(-1.1", 2)
+	s.zcount(c, 0, "zset", "2.2", "1.1", 0)
+	s.zcount(c, 0, "zset", "-1.1", "-2.2", 0)
 	s.zcount(c, 0, "zset", "-inf", "+inf", 7)
 	s.zcount(c, 0, "zset", "0", "+inf", 4)
 	s.zcount(c, 0, "zset", "-inf", "0", 4)
@@ -311,13 +311,13 @@ func (s *testStoreSuite) TestZCount(c *C) {
 }
 
 func (s *testStoreSuite) TestZLexCount(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 0)
-	s.zadd(c, 0, "zset", 1, "b", 0)
-	s.zadd(c, 0, "zset", 1, "c", 0)
-	s.zadd(c, 0, "zset", 1, "d", 0)
-	s.zadd(c, 0, "zset", 1, "e", 0)
-	s.zadd(c, 0, "zset", 1, "f", 0)
-	s.zadd(c, 0, "zset", 1, "g", 0)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
 	s.zlexcount(c, 0, "zset", "-", "+", 7)
 	s.zlexcount(c, 0, "zset", "(a", "[c", 2)
@@ -335,9 +335,9 @@ func (s *testStoreSuite) TestZLexCount(c *C) {
 }
 
 func (s *testStoreSuite) TestZRange(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 1)
-	s.zadd(c, 0, "zset", 1, "b", 2)
-	s.zadd(c, 0, "zset", 1, "c", 3)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
 
 	s.zrange(c, 0, "zset", 0, 3, false, "a", "b", "c")
 	s.zrange(c, 0, "zset", 0, -1, false, "a", "b", "c")
@@ -355,13 +355,13 @@ func (s *testStoreSuite) TestZRange(c *C) {
 }
 
 func (s *testStoreSuite) TestZRangeByLex(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 0)
-	s.zadd(c, 0, "zset", 1, "b", 0)
-	s.zadd(c, 0, "zset", 1, "c", 0)
-	s.zadd(c, 0, "zset", 1, "d", 0)
-	s.zadd(c, 0, "zset", 1, "e", 0)
-	s.zadd(c, 0, "zset", 1, "f", 0)
-	s.zadd(c, 0, "zset", 1, "g", 0)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
 	s.zrangebylex(c, 0, "zset", "-", "+", 0, 0, false)
 	s.zrangebylex(c, 0, "zset", "-", "+", 0, 1, false, "a")
@@ -378,36 +378,36 @@ func (s *testStoreSuite) TestZRangeByLex(c *C) {
 }
 
 func (s *testStoreSuite) TestZRangeByScore(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 1)
-	s.zadd(c, 0, "zset", 1, "b", 2)
-	s.zadd(c, 0, "zset", 1, "c", 3)
-	s.zadd(c, 0, "zset", 1, "d", 4)
-	s.zadd(c, 0, "zset", 1, "e", 5)
-	s.zadd(c, 0, "zset", 1, "f", 6)
-	s.zadd(c, 0, "zset", 1, "g", 7)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
-	s.zrangebyscore(c, 0, "zset", "0", "7", 0, 2, false, "a", "b")
-	s.zrangebyscore(c, 0, "zset", "-inf", "7", 0, 1, false, "a")
-	s.zrangebyscore(c, 0, "zset", "-inf", "7", 1, 1, false, "b")
-	s.zrangebyscore(c, 0, "zset", "(1", "(2", 1, 1, false)
-	s.zrangebyscore(c, 0, "zset", "8", "9", 1, 1, false)
+	s.zrangebyscore(c, 0, "zset", "0", "7.7", 0, 2, false, "a", "b")
+	s.zrangebyscore(c, 0, "zset", "-inf", "7.7", 0, 1, false, "a")
+	s.zrangebyscore(c, 0, "zset", "-inf", "7.7", 1, 1, false, "b")
+	s.zrangebyscore(c, 0, "zset", "(1.1", "(2.2", 1, 1, false)
+	s.zrangebyscore(c, 0, "zset", "8.8", "9.9", 1, 1, false)
 
 	s.zrangebyscore(c, 0, "zset", "+inf", "-inf", 0, 1, true, "g")
-	s.zrangebyscore(c, 0, "zset", "3", "(1", 0, -1, true, "c", "b")
-	s.zrangebyscore(c, 0, "zset", "(2", "(1", 0, -1, true)
+	s.zrangebyscore(c, 0, "zset", "3.3", "(1.1", 0, -1, true, "c", "b")
+	s.zrangebyscore(c, 0, "zset", "(2.2", "(1.1", 0, -1, true)
 
 	s.zdel(c, 0, "zset", 1)
 	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRank(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 1)
-	s.zadd(c, 0, "zset", 1, "b", 2)
-	s.zadd(c, 0, "zset", 1, "c", 3)
-	s.zadd(c, 0, "zset", 1, "d", 4)
-	s.zadd(c, 0, "zset", 1, "e", 5)
-	s.zadd(c, 0, "zset", 1, "f", 6)
-	s.zadd(c, 0, "zset", 1, "g", 7)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
 	s.zrank(c, 0, "zset", "a", false, 0)
 	s.zrank(c, 0, "zset", "aa", false, -1)
@@ -425,13 +425,13 @@ func (s *testStoreSuite) TestZRank(c *C) {
 }
 
 func (s *testStoreSuite) TestZRemRangeByLex(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 0)
-	s.zadd(c, 0, "zset", 1, "b", 0)
-	s.zadd(c, 0, "zset", 1, "c", 0)
-	s.zadd(c, 0, "zset", 1, "d", 0)
-	s.zadd(c, 0, "zset", 1, "e", 0)
-	s.zadd(c, 0, "zset", 1, "f", 0)
-	s.zadd(c, 0, "zset", 1, "g", 0)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
 	s.zremrangebylex(c, 0, "zset", "[a", "(c", 2)
 	s.zcard(c, 0, "zset", 5)
@@ -444,13 +444,13 @@ func (s *testStoreSuite) TestZRemRangeByLex(c *C) {
 }
 
 func (s *testStoreSuite) TestZRemRangeByRank(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 1)
-	s.zadd(c, 0, "zset", 1, "b", 2)
-	s.zadd(c, 0, "zset", 1, "c", 3)
-	s.zadd(c, 0, "zset", 1, "d", 4)
-	s.zadd(c, 0, "zset", 1, "e", 5)
-	s.zadd(c, 0, "zset", 1, "f", 6)
-	s.zadd(c, 0, "zset", 1, "g", 7)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
 	s.zremrangebyrank(c, 0, "zset", 0, 1, 2)
 	s.zcard(c, 0, "zset", 5)
@@ -464,17 +464,17 @@ func (s *testStoreSuite) TestZRemRangeByRank(c *C) {
 }
 
 func (s *testStoreSuite) TestZRemRangeByScore(c *C) {
-	s.zadd(c, 0, "zset", 1, "a", 1)
-	s.zadd(c, 0, "zset", 1, "b", 2)
-	s.zadd(c, 0, "zset", 1, "c", 3)
-	s.zadd(c, 0, "zset", 1, "d", 4)
-	s.zadd(c, 0, "zset", 1, "e", 5)
-	s.zadd(c, 0, "zset", 1, "f", 6)
-	s.zadd(c, 0, "zset", 1, "g", 7)
+	s.zadd(c, 0, "zset", 1, "a", 1.1)
+	s.zadd(c, 0, "zset", 1, "b", 2.2)
+	s.zadd(c, 0, "zset", 1, "c", 3.3)
+	s.zadd(c, 0, "zset", 1, "d", 4.4)
+	s.zadd(c, 0, "zset", 1, "e", 5.5)
+	s.zadd(c, 0, "zset", 1, "f", 6.6)
+	s.zadd(c, 0, "zset", 1, "g", 7.7)
 
-	s.zremrangebyscore(c, 0, "zset", "1", "2", 2)
+	s.zremrangebyscore(c, 0, "zset", "1.1", "2.2", 2)
 	s.zcard(c, 0, "zset", 5)
-	s.zremrangebyscore(c, 0, "zset", "(3", "5", 2)
+	s.zremrangebyscore(c, 0, "zset", "(3.3", "5.5", 2)
 	s.zrangebylex(c, 0, "zset", "-", "+", 0, -1, false, "c", "f", "g")
 	s.zremrangebyscore(c, 0, "zset", "-inf", "+inf", 3)
 	s.zcard(c, 0, "zset", 0)

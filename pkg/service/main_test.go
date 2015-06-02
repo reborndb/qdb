@@ -222,7 +222,6 @@ func (pc *testPoolConn) checkFloat(c *C, expect float64, cmd string, args ...int
 		v = string(x.Value)
 	default:
 		c.Errorf("invalid type, type is %T", resp)
-
 	}
 	f, err := strconv.ParseFloat(v, 64)
 	c.Assert(err, IsNil)
