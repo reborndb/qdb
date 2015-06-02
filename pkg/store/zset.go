@@ -1005,7 +1005,7 @@ func (s *Store) genericZRange(db uint32, args []interface{}, reverse bool) ([][]
 		if offset >= start {
 			res = append(res, o.Member)
 			if withScore == 2 {
-				res = append(res, FormatInt(int64(o.Score)))
+				res = append(res, FormatFloat(o.Score))
 			}
 
 			rangeLen--
@@ -1203,7 +1203,7 @@ func (s *Store) genericZRangeByScore(db uint32, args []interface{}, reverse bool
 
 			res = append(res, o.Member)
 			if withScore == 2 {
-				res = append(res, FormatInt(int64(o.Score)))
+				res = append(res, FormatFloat(o.Score))
 			}
 
 			count--
