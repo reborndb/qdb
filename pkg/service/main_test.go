@@ -167,6 +167,9 @@ func (pc *testPoolConn) doCmd(c *C, cmd string, args ...interface{}) redis.Resp 
 	err := redis.Encode(w, req)
 	c.Assert(err, IsNil)
 
+	err = w.Flush()
+	c.Assert(err, IsNil)
+
 	resp, err := redis.Decode(r)
 	c.Assert(err, IsNil)
 	return resp
