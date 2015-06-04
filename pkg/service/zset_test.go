@@ -99,17 +99,15 @@ func (s *testServiceSuite) checkZRange(c *C, cmd string, expect []interface{}, k
 		c.Assert(ay, IsNil)
 	} else {
 		for i := range expect {
-			switch expect[i].(type) {
+			switch x := expect[i].(type) {
 			case string:
-				v := expect[i].(string)
-				c.Assert(v, Equals, string(ay[i]))
+				c.Assert(x, Equals, string(ay[i]))
 			case float64:
-				v := expect[i].(float64)
 				f, err := strconv.ParseFloat(string(ay[i]), 64)
 				c.Assert(err, IsNil)
-				c.Assert(math.Abs(v-f) < 1e-9, Equals, true)
+				c.Assert(math.Abs(x-f) < 1e-9, Equals, true)
 			default:
-				c.Errorf("invalid type, type is %T", expect[i])
+				c.Errorf("invalid type, type is %T", x)
 			}
 		}
 	}
