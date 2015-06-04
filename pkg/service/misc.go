@@ -13,6 +13,28 @@ import (
 	redis "github.com/reborndb/go/redis/resp"
 )
 
+// AUTH password
+func (h *Handler) Auth(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+	if len(args) != 1 {
+		return toRespErrorf("len(args) = %d, expect = 1", len(args))
+	}
+
+	c, err := checkConn(arg0, nil)
+	if err != nil {
+		return toRespError(err)
+	}
+
+	if len(h.config.Password) == 0 {
+		return toRespErrorf("Client sent AUTH, but no password is set")
+	} else if h.config.Password == string(args[0]) {
+		c.authenticated = true
+		return redis.NewString("OK"), nil
+	} else {
+		c.authenticated = false
+		return toRespErrorf("invalid password")
+	}
+}
+
 // PING
 func (h *Handler) Ping(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
@@ -214,11 +236,6 @@ func (h *Handler) Config(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 2 or 3", len(args))
 	}
 
-	_, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
 	sub := strings.ToLower(string(args[0]))
 
 	switch sub {
@@ -233,6 +250,18 @@ func (h *Handler) Config(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 			return toRespErrorf("unknown entry %s", e)
 		case "maxmemory":
 			return redis.NewString("0"), nil
+		}
+	case "set":
+		if len(args) != 3 {
+			return toRespErrorf("len(args) = %d, expect = 3", len(args))
+		}
+		switch e := strings.ToLower(string(args[1])); e {
+		default:
+			return toRespErrorf("unknown entry %s", e)
+		case "requirepass":
+			password := string(args[2])
+			h.config.Password = password
+			return redis.NewString("OK"), nil
 		}
 	}
 }

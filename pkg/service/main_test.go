@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,7 +32,8 @@ var _ = Suite(&testServiceSuite{})
 
 type testServiceSuite struct {
 	s        *testServer
-	coonPool *testConnPool
+	conn     *testConn
+	connPool *testConnPool
 
 	slotPort     int
 	slotServer   *testServer
@@ -40,16 +42,29 @@ type testServiceSuite struct {
 
 func (s *testServiceSuite) SetUpSuite(c *C) {
 	s.s = testCreateServer(c, 16380)
-	s.coonPool = testCreateConnPool(16380)
+	c.Assert(s.s, NotNil)
+
+	s.conn = testCreateConn(16380)
+	c.Assert(s.conn, NotNil)
+
+	s.connPool = testCreateConnPool(16380)
+	c.Assert(s.connPool, NotNil)
 
 	s.slotPort = 16381
 	s.slotServer = testCreateServer(c, s.slotPort)
+	c.Assert(s.slotServer, NotNil)
+
 	s.slotConnPool = testCreateConnPool(s.slotPort)
+	c.Assert(s.slotConnPool, NotNil)
 }
 
 func (s *testServiceSuite) TearDownSuite(c *C) {
-	if s.coonPool != nil {
-		s.coonPool.Close()
+	if s.conn != nil {
+		s.conn.Close()
+	}
+
+	if s.connPool != nil {
+		s.connPool.Close()
 	}
 
 	if s.slotConnPool != nil {
@@ -100,6 +115,24 @@ func testCreateServer(c *C, port int) *testServer {
 	return s
 }
 
+type testConn struct {
+	net.Conn
+}
+
+func testCreateConn(port int) *testConn {
+	nc, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return nil
+	}
+	return &testConn{nc}
+}
+
+func (c *testConn) Close() {
+	if c.Conn != nil {
+		c.Conn.Close()
+	}
+}
+
 type testConnPool struct {
 	p *pools.ResourcePool
 }
@@ -145,6 +178,10 @@ type testPoolConn struct {
 	net.Conn
 	closed bool
 	p      *pools.ResourcePool
+}
+
+func newTestPoolConn(tc *testConn) *testPoolConn {
+	return &testPoolConn{Conn: tc.Conn, closed: false}
 }
 
 func (c *testPoolConn) Close() {
@@ -203,6 +240,26 @@ func (pc *testPoolConn) checkString(c *C, expect string, cmd string, args ...int
 	}
 }
 
+func (pc *testPoolConn) checkError(c *C, expect string, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	switch x := resp.(type) {
+	case *redis.Error:
+		c.Assert(x.Value, Equals, expect)
+	default:
+		c.Errorf("invalid type %T", resp)
+	}
+}
+
+func (pc *testPoolConn) checkContainError(c *C, expect string, cmd string, args ...interface{}) {
+	resp := pc.doCmd(c, cmd, args...)
+	switch x := resp.(type) {
+	case *redis.Error:
+		c.Assert(strings.Contains(x.Value, expect), Equals, true)
+	default:
+		c.Errorf("invalid type %T", resp)
+	}
+}
+
 func (pc *testPoolConn) checkInt(c *C, expect int64, cmd string, args ...interface{}) {
 	resp := pc.doCmd(c, cmd, args...)
 	c.Assert(resp, DeepEquals, redis.NewInt(expect))
@@ -225,8 +282,8 @@ func (pc *testPoolConn) checkFloat(c *C, expect float64, cmd string, args ...int
 		v = string(x.Value)
 	default:
 		c.Errorf("invalid type, type is %T", resp)
-
 	}
+
 	f, err := strconv.ParseFloat(v, 64)
 	c.Assert(err, IsNil)
 	c.Assert(math.Abs(f-expect) < 1e-10, Equals, true)
@@ -270,7 +327,7 @@ func (pc *testPoolConn) checkIntArray(c *C, expect []int64, cmd string, args ...
 }
 
 func (s *testServiceSuite) getConn(c *C) *testPoolConn {
-	return s.coonPool.Get(c)
+	return s.connPool.Get(c)
 }
 
 func (s *testServiceSuite) checkNil(c *C, cmd string, args ...interface{}) {
@@ -302,6 +359,20 @@ func (s *testServiceSuite) checkString(c *C, expect string, cmd string, args ...
 	nc.checkString(c, expect, cmd, args...)
 }
 
+func (s *testServiceSuite) checkError(c *C, expect string, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkError(c, expect, cmd, args...)
+}
+
+func (s *testServiceSuite) checkContainError(c *C, expect string, cmd string, args ...interface{}) {
+	nc := s.getConn(c)
+	defer nc.Recycle()
+
+	nc.checkContainError(c, expect, cmd, args...)
+}
+
 func (s *testServiceSuite) checkInt(c *C, expect int64, cmd string, args ...interface{}) {
 	nc := s.getConn(c)
 	defer nc.Recycle()
@@ -312,18 +383,21 @@ func (s *testServiceSuite) checkInt(c *C, expect int64, cmd string, args ...inte
 func (s *testServiceSuite) checkIntApprox(c *C, expect, delta int64, cmd string, args ...interface{}) {
 	nc := s.getConn(c)
 	defer nc.Recycle()
+
 	nc.checkIntApprox(c, expect, delta, cmd, args...)
 }
 
 func (s *testServiceSuite) checkFloat(c *C, expect float64, cmd string, args ...interface{}) {
 	nc := s.getConn(c)
 	defer nc.Recycle()
+
 	nc.checkFloat(c, expect, cmd, args...)
 }
 
 func (s *testServiceSuite) checkBytes(c *C, expect []byte, cmd string, args ...interface{}) {
 	nc := s.getConn(c)
 	defer nc.Recycle()
+
 	nc.checkBytes(c, expect, cmd, args...)
 }
 

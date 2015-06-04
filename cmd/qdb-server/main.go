@@ -90,6 +90,7 @@ Options:
     --dbtype=TYPE                     dtabase type, like rocksdb, leveldb, goleveldb	
     --dbpath=PATH                     database store path						
     --addr=ADDR                       service listening address	
+    --pass=PASSWORD                   service password
     --pidfile=FILE                    service pid file 
     --conn_timeout=N                  connection timeout after N seconds
     --dump_path=PATH                  path saving snapshot rdb file
@@ -99,6 +100,7 @@ Options:
     --repl_backlog_file_path=PATH     path saving replication backlog data, if empty, use memory instead
     --repl_backlog_size=SIZE          maximum backlog size(bytes)
     --repl_ping_slave_period=N        Master pings slave in an interval(seconds) when replication
+    --master_pass=MASTERAUTH          Master auth password for replication
 `
 	d, err := docopt.Parse(usage, nil, true, "", false)
 	if err != nil {
@@ -142,6 +144,7 @@ Options:
 
 	setStringFromOpt(&conf.Service.Listen, d, "--addr")
 	setStringFromOpt(&conf.Service.PidFile, d, "--pidfile")
+	setStringFromOpt(&conf.Service.Password, d, "--pass")
 	setIntFromOpt(&conf.Service.ConnTimeout, d, "--conn_timeout")
 	setStringFromOpt(&conf.Service.DumpPath, d, "--dump_path")
 	setStringFromOpt(&conf.Service.SyncFilePath, d, "--sync_file_path")
@@ -150,6 +153,7 @@ Options:
 	setStringFromOpt(&conf.Service.ReplBacklogFilePath, d, "--repl_backlog_file_path")
 	setIntFromOpt(&conf.Service.ReplBacklogSize, d, "--repl_backlog_size")
 	setIntFromOpt(&conf.Service.ReplPingSlavePeriod, d, "--repl_ping_slave_period")
+	setStringFromOpt(&conf.Service.MasterPassword, d, "--master_pass")
 
 	log.Infof("load config\n%s\n\n", conf)
 

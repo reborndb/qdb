@@ -22,3 +22,19 @@ func (s *testServiceSuite) TestFlushAll(c *C) {
 	s.checkOK(c, "flushall")
 	s.checkNil(c, "get", k)
 }
+
+func (s *testServiceSuite) TestAuth(c *C) {
+	// only reuse testPoolConn for auth test
+	pc := newTestPoolConn(s.conn)
+	pc.checkString(c, "PONG", "ping")
+	pc.checkOK(c, "config", "set", "requirepass", "123456")
+	pc.checkContainError(c, "NOAUTH Authentication required", "ping")
+	pc.checkContainError(c, "invalid password", "auth", "123")
+	pc.checkContainError(c, "invalid password", "auth", "")
+	pc.checkOK(c, "auth", "123456")
+	pc.checkString(c, "PONG", "ping")
+	pc.checkOK(c, "config", "set", "requirepass", "")
+	pc.checkString(c, "PONG", "ping")
+	pc.checkContainError(c, "Client sent AUTH, but no password is set", "auth", "123")
+	pc.checkContainError(c, "Client sent AUTH, but no password is set", "auth", "")
+}
