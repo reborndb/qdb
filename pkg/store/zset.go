@@ -16,26 +16,6 @@ import (
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
-type ScoreInt int64
-
-const (
-	// we will use int64 as the score for backend binary sort
-	// but redis rdb will use float64
-	// to avoid data precison lost, the int64 range must be in [- 2**53, 2**53] like javascript
-	MaxScore = ScoreInt(1 << 53)
-	MinScore = -(ScoreInt(1 << 53))
-
-	negativeInfScore = ScoreInt(math.MinInt64)
-	positiveInfScore = ScoreInt(math.MaxInt64)
-)
-
-// the binary bigendian for negative score is bigger than positive score
-// so we must we a flag before the binary buffer for lexicographical sort
-const (
-	negativeScoreFlag byte = '<'
-	positiveScoreFlag byte = '>'
-)
-
 var errTravelBreak = errors.New("break current travel")
 
 type zsetRow struct {
@@ -43,7 +23,7 @@ type zsetRow struct {
 
 	Size   int64
 	Member []byte
-	Score  ScoreInt
+	Score  float64
 
 	indexKeyPrefix []byte
 	indexKeyRefs   []interface{}
@@ -60,10 +40,6 @@ func newZSetRow(db uint32, key []byte) *zsetRow {
 	o := &zsetRow{}
 	o.lazyInit(db, key, newStoreRowHelper(db, key, ZSetCode))
 	return o
-}
-
-func isValidScore(score ScoreInt) bool {
-	return score >= MinScore && score <= MaxScore
 }
 
 func (o *zsetRow) lazyInit(db uint32, key []byte, h *storeRowHelper) {
@@ -85,13 +61,19 @@ func (o *zsetRow) IndexKeyPrefix() []byte {
 func (o *zsetRow) IndexKey() []byte {
 	w := NewBufWriter(o.IndexKeyPrefix())
 
-	if o.Score >= 0 {
-		encodeRawBytes(w, positiveScoreFlag)
-	} else {
-		encodeRawBytes(w, negativeScoreFlag)
-	}
-
 	encodeRawBytes(w, o.indexKeyRefs...)
+	return w.Bytes()
+}
+
+type scoreInt uint64
+
+func (o *zsetRow) indexNextScoreKey() []byte {
+	w := NewBufWriter(o.IndexKeyPrefix())
+
+	nextScore := scoreInt(float64ToUint64(o.Score) + 1)
+
+	encodeRawBytes(w, &nextScore, &o.Member)
+
 	return w.Bytes()
 }
 
@@ -104,8 +86,6 @@ func (o *zsetRow) IndexValue() []byte {
 
 func (o *zsetRow) ParseIndexKeySuffix(p []byte) (err error) {
 	r := NewBufReader(p)
-	var scoreFlag byte
-	err = decodeRawBytes(r, err, &scoreFlag)
 	err = decodeRawBytes(r, err, o.indexKeyRefs...)
 	err = decodeRawBytes(r, err)
 	return
@@ -174,9 +154,9 @@ func (o *zsetRow) storeObject(s *Store, bt *engine.Batch, expireat uint64, obj i
 
 	ms := &markSet{}
 	for _, e := range zset {
-		o.Member, o.Score = e.Member, ScoreInt(e.Score)
-		if !isValidScore(o.Score) {
-			return errors.Errorf("invalid score %v, must in [%d, %d]", e.Score, MinScore, MaxScore)
+		o.Member, o.Score = e.Member, e.Score
+		if math.IsNaN(o.Score) {
+			return errors.Errorf("invalid nan score")
 		}
 
 		ms.Set(o.Member)
@@ -260,7 +240,7 @@ func (s *Store) ZGetAll(db uint32, args ...interface{}) ([][]byte, error) {
 	eles := x.(rdb.ZSet)
 	rets := make([][]byte, len(eles)*2)
 	for i, e := range eles {
-		rets[i*2], rets[i*2+1] = e.Member, FormatInt(int64(e.Score))
+		rets[i*2], rets[i*2+1] = e.Member, FormatFloat(e.Score)
 	}
 	return rets, nil
 }
@@ -299,7 +279,7 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 	var key []byte
 	var eles = make([]struct {
 		Member []byte
-		Score  int64
+		Score  float64
 	}, len(args)/2)
 	if err := parseArgument(args[0], &key); err != nil {
 		return 0, errArguments("parse args[%d] failed, %s", 0, err)
@@ -308,9 +288,8 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 		e := &eles[i]
 		if err := parseArgument(args[i*2+1], &e.Score); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i*2+1, err)
-		} else if !isValidScore(ScoreInt(e.Score)) {
-			return 0, errArguments("parse args[%d] failed, invalid score %d", i*2+1, e.Score)
 		}
+
 		if err := parseArgument(args[i*2+2], &e.Member); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i*2+2, err)
 		} else if len(e.Member) == 0 {
@@ -347,7 +326,7 @@ func (s *Store) ZAdd(db uint32, args ...interface{}) (int64, error) {
 			bt.Del(o.IndexKey())
 		}
 
-		o.Score = ScoreInt(e.Score)
+		o.Score = e.Score
 
 		bt.Set(o.DataKey(), o.DataValue())
 		bt.Set(o.IndexKey(), o.IndexValue())
@@ -418,7 +397,7 @@ func (s *Store) ZRem(db uint32, args ...interface{}) (int64, error) {
 }
 
 // ZSCORE key member
-func (s *Store) ZScore(db uint32, args ...interface{}) (int64, bool, error) {
+func (s *Store) ZScore(db uint32, args ...interface{}) (float64, bool, error) {
 	if len(args) != 2 {
 		return 0, false, errArguments("len(args) = %d, expect = 2", len(args))
 	}
@@ -445,18 +424,18 @@ func (s *Store) ZScore(db uint32, args ...interface{}) (int64, bool, error) {
 	if err != nil || !exists {
 		return 0, false, err
 	} else {
-		return int64(o.Score), true, nil
+		return o.Score, true, nil
 	}
 }
 
 // ZINCRBY key delta member
-func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
+func (s *Store) ZIncrBy(db uint32, args ...interface{}) (float64, error) {
 	if len(args) != 3 {
 		return 0, errArguments("len(args) = %d, expect = 3", len(args))
 	}
 
 	var key, member []byte
-	var delta int64
+	var delta float64
 	for i, ref := range []interface{}{&key, &delta, &member} {
 		if err := parseArgument(args[i], ref); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i, err)
@@ -490,14 +469,14 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 	}
 
 	if exists {
-		delta += int64(o.Score)
+		delta += o.Score
 	} else {
 		o.Size++
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
-	o.Score = ScoreInt(delta)
-	if !isValidScore(o.Score) {
-		return 0, errors.Errorf("invalid score %d, must in [%d, %d]", o.Score, MinScore, MaxScore)
+	o.Score = delta
+	if math.IsNaN(delta) {
+		return 0, errors.Errorf("invalid nan score")
 	}
 
 	bt.Set(o.DataKey(), o.DataValue())
@@ -509,15 +488,15 @@ func (s *Store) ZIncrBy(db uint32, args ...interface{}) (int64, error) {
 
 // holds a inclusive/exclusive range spec by score comparison
 type rangeSpec struct {
-	Min ScoreInt
-	Max ScoreInt
+	Min float64
+	Max float64
 
 	// are min or max score exclusive
 	MinEx bool
 	MaxEx bool
 }
 
-func (r *rangeSpec) GteMin(v ScoreInt) bool {
+func (r *rangeSpec) GteMin(v float64) bool {
 	if r.MinEx {
 		return v > r.Min
 	} else {
@@ -525,7 +504,7 @@ func (r *rangeSpec) GteMin(v ScoreInt) bool {
 	}
 }
 
-func (r *rangeSpec) LteMax(v ScoreInt) bool {
+func (r *rangeSpec) LteMax(v float64) bool {
 	if r.MaxEx {
 		return v < r.Max
 	} else {
@@ -533,7 +512,7 @@ func (r *rangeSpec) LteMax(v ScoreInt) bool {
 	}
 }
 
-func (r *rangeSpec) InRange(v ScoreInt) bool {
+func (r *rangeSpec) InRange(v float64) bool {
 	if r.Min > r.Max || (r.Min == r.Max && (r.MinEx || r.MaxEx)) {
 		return false
 	}
@@ -548,7 +527,7 @@ func (r *rangeSpec) InRange(v ScoreInt) bool {
 	return true
 }
 
-func parseRangeScore(buf []byte) (ScoreInt, bool, error) {
+func parseRangeScore(buf []byte) (float64, bool, error) {
 	if len(buf) == 0 {
 		return 0, false, errors.Errorf("empty range score argument")
 	}
@@ -559,21 +538,14 @@ func parseRangeScore(buf []byte) (ScoreInt, bool, error) {
 		ex = true
 	}
 
-	str := strings.ToLower(string(buf))
-	switch str {
-	case "-inf":
-		return negativeInfScore, ex, nil
-	case "+inf":
-		return positiveInfScore, ex, nil
-	default:
-		if score, err := strconv.ParseInt(str, 10, 64); err != nil {
-			return 0, ex, errors.Trace(err)
-		} else if !isValidScore(ScoreInt(score)) {
-			return 0, ex, errors.Errorf("invalid score %v, must in [%d, %d]", score, MinScore, MaxScore)
-		} else {
-			return ScoreInt(score), ex, nil
-		}
+	f, err := strconv.ParseFloat(string(buf), 64)
+	if err != nil {
+		return 0, ex, errors.Trace(err)
+	} else if math.IsNaN(f) {
+		return 0, ex, errors.Errorf("invalid nan score")
 	}
+
+	return f, ex, nil
 }
 
 func parseRangeSpec(min []byte, max []byte) (*rangeSpec, error) {
@@ -631,14 +603,9 @@ func (o *zsetRow) travelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error
 }
 
 func (o *zsetRow) seekToLastInRange(it *storeIterator, r *rangeSpec) {
-	if r.Max == positiveInfScore {
-		o.Score = positiveInfScore
-	} else {
-		o.Score = r.Max + 1
-	}
+	o.Score = r.Max
 	o.Member = []byte{}
-
-	it.SeekTo(o.IndexKey())
+	it.SeekTo(o.indexNextScoreKey())
 	if !it.Valid() {
 		// try seek to last
 		it.SeekToLast()
@@ -862,7 +829,7 @@ func (o *zsetRow) travelInLexRange(s *Store, r *lexRangeSpec, f func(o *zsetRow)
 	it := s.getIterator()
 	defer s.putIterator(it)
 
-	o.Score = MinScore
+	o.Score = math.Inf(-1)
 	o.Member = r.Min
 
 	it.SeekTo(o.IndexKey())
@@ -897,10 +864,10 @@ func (o *zsetRow) travelInLexRange(s *Store, r *lexRangeSpec, f func(o *zsetRow)
 }
 
 func (o *zsetRow) seekToLastInLexRange(it *storeIterator, r *lexRangeSpec) {
-	o.Score = positiveInfScore
+	o.Score = math.Inf(1)
 	o.Member = r.Max
 
-	it.SeekTo(o.IndexKey())
+	it.SeekTo(o.indexNextScoreKey())
 	if !it.Valid() {
 		// we will try to use SeekToLast
 		it.SeekToLast()
@@ -1030,7 +997,7 @@ func (s *Store) genericZRange(db uint32, args []interface{}, reverse bool) ([][]
 		return [][]byte{}, nil
 	}
 
-	r := &rangeSpec{Min: MinScore, Max: MaxScore, MinEx: false, MaxEx: false}
+	r := &rangeSpec{Min: math.Inf(-1), Max: math.Inf(1), MinEx: true, MaxEx: true}
 
 	res := make([][]byte, 0, rangeLen*int64(withScore))
 	offset := int64(0)
@@ -1038,7 +1005,7 @@ func (s *Store) genericZRange(db uint32, args []interface{}, reverse bool) ([][]
 		if offset >= start {
 			res = append(res, o.Member)
 			if withScore == 2 {
-				res = append(res, FormatInt(int64(o.Score)))
+				res = append(res, FormatFloat(o.Score))
 			}
 
 			rangeLen--
@@ -1236,7 +1203,7 @@ func (s *Store) genericZRangeByScore(db uint32, args []interface{}, reverse bool
 
 			res = append(res, o.Member)
 			if withScore == 2 {
-				res = append(res, FormatInt(int64(o.Score)))
+				res = append(res, FormatFloat(o.Score))
 			}
 
 			count--
@@ -1309,7 +1276,7 @@ func (s *Store) genericZRank(db uint32, args []interface{}, reverse bool) (int64
 		return -1, nil
 	}
 
-	r := &rangeSpec{Min: MinScore, Max: ScoreInt(o.Score), MinEx: false, MaxEx: false}
+	r := &rangeSpec{Min: math.Inf(-1), Max: o.Score, MinEx: true, MaxEx: false}
 	n := int64(1)
 	checkScore := o.Score
 	f := func(o *zsetRow) error {
@@ -1415,7 +1382,7 @@ func (s *Store) ZRemRangeByRank(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
-	r := &rangeSpec{Min: MinScore, Max: MaxScore, MinEx: false, MaxEx: false}
+	r := &rangeSpec{Min: math.Inf(-1), Max: math.Inf(1), MinEx: true, MaxEx: true}
 
 	if err := s.acquire(); err != nil {
 		return 0, err
