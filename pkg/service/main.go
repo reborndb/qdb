@@ -212,3 +212,12 @@ func getRandomHex(buf []byte) []byte {
 
 	return buf
 }
+
+func getKeys(args [][]byte) [][]byte {
+	var keys [][]byte
+	for i := 0; i < len(args); i += 2 {
+		keys = append(keys, args[i])
+	}
+
+	return keys
+}

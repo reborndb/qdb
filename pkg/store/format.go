@@ -204,9 +204,6 @@ func parseArgument(arg interface{}, ref interface{}) error {
 		default:
 			return errors.Errorf("expect %v, but got %v", reflect.TypeOf(*x), reflect.TypeOf(y))
 		}
-		if len(*x) == 0 {
-			return errors.Errorf("byte slice length = 0")
-		}
 	case *string:
 		switch y := arg.(type) {
 		case []byte:
@@ -215,9 +212,6 @@ func parseArgument(arg interface{}, ref interface{}) error {
 			*x = y
 		default:
 			return errors.Errorf("expect %v, but got %v", reflect.TypeOf(*x), reflect.TypeOf(y))
-		}
-		if len(*x) == 0 {
-			return errors.Errorf("string length = 0")
 		}
 	}
 	return nil
