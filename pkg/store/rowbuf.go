@@ -57,7 +57,7 @@ func (r *BufReader) ReadVarbytes() ([]byte, error) {
 	if n < 0 || n > maxVarbytesLen {
 		return nil, errors.Trace(ErrVarbytesLen)
 	} else if n == 0 {
-		return nil, nil
+		return []byte{}, nil
 	}
 	return r.ReadBytes(int(n))
 }

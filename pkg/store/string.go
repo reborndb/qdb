@@ -92,14 +92,9 @@ func (s *Store) Get(db uint32, args ...interface{}) ([]byte, error) {
 	if err != nil || o == nil {
 		return nil, err
 	} else {
-		ok, err := o.LoadDataValue(s)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return nil, err
-		}
-
-		// Notice: fix a bug, when value is ""
-		if ok && o.Value == nil {
-			o.Value = []byte{}
 		}
 
 		return o.Value, nil
@@ -326,14 +321,9 @@ func (s *Store) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 
 	bt := engine.NewBatch()
 	if o != nil {
-		ok, err := o.LoadDataValue(s)
+		_, err := o.LoadDataValue(s)
 		if err != nil {
 			return nil, err
-		}
-
-		// Notice: fix a bug, when value is ""
-		if ok && o.Value == nil {
-			o.Value = []byte{}
 		}
 
 		if o.ExpireAt != 0 {
@@ -734,14 +724,9 @@ func (s *Store) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 			return nil, err
 		}
 		if o != nil {
-			ok, err := o.LoadDataValue(s)
+			_, err := o.LoadDataValue(s)
 			if err != nil {
 				return nil, err
-			}
-
-			// Notice: fix a bug, when value is ""
-			if ok && o.Value == nil {
-				o.Value = []byte{}
 			}
 
 			values[i] = o.Value
