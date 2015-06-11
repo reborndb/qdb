@@ -171,15 +171,14 @@ Options:
 	}
 
 	db, err = engine.Open(conf.DBType, conf.DBPath, dbConf, args.repair)
-
 	if err != nil {
 		log.PanicErrorf(err, "open database failed")
 	}
 
 	bl := store.New(db)
-	defer bl.Close()
 
 	if args.repair {
+		bl.Close()
 		return
 	}
 
@@ -189,19 +188,25 @@ Options:
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM, os.Interrupt, os.Kill)
 
-	go func() {
+	handler, err := service.NewHandler(conf.Service, bl)
+	if err != nil {
+		log.PanicErrorf(err, "create new handler failed")
+	}
+
+	go func(h *service.Handler) {
 		for _ = range c {
 			log.Infof("interrupt and shutdown")
-			bl.Close()
+			h.Close()
 
 			// shutdown gracefully, remove pidfile
 			os.Remove(conf.Service.PidFile)
 
 			os.Exit(0)
 		}
-	}()
+	}(handler)
 
-	if err := service.Serve(conf.Service, bl); err != nil {
+	err = handler.Run()
+	if err != nil {
 		log.ErrorErrorf(err, "service failed")
 	}
 }

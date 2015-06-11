@@ -253,12 +253,12 @@ func (s *testStoreSuite) TestXRestore(c *C) {
 	s.xrestore(c, 0, "string", 0, "world")
 	s.xget(c, 0, "string", "world")
 	s.xrestore(c, 0, "string", 10, "hello")
-	sleepms(20)
+	sleepms(100)
 	s.kpttl(c, 0, "string", -2)
 
 	s.xrestore(c, 0, "string", 10, "test")
 	s.xget(c, 0, "string", "test")
-	sleepms(20)
+	sleepms(100)
 	s.xget(c, 0, "string", "")
 	s.checkEmpty(c)
 }
