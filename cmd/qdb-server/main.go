@@ -176,11 +176,15 @@ Options:
 		log.PanicErrorf(err, "open database failed")
 	}
 
-	bl := store.New(db)
-	defer bl.Close()
+	dbStore := store.New(db)
 
 	if args.repair {
 		return
+	}
+
+	server, err := service.NewServer(conf.Service, dbStore)
+	if err != nil {
+		log.PanicErrorf(err, "create server failed")
 	}
 
 	// create pid file
@@ -189,21 +193,25 @@ Options:
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM, os.Interrupt, os.Kill)
 
-	go func() {
+	go func(s *service.Server) {
 		for _ = range c {
 			log.Infof("interrupt and shutdown")
-			bl.Close()
+
+			// close server
+			s.Close()
 
 			// shutdown gracefully, remove pidfile
 			os.Remove(conf.Service.PidFile)
 
 			os.Exit(0)
 		}
-	}()
+	}(server)
 
-	if err := service.Serve(conf.Service, bl); err != nil {
+	if err := server.Serve(); err != nil {
 		log.ErrorErrorf(err, "service failed")
 	}
+
+	server.Close()
 }
 
 func createPidFile(name string) {

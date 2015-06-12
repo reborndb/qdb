@@ -171,6 +171,7 @@ func (s *testServer) Close() {
 
 	if s.h != nil {
 		s.h.close()
+		s.h = nil
 	}
 }
 
