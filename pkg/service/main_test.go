@@ -104,9 +104,9 @@ func testCreateServer(c *C, port int) *testServer {
 	cfg.DumpPath = path.Join(base, "rdb.dump")
 	cfg.SyncFilePath = path.Join(base, "sync.pipe")
 
-	h, err := newHandler(cfg, store)
+	h, err := NewHandler(cfg, store)
 	c.Assert(err, IsNil)
-	go h.run()
+	go h.Run()
 
 	s := new(testServer)
 	s.s = store
@@ -164,13 +164,8 @@ func (p *testConnPool) Get(c *C) *testPoolConn {
 }
 
 func (s *testServer) Close() {
-	if s.s != nil {
-		s.s.Close()
-		s.s = nil
-	}
-
 	if s.h != nil {
-		s.h.close()
+		s.h.Close()
 	}
 }
 

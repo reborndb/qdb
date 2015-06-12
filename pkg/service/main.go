@@ -19,18 +19,6 @@ import (
 	"github.com/reborndb/qdb/pkg/store"
 )
 
-func Serve(config *Config, bl *store.Store) error {
-	h, err := newHandler(config, bl)
-	if err != nil {
-		return errors.Trace(err)
-	}
-
-	defer h.close()
-
-	err = h.run()
-	return errors.Trace(err)
-}
-
 type Session interface {
 	DB() uint32
 	SetDB(db uint32)
@@ -95,15 +83,18 @@ type Handler struct {
 
 		slaves map[*conn]chan struct{}
 	}
+
+	noReflectFuncs []string
 }
 
-func newHandler(config *Config, s *store.Store) (*Handler, error) {
+func NewHandler(config *Config, s *store.Store) (*Handler, error) {
 	h := &Handler{
-		config:    config,
-		master:    make(chan *conn, 0),
-		signal:    make(chan int, 0),
-		store:     s,
-		bgSaveSem: sync2.NewSemaphore(1),
+		config:         config,
+		master:         make(chan *conn, 0),
+		signal:         make(chan int, 0),
+		store:          s,
+		bgSaveSem:      sync2.NewSemaphore(1),
+		noReflectFuncs: []string{"Run", "Close"},
 	}
 
 	h.runID = make([]byte, 40)
@@ -117,12 +108,12 @@ func newHandler(config *Config, s *store.Store) (*Handler, error) {
 	h.l = l
 
 	if err = h.initReplication(s); err != nil {
-		h.close()
+		h.Close()
 		return nil, errors.Trace(err)
 	}
 
-	if h.htable, err = handler.NewHandlerTable(h); err != nil {
-		h.close()
+	if h.htable, err = handler.NewHandlerTable(h, h.filter); err != nil {
+		h.Close()
 		return nil, errors.Trace(err)
 	} else {
 		go h.daemonSyncMaster()
@@ -131,7 +122,7 @@ func newHandler(config *Config, s *store.Store) (*Handler, error) {
 	return h, nil
 }
 
-func (h *Handler) close() {
+func (h *Handler) Close() {
 	if h.l != nil {
 		h.l.Close()
 		h.l = nil
@@ -139,10 +130,15 @@ func (h *Handler) close() {
 
 	h.closeReplication()
 
+	if h.store != nil {
+		h.store.Close()
+		h.store = nil
+	}
+
 	close(h.signal)
 }
 
-func (h *Handler) run() error {
+func (h *Handler) Run() error {
 	log.Infof("open listen address '%s' and start service", h.l.Addr())
 
 	for {
@@ -168,7 +164,26 @@ func (h *Handler) run() error {
 			}()
 		}
 	}
+
 	return nil
+}
+
+func (h *Handler) filter(name string) bool {
+	if len(name) == 0 {
+		return true
+	}
+
+	if name[0] < 'A' || name[0] > 'Z' {
+		return true
+	}
+
+	for _, v := range h.noReflectFuncs {
+		if v == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func toRespError(err error) (redis.Resp, error) {
@@ -211,4 +226,13 @@ func getRandomHex(buf []byte) []byte {
 	}
 
 	return buf
+}
+
+func getKeys(args [][]byte) [][]byte {
+	var keys [][]byte
+	for i := 0; i < len(args); i += 2 {
+		keys = append(keys, args[i])
+	}
+
+	return keys
 }

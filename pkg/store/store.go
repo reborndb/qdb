@@ -5,6 +5,7 @@ package store
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 
 	"github.com/reborndb/go/errors"
@@ -26,6 +27,13 @@ type Store struct {
 
 	preCommitHandlers  []ForwardHandler
 	postCommitHandlers []ForwardHandler
+}
+
+func (s *Store) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("[Store](%+v)", *s)
 }
 
 func New(db engine.Database) *Store {

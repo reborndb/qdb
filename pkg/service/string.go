@@ -50,7 +50,8 @@ func (h *Handler) Set(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := getKeys(args)
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -68,7 +69,8 @@ func (h *Handler) PSetEX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := args[0:1]
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -86,7 +88,8 @@ func (h *Handler) SetEX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := args[0:1]
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -104,7 +107,8 @@ func (h *Handler) SetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := args[0:1]
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -122,7 +126,8 @@ func (h *Handler) GetSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := args[0:1]
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -266,7 +271,8 @@ func (h *Handler) MSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := getKeys(args)
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}
@@ -284,7 +290,8 @@ func (h *Handler) MSetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
 	}
 
-	s, err := session(arg0, args)
+	keys := getKeys(args)
+	s, err := session(arg0, keys)
 	if err != nil {
 		return toRespError(err)
 	}

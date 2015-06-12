@@ -1,3 +1,8 @@
+PWD=$(shell pwd)
+export C_INCLUDE_PATH=${PWD}/extern/tmp
+export LIBRARY_PATH=${PWD}/extern/tmp
+export LD_LIBRARY_PATH=${PWD}/extern/tmp
+
 all: build
 
 build:
@@ -20,4 +25,4 @@ run:
 	./bin/qdb-server -c conf/config.toml -n 4
 
 gotest:
-	go test --race -tags 'all' -cover -v ./pkg/... ./cmd/...
+	go test -tags 'all' -cover -v ./pkg/... ./cmd/...

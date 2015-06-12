@@ -41,6 +41,11 @@ func (s *testServiceSuite) TestXGetSet(c *C) {
 	s.checkInt(c, 1, "incr", k)
 	s.checkString(c, "1", "getset", k, 0)
 	s.checkString(c, "0", "get", k)
+	s.checkInt(c, 1, "del", k)
+	s.checkOK(c, "set", k, "hello")
+	s.checkString(c, "hello", "getset", k, "")
+	s.checkString(c, "", "getset", k, "hello")
+	s.checkString(c, "hello", "get", k)
 }
 
 func (s *testServiceSuite) TestXIncr(c *C) {
@@ -70,6 +75,8 @@ func (s *testServiceSuite) TestXSet(c *C) {
 	k := randomKey(c)
 	s.checkOK(c, "set", k, "hello")
 	s.checkString(c, "hello", "get", k)
+	s.checkOK(c, "set", k, "")
+	s.checkString(c, "", "get", k)
 }
 
 func (s *testServiceSuite) TestXPSetEX(c *C) {
@@ -78,6 +85,8 @@ func (s *testServiceSuite) TestXPSetEX(c *C) {
 	s.checkOK(c, "psetex", k, 2000*1000, "world")
 	s.checkString(c, "world", "get", k)
 	s.checkIntApprox(c, 2000, 5, "ttl", k)
+	s.checkOK(c, "psetex", k, 1000*1000, "")
+	s.checkString(c, "", "get", k)
 }
 
 func (s *testServiceSuite) TestXSetEX(c *C) {
@@ -86,6 +95,8 @@ func (s *testServiceSuite) TestXSetEX(c *C) {
 	s.checkOK(c, "setex", k, 2000, "world")
 	s.checkString(c, "world", "get", k)
 	s.checkIntApprox(c, 2000, 5, "ttl", k)
+	s.checkOK(c, "setex", k, 1000, "")
+	s.checkString(c, "", "get", k)
 }
 
 func (s *testServiceSuite) TestXSetNX(c *C) {
@@ -94,6 +105,9 @@ func (s *testServiceSuite) TestXSetNX(c *C) {
 	s.checkInt(c, 0, "setnx", k, "world")
 	s.checkString(c, "hello", "get", k)
 	s.checkInt(c, -1, "ttl", k)
+	s.checkInt(c, 1, "del", k)
+	s.checkInt(c, 1, "setnx", k, "")
+	s.checkString(c, "", "get", k)
 }
 
 func (s *testServiceSuite) TestXSetRange(c *C) {
@@ -127,6 +141,11 @@ func (s *testServiceSuite) TestXMSet(c *C) {
 	s.checkString(c, "3", "get", k+"3")
 	s.checkOK(c, "mset", k, 100, k, 1000)
 	s.checkString(c, "1000", "get", k)
+	s.checkOK(c, "mset", k+"11", "", k+"12", "", k+"13", "", k+"14", "")
+	s.checkString(c, "", "get", k+"11")
+	s.checkString(c, "", "get", k+"12")
+	s.checkString(c, "", "get", k+"13")
+	s.checkString(c, "", "get", k+"14")
 }
 
 func (s *testServiceSuite) TestMSetNX(c *C) {
@@ -136,12 +155,15 @@ func (s *testServiceSuite) TestMSetNX(c *C) {
 	s.checkInt(c, 1, "del", k)
 	s.checkInt(c, 1, "msetnx", k, "1", k, "2")
 	s.checkString(c, "2", "get", k)
+	s.checkInt(c, 1, "msetnx", "3", "", "4", "")
+	s.checkString(c, "", "get", "3")
+	s.checkString(c, "", "get", "4")
 }
 
 func (s *testServiceSuite) TestMGet(c *C) {
 	k := randomKey(c)
-	s.checkOK(c, "mset", k, 0, k+"1", 1, k+"2", 2, k+"3", 3)
-	a := s.checkBytesArray(c, "mget", k, k+"1", k+"2", k+"3")
-	c.Assert(a, HasLen, 4)
-	c.Assert(a, DeepEquals, [][]byte{[]byte("0"), []byte("1"), []byte("2"), []byte("3")})
+	s.checkOK(c, "mset", k, 0, k+"1", 1, k+"2", 2, k+"3", 3, k+"4", "")
+	a := s.checkBytesArray(c, "mget", k, k+"1", k+"2", k+"3", k+"4")
+	c.Assert(a, HasLen, 5)
+	c.Assert(a, DeepEquals, [][]byte{[]byte("0"), []byte("1"), []byte("2"), []byte("3"), []byte("")})
 }
