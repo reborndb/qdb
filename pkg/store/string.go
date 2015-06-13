@@ -96,6 +96,7 @@ func (s *Store) Get(db uint32, args ...interface{}) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return o.Value, nil
 	}
 }
@@ -324,6 +325,7 @@ func (s *Store) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if o.ExpireAt != 0 {
 			o.ExpireAt = 0
 			bt.Set(o.MetaKey(), o.MetaValue())
@@ -726,6 +728,7 @@ func (s *Store) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			values[i] = o.Value
 		}
 	}
