@@ -254,15 +254,26 @@ func (s *testReplSuite) testReplication(c *C, master testReplNode, slave testRep
 	resp = s.doCmd(c, slave.Port(), "GET", "b")
 	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString("100"))
 
+	s.doCmdMustOK(c, master.Port(), "SET", "c", "")
+
+	time.Sleep(500 * time.Millisecond)
+	resp = s.doCmd(c, slave.Port(), "GET", "c")
+	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString(""))
+
 	offset = slave.SyncOffset(c)
 	// now close replication connection
 	nc.Close(c)
 	s.doCmdMustOK(c, master.Port(), "SET", "b", "1000")
 
+	s.doCmdMustOK(c, master.Port(), "SET", "c", "123")
+
 	s.waitAndCheckSyncOffset(c, slave, offset)
 
 	resp = s.doCmd(c, slave.Port(), "GET", "b")
 	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString("1000"))
+
+	resp = s.doCmd(c, slave.Port(), "GET", "c")
+	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString("123"))
 
 	s.doCmd(c, master.Port(), "ROLE")
 	s.doCmd(c, slave.Port(), "ROLE")

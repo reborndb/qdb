@@ -19,7 +19,7 @@ func (h *Handler) Auth(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	c, err := checkConn(arg0, nil)
+	c, err := checkConn(arg0, args)
 	if err != nil {
 		return toRespError(err)
 	}
