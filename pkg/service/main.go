@@ -185,11 +185,7 @@ func session(arg0 interface{}, args [][]byte) (Session, error) {
 	if s == nil {
 		return nil, errors.New("invalid session")
 	}
-	for i, v := range args {
-		if len(v) == 0 {
-			return nil, errors.Errorf("args[%d] is nil", i)
-		}
-	}
+
 	return s, nil
 }
 
@@ -211,13 +207,4 @@ func getRandomHex(buf []byte) []byte {
 	}
 
 	return buf
-}
-
-func getKeys(args [][]byte) [][]byte {
-	var keys [][]byte
-	for i := 0; i < len(args); i += 2 {
-		keys = append(keys, args[i])
-	}
-
-	return keys
 }

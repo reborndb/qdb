@@ -270,7 +270,7 @@ func (s *testStoreSuite) TestRestore(c *C) {
 	s.zrestore(c, 0, "key", 3000, "z0", 100, "z1", 1000)
 	s.lrestore(c, 0, "key", 4000, "l0", "l1", "l2")
 	s.srestore(c, 0, "key", 10, "a", "b", "c", "d")
-	sleepms(20)
+	sleepms(30)
 	s.kexists(c, 0, "key", 0)
 	s.checkEmpty(c)
 }

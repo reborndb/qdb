@@ -48,6 +48,11 @@ func (s *testStoreSuite) xrestore(c *C, db uint32, key string, ttlms uint64, val
 
 func (s *testStoreSuite) xset(c *C, db uint32, key, value string) {
 	err := s.s.Set(db, []byte(key), []byte(value))
+	if len(key) == 0 {
+		c.Assert(err, NotNil)
+		return
+	}
+
 	c.Assert(err, IsNil)
 
 	s.kttl(c, db, key, -1)
@@ -69,12 +74,23 @@ func (s *testStoreSuite) xget(c *C, db uint32, key string, expect string) {
 
 func (s *testStoreSuite) xappend(c *C, db uint32, key, value string, expect int64) {
 	x, err := s.s.Append(db, key, value)
-	c.Assert(err, IsNil)
 	c.Assert(x, Equals, expect)
+
+	if len(key) == 0 {
+		c.Assert(err, NotNil)
+		return
+	}
+
+	c.Assert(err, IsNil)
 }
 
 func (s *testStoreSuite) xgetset(c *C, db uint32, key, value string, expect string) {
 	x, err := s.s.GetSet(db, key, value)
+	if len(key) == 0 {
+		c.Assert(err, NotNil)
+		return
+	}
+
 	c.Assert(err, IsNil)
 
 	if expect == "" {
@@ -88,6 +104,11 @@ func (s *testStoreSuite) xgetset(c *C, db uint32, key, value string, expect stri
 
 func (s *testStoreSuite) xpsetex(c *C, db uint32, key, value string, ttlms uint64) {
 	err := s.s.PSetEX(db, key, ttlms, value)
+	if len(key) == 0 {
+		c.Assert(err, NotNil)
+		return
+	}
+
 	c.Assert(err, IsNil)
 
 	s.xdump(c, db, key, value)
@@ -96,6 +117,11 @@ func (s *testStoreSuite) xpsetex(c *C, db uint32, key, value string, ttlms uint6
 
 func (s *testStoreSuite) xsetex(c *C, db uint32, key, value string, ttls uint64) {
 	err := s.s.SetEX(db, key, ttls, value)
+	if len(key) == 0 {
+		c.Assert(err, NotNil)
+		return
+	}
+
 	c.Assert(err, IsNil)
 
 	s.xdump(c, db, key, value)
@@ -104,8 +130,14 @@ func (s *testStoreSuite) xsetex(c *C, db uint32, key, value string, ttls uint64)
 
 func (s *testStoreSuite) xsetnx(c *C, db uint32, key, value string, expect int64) {
 	x, err := s.s.SetNX(db, key, value)
-	c.Assert(err, IsNil)
 	c.Assert(x, Equals, expect)
+
+	if len(key) == 0 {
+		c.Assert(err, NotNil)
+		return
+	}
+
+	c.Assert(err, IsNil)
 
 	if expect != 0 {
 		s.xdump(c, db, key, value)
@@ -184,18 +216,30 @@ func (s *testStoreSuite) xgetrange(c *C, db uint32, key string, beg, end int, ex
 }
 
 func (s *testStoreSuite) xmset(c *C, db uint32, pairs ...string) {
+	c.Assert(len(pairs)%2, Equals, 0)
+
+	m := make(map[string]string)
 	args := make([]interface{}, len(pairs))
-	for i, s := range pairs {
-		args[i] = s
+	for i := 0; i < len(pairs); i += 2 {
+		args[i] = pairs[i]
+		args[i+1] = pairs[i+1]
+		m[pairs[i]] = pairs[i+1]
 	}
 
 	err := s.s.MSet(db, args...)
+
+	keys := [][]byte{}
+	for k, _ := range m {
+		keys = append(keys, []byte(k))
+	}
+
+	if checkKeysEmpty(keys) {
+		c.Assert(err, NotNil)
+		return
+	}
+
 	c.Assert(err, IsNil)
 
-	m := make(map[string]string)
-	for i := 0; i < len(pairs); i += 2 {
-		m[pairs[i]] = pairs[i+1]
-	}
 	for key, value := range m {
 		s.xget(c, db, key, value)
 		s.kttl(c, db, key, -1)
@@ -203,23 +247,33 @@ func (s *testStoreSuite) xmset(c *C, db uint32, pairs ...string) {
 }
 
 func (s *testStoreSuite) xmsetnx(c *C, db uint32, expect int64, pairs ...string) {
+	c.Assert(len(pairs)%2, Equals, 0)
+
+	m := make(map[string]string)
 	args := make([]interface{}, len(pairs))
-	for i, s := range pairs {
-		args[i] = s
+	for i := 0; i < len(pairs); i += 2 {
+		args[i] = pairs[i]
+		args[i+1] = pairs[i+1]
+		m[pairs[i]] = pairs[i+1]
 	}
 
 	x, err := s.s.MSetNX(db, args...)
-	c.Assert(err, IsNil)
 	c.Assert(x, Equals, expect)
+
+	keys := [][]byte{}
+	for k, _ := range m {
+		keys = append(keys, []byte(k))
+	}
+
+	if checkKeysEmpty(keys) {
+		c.Assert(err, NotNil)
+		return
+	}
 
 	if expect == 0 {
 		return
 	}
 
-	m := make(map[string]string)
-	for i := 0; i < len(pairs); i += 2 {
-		m[pairs[i]] = pairs[i+1]
-	}
 	for key, value := range m {
 		s.xget(c, db, key, value)
 		s.kttl(c, db, key, -1)
@@ -285,6 +339,8 @@ func (s *testStoreSuite) TestXSet(c *C) {
 	s.xset(c, 0, "string", "test2")
 	s.xdel(c, 0, "string", 1)
 	s.kpttl(c, 0, "string", -2)
+
+	s.xset(c, 0, "", "empty")
 	s.checkEmpty(c)
 }
 
@@ -313,6 +369,8 @@ func (s *testStoreSuite) TestXAppend(c *C) {
 	}
 	s.xdump(c, 0, "string", expect)
 	s.xdel(c, 0, "string", 1)
+
+	s.xappend(c, 0, "", "empty", 0)
 	s.checkEmpty(c)
 }
 
@@ -327,6 +385,8 @@ func (s *testStoreSuite) TestXSetEX(c *C) {
 	s.xget(c, 0, "string", "world")
 	s.kpttl(c, 0, "string", 100000)
 	s.xdel(c, 0, "string", 1)
+
+	s.xsetex(c, 0, "", "empty", 0)
 	s.checkEmpty(c)
 }
 
@@ -349,6 +409,8 @@ func (s *testStoreSuite) TestXSetNX(c *C) {
 	s.xsetnx(c, 0, "string", "world", 1)
 	s.xdel(c, 0, "string", 1)
 	s.xdel(c, 0, "string", 0)
+
+	s.xsetnx(c, 0, "", "empty", 0)
 	s.checkEmpty(c)
 }
 
@@ -360,8 +422,9 @@ func (s *testStoreSuite) TestXGetSet(c *C) {
 	s.kpexpire(c, 0, "string", 1000, 1)
 	s.xgetset(c, 0, "string", "world", "hello")
 	s.kpttl(c, 0, "string", -1)
-
 	s.xdel(c, 0, "string", 1)
+
+	s.xgetset(c, 0, "", "empty", "")
 	s.checkEmpty(c)
 }
 
@@ -526,6 +589,8 @@ func (s *testStoreSuite) TestXMSet(c *C) {
 
 	s.xmset(c, 0, "a", "1", "a", "2", "a", "3", "b", "1", "b", "2")
 	s.kdel(c, 0, 3, "a", "b", "c")
+
+	s.xmset(c, 0, "", "empty")
 	s.checkEmpty(c)
 }
 
@@ -550,6 +615,8 @@ func (s *testStoreSuite) TestMSetNX(c *C) {
 	s.xmsetnx(c, 0, 1, "string", "hello", "string", "world")
 	s.xget(c, 0, "string", "world")
 	s.xdel(c, 0, "string", 1)
+
+	s.xmsetnx(c, 0, 0, "", "empty")
 	s.checkEmpty(c)
 }
 
