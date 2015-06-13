@@ -17,6 +17,53 @@ type stringRow struct {
 	Value []byte
 }
 
+func adjustIndex(index int64, min, max int64) int64 {
+	if index >= 0 {
+		return index + min
+	} else {
+		return index + max
+	}
+}
+
+func minIntValue(v1, v2 int64) int64 {
+	if v1 < v2 {
+		return v1
+	} else {
+		return v2
+	}
+}
+
+func maxIntValue(v1, v2 int64) int64 {
+	if v1 < v2 {
+		return v2
+	} else {
+		return v1
+	}
+}
+
+func getKeys(args [][]byte) [][]byte {
+	var keys [][]byte
+	for i := 0; i < len(args); i += 2 {
+		keys = append(keys, args[i])
+	}
+
+	return keys
+}
+
+func checkKeysEmpty(keys [][]byte) bool {
+	if len(keys) == 0 {
+		return true
+	}
+
+	for _, v := range keys {
+		if len(v) == 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func newStringRow(db uint32, key []byte) *stringRow {
 	o := &stringRow{}
 	o.lazyInit(db, key, newStoreRowHelper(db, key, StringCode))
@@ -96,6 +143,7 @@ func (s *Store) Get(db uint32, args ...interface{}) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return o.Value, nil
 	}
 }
@@ -111,6 +159,10 @@ func (s *Store) Append(db uint32, args ...interface{}) (int64, error) {
 		if err := parseArgument(args[i], ref); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i, err)
 		}
+	}
+
+	if len(key) == 0 {
+		return 0, errArguments("empty key found")
 	}
 
 	if err := s.acquire(); err != nil {
@@ -153,6 +205,10 @@ func (s *Store) Set(db uint32, args ...interface{}) error {
 		}
 	}
 
+	if len(key) == 0 {
+		return errArguments("empty key found")
+	}
+
 	if err := s.acquire(); err != nil {
 		return err
 	}
@@ -184,9 +240,15 @@ func (s *Store) PSetEX(db uint32, args ...interface{}) error {
 			return errArguments("parse args[%d] failed, %s", i, err)
 		}
 	}
+
+	if len(key) == 0 {
+		return errArguments("empty key found")
+	}
+
 	if ttlms == 0 {
 		return errArguments("invalid ttlms = %d", ttlms)
 	}
+
 	expireat := uint64(0)
 	if v, ok := TTLmsToExpireAt(ttlms); ok && v > 0 {
 		expireat = v
@@ -230,9 +292,15 @@ func (s *Store) SetEX(db uint32, args ...interface{}) error {
 			return errArguments("parse args[%d] failed, %s", i, err)
 		}
 	}
+
+	if len(key) == 0 {
+		return errArguments("empty key found")
+	}
+
 	if ttls == 0 {
 		return errArguments("invalid ttls = %d", ttls)
 	}
+
 	expireat := uint64(0)
 	if v, ok := TTLsToExpireAt(ttls); ok && v > 0 {
 		expireat = v
@@ -276,6 +344,10 @@ func (s *Store) SetNX(db uint32, args ...interface{}) (int64, error) {
 		}
 	}
 
+	if len(key) == 0 {
+		return 0, errArguments("empty key found")
+	}
+
 	if err := s.acquire(); err != nil {
 		return 0, err
 	}
@@ -308,6 +380,10 @@ func (s *Store) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 
+	if len(key) == 0 {
+		return nil, errArguments("empty key found")
+	}
+
 	if err := s.acquire(); err != nil {
 		return nil, err
 	}
@@ -324,6 +400,7 @@ func (s *Store) GetSet(db uint32, args ...interface{}) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if o.ExpireAt != 0 {
 			o.ExpireAt = 0
 			bt.Set(o.MetaKey(), o.MetaValue())
@@ -624,6 +701,11 @@ func (s *Store) MSet(db uint32, args ...interface{}) error {
 		}
 	}
 
+	keys := getKeys(pairs)
+	if checkKeysEmpty(keys) {
+		return errArguments("empty key found")
+	}
+
 	if err := s.acquire(); err != nil {
 		return err
 	}
@@ -660,6 +742,11 @@ func (s *Store) MSetNX(db uint32, args ...interface{}) (int64, error) {
 		if err := parseArgument(args[i], &pairs[i]); err != nil {
 			return 0, errArguments("parse args[%d] failed, %s", i, err)
 		}
+	}
+
+	keys := getKeys(pairs)
+	if checkKeysEmpty(keys) {
+		return 0, errArguments("empty key found")
 	}
 
 	if err := s.acquire(); err != nil {
@@ -726,6 +813,7 @@ func (s *Store) MGet(db uint32, args ...interface{}) ([][]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			values[i] = o.Value
 		}
 	}
@@ -813,30 +901,6 @@ func (s *Store) GetRange(db uint32, args ...interface{}) ([]byte, error) {
 		}
 	}
 	return nil, nil
-}
-
-func adjustIndex(index int64, min, max int64) int64 {
-	if index >= 0 {
-		return index + min
-	} else {
-		return index + max
-	}
-}
-
-func minIntValue(v1, v2 int64) int64 {
-	if v1 < v2 {
-		return v1
-	} else {
-		return v2
-	}
-}
-
-func maxIntValue(v1, v2 int64) int64 {
-	if v1 < v2 {
-		return v2
-	} else {
-		return v1
-	}
 }
 
 // STRLEN key

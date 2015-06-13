@@ -208,11 +208,7 @@ func checkConn(arg0 interface{}, args [][]byte) (*conn, error) {
 	if s == nil {
 		return nil, errors.New("invalid connection")
 	}
-	for i, v := range args {
-		if len(v) == 0 {
-			return nil, errors.Errorf("args[%d] is nil", i)
-		}
-	}
+
 	return s, nil
 }
 
