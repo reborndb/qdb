@@ -19,16 +19,33 @@ import (
 	"github.com/reborndb/qdb/pkg/store"
 )
 
-func Serve(config *Config, bl *store.Store) error {
-	h, err := newHandler(config, bl)
+type Server struct {
+	h *Handler
+}
+
+func NewServer(c *Config, s *store.Store) (*Server, error) {
+	h, err := newHandler(c, s)
 	if err != nil {
-		return errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
 
-	defer h.close()
+	server := &Server{h: h}
+	return server, nil
+}
 
-	err = h.run()
+func (s *Server) Serve() error {
+	if s.h == nil {
+		return errors.New("empty server handler")
+	}
+
+	err := s.h.run()
 	return errors.Trace(err)
+}
+
+func (s *Server) Close() {
+	if s.h != nil {
+		s.h.close()
+	}
 }
 
 type Session interface {
@@ -97,9 +114,9 @@ type Handler struct {
 	}
 }
 
-func newHandler(config *Config, s *store.Store) (*Handler, error) {
+func newHandler(c *Config, s *store.Store) (*Handler, error) {
 	h := &Handler{
-		config:    config,
+		config:    c,
 		master:    make(chan *conn, 0),
 		signal:    make(chan int, 0),
 		store:     s,
@@ -110,7 +127,7 @@ func newHandler(config *Config, s *store.Store) (*Handler, error) {
 	getRandomHex(h.runID)
 	log.Infof("server runid is %s", h.runID)
 
-	l, err := net.Listen("tcp", config.Listen)
+	l, err := net.Listen("tcp", h.config.Listen)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -138,6 +155,11 @@ func (h *Handler) close() {
 	}
 
 	h.closeReplication()
+
+	if h.store != nil {
+		h.store.Close()
+		h.store = nil
+	}
 
 	close(h.signal)
 }
