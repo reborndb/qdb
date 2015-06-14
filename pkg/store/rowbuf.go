@@ -7,13 +7,13 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/juju/errors"
 	"github.com/reborndb/go/bytesize"
-	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/io/ioutils"
 )
 
 var (
-	ErrVarbytesLen = errors.Static("invalid varbytes length")
+	ErrVarbytesLen = errors.New("invalid varbytes length")
 )
 
 const (

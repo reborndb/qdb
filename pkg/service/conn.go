@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/reborndb/go/atomic2"
-	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/qdb/pkg/store"

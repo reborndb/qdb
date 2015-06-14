@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 )
 
 func Num64(i interface{}) interface{} {

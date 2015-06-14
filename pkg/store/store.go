@@ -7,13 +7,13 @@ import (
 	"container/list"
 	"sync"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
 var (
-	ErrClosed = errors.Static("store has been closed")
+	ErrClosed = errors.New("store has been closed")
 )
 
 type Store struct {

@@ -8,14 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
 var (
-	ErrSnapClosed = errors.Static("store snapshot has been closed")
+	ErrSnapClosed = errors.New("store snapshot has been closed")
 )
 
 type StoreSnapshot struct {

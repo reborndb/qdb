@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/qdb/extern/levigo"
 	"github.com/reborndb/qdb/pkg/engine"
 )

@@ -6,25 +6,25 @@ package store
 import (
 	"fmt"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
 var (
-	ErrMetaKey = errors.Static("invalid meta key")
-	ErrDataKey = errors.Static("invalid data key")
+	ErrMetaKey = errors.New("invalid meta key")
+	ErrDataKey = errors.New("invalid data key")
 
-	ErrNotMatched = errors.Static("unmatched raw bytes")
+	ErrNotMatched = errors.New("unmatched raw bytes")
 
-	ErrObjectCode  = errors.Static("invalid object code")
-	ErrObjectValue = errors.Static("invalid object value")
+	ErrObjectCode  = errors.New("invalid object code")
+	ErrObjectValue = errors.New("invalid object value")
 
-	ErrNotString = errors.Static("not string")
-	ErrNotHash   = errors.Static("not hash")
-	ErrNotList   = errors.Static("not list")
-	ErrNotZSet   = errors.Static("not zset")
-	ErrNotSet    = errors.Static("not set")
+	ErrNotString = errors.New("not string")
+	ErrNotHash   = errors.New("not hash")
+	ErrNotList   = errors.New("not list")
+	ErrNotZSet   = errors.New("not zset")
+	ErrNotSet    = errors.New("not set")
 )
 
 func EncodeMetaKey(db uint32, key []byte) []byte {

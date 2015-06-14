@@ -6,7 +6,7 @@ package store
 import (
 	"time"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
