@@ -28,8 +28,8 @@ type Config struct {
 	// 0 means to no release at all.
 	ReplBacklogTTL int `toml:"repl_backlog_ttl"`
 
-	Password       string `toml:"password"`
-	MasterPassword string `toml:"master_password"`
+	Auth       string `toml:"auth"`
+	MasterAuth string `toml:"master_auth"`
 }
 
 func NewDefaultConfig() *Config {

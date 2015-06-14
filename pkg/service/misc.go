@@ -24,9 +24,9 @@ func (h *Handler) Auth(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		return toRespError(err)
 	}
 
-	if len(h.config.Password) == 0 {
+	if len(h.config.Auth) == 0 {
 		return toRespErrorf("Client sent AUTH, but no password is set")
-	} else if h.config.Password == string(args[0]) {
+	} else if h.config.Auth == string(args[0]) {
 		c.authenticated = true
 		return redis.NewString("OK"), nil
 	} else {
@@ -259,8 +259,8 @@ func (h *Handler) Config(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		default:
 			return toRespErrorf("unknown entry %s", e)
 		case "requirepass":
-			password := string(args[2])
-			h.config.Password = password
+			auth := string(args[2])
+			h.config.Auth = auth
 			return redis.NewString("OK"), nil
 		}
 	}
