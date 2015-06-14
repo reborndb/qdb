@@ -128,7 +128,7 @@ func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
 	if f := h.htable[cmd]; f == nil {
 		return toRespErrorf("unknown command %s", cmd)
 	} else {
-		if len(h.config.Password) > 0 && !c.authenticated && strings.ToLower(cmd) != "auth" {
+		if len(h.config.Auth) > 0 && !c.authenticated && strings.ToLower(cmd) != "auth" {
 			return toRespErrorf("NOAUTH Authentication required")
 		}
 

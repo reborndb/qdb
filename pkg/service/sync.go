@@ -168,8 +168,8 @@ func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
 
 	// do AUTH if possible
 	c := newConn(nc, h.store, 0)
-	if len(h.config.MasterPassword) > 0 {
-		if err = c.doMustOK("AUTH", h.config.MasterPassword); err != nil {
+	if len(h.config.MasterAuth) > 0 {
+		if err = c.doMustOK("AUTH", h.config.MasterAuth); err != nil {
 			c.Close()
 			return nil, errors.Trace(err)
 		}
