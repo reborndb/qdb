@@ -5,6 +5,7 @@ package service
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -16,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	jerrors "github.com/juju/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/pools"
 	redis "github.com/reborndb/go/redis/resp"
@@ -437,4 +439,25 @@ func randomKey(c *C) string {
 		}
 		c.Assert(i < 32, Equals, true)
 	}
+}
+
+func (s *testServiceSuite) TestErrorEuqal(c *C) {
+	e1 := errors.New("test error")
+	c.Assert(e1, NotNil)
+
+	e2 := jerrors.Trace(e1)
+	c.Assert(e2, NotNil)
+
+	e3 := jerrors.Trace(e2)
+	c.Assert(e3, NotNil)
+
+	c.Assert(jerrors.Cause(e2), Equals, e1)
+	c.Assert(jerrors.Cause(e3), Equals, e1)
+	c.Assert(jerrors.Cause(e2), Equals, jerrors.Cause(e3))
+
+	e4 := jerrors.New("test error")
+	c.Assert(jerrors.Cause(e4), Not(Equals), e1)
+
+	e5 := jerrors.Errorf("test error")
+	c.Assert(jerrors.Cause(e5), Not(Equals), e1)
 }
