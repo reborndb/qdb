@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
 	. "gopkg.in/check.v1"

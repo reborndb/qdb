@@ -16,7 +16,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/docopt/docopt-go"
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/qdb/pkg/engine"
 	"github.com/reborndb/qdb/pkg/engine/goleveldb"

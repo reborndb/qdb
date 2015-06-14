@@ -9,8 +9,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/juju/errors"
 	"github.com/reborndb/go/atomic2"
-	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
@@ -179,7 +179,7 @@ func (h *Handler) run() error {
 				defer c.Close()
 				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {
-					if errors.Equal(err, io.EOF) {
+					if errors.Cause(err) == io.EOF {
 						log.Infof("connection lost: %s [io.EOF]", c)
 					} else {
 						log.InfoErrorf(err, "connection lost: %s", c)

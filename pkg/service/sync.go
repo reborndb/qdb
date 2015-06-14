@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/reborndb/go/atomic2"
-	"github.com/reborndb/go/errors"
 	"github.com/reborndb/go/io/ioutils"
 	"github.com/reborndb/go/io/pipe"
 	"github.com/reborndb/go/log"

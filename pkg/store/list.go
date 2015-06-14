@@ -6,14 +6,14 @@ package store
 import (
 	"bytes"
 
-	"github.com/reborndb/go/errors"
+	"github.com/juju/errors"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
 var (
-	ErrNoSuchList = errors.Static("no such list")
-	ErrOutOfRange = errors.Static("index out of range")
+	ErrNoSuchList = errors.New("no such list")
+	ErrOutOfRange = errors.New("index out of range")
 )
 
 type listRow struct {
