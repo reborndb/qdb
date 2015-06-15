@@ -17,7 +17,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/docopt/docopt-go"
 	"github.com/juju/errors"
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/qdb/pkg/engine"
 	"github.com/reborndb/qdb/pkg/engine/goleveldb"
 	"github.com/reborndb/qdb/pkg/engine/leveldb"
@@ -33,9 +33,7 @@ var args struct {
 }
 
 func init() {
-	log.SetLevel(log.LEVEL_INFO)
-	log.SetTrace(log.LEVEL_WARN)
-	log.SetFlags(log.Flags() | log.Lshortfile)
+	log.SetLevel(log.LOG_LEVEL_INFO)
 }
 
 type Config struct {
@@ -70,7 +68,7 @@ func setStringFromOpt(dest *string, d map[string]interface{}, key string) {
 func setIntFromOpt(dest *int, d map[string]interface{}, key string) {
 	if s, ok := d[key].(string); ok && len(s) != 0 {
 		if n, err := strconv.Atoi(s); err != nil {
-			log.PanicErrorf(err, "parse %s failed", key)
+			log.Fatalf("parse %s failed - %s", key, err)
 		} else {
 			*dest = n
 		}
@@ -104,18 +102,21 @@ Options:
 `
 	d, err := docopt.Parse(usage, nil, true, "", false)
 	if err != nil {
-		log.PanicErrorf(err, "parse arguments failed")
+		log.Fatalf("parse arguments failed - %s", err)
 	}
 
 	if s, ok := d["-L"].(string); ok && len(s) > 0 {
-		log.StdLog = log.MustFileLog(s)
+		err = log.SetOutputByName(s)
+		if err != nil {
+			log.Fatalf("set log name failed - %s", err)
+		}
 	}
 
 	if s, ok := d["--ncpu"].(string); ok && len(s) != 0 {
 		if n, err := strconv.ParseInt(s, 10, 64); err != nil {
-			log.PanicErrorf(err, "parse --ncpu failed")
+			log.Fatalf("parse --ncpu failed - %s", err)
 		} else if n <= 0 || n > 64 {
-			log.Panicf("parse --ncpu = %d, only accept [1,64]", n)
+			log.Fatalf("parse --ncpu = %d, only accept [1,64]", n)
 		} else {
 			runtime.GOMAXPROCS(int(n))
 		}
@@ -135,7 +136,7 @@ Options:
 
 	if args.config != "" {
 		if err := conf.LoadFromFile(args.config); err != nil {
-			log.PanicErrorf(err, "load config failed")
+			log.Fatalf("load config failed - %s", err)
 		}
 	}
 
@@ -161,7 +162,7 @@ Options:
 	var dbConf interface{}
 	switch t := strings.ToLower(conf.DBType); t {
 	default:
-		log.Panicf("unknown db type = '%s'", conf.DBType)
+		log.Fatalf("unknown db type = '%s'", conf.DBType)
 	case "leveldb":
 		dbConf = conf.LevelDB
 	case "rocksdb":
@@ -173,7 +174,7 @@ Options:
 	db, err = engine.Open(conf.DBType, conf.DBPath, dbConf, args.repair)
 
 	if err != nil {
-		log.PanicErrorf(err, "open database failed")
+		log.Fatalf("open database failed - %s", err)
 	}
 
 	dbStore := store.New(db)
@@ -184,7 +185,7 @@ Options:
 
 	server, err := service.NewServer(conf.Service, dbStore)
 	if err != nil {
-		log.PanicErrorf(err, "create server failed")
+		log.Fatalf("create server failed - %s", err)
 	}
 
 	// create pid file
@@ -208,7 +209,7 @@ Options:
 	}(server)
 
 	if err := server.Serve(); err != nil {
-		log.ErrorErrorf(err, "service failed")
+		log.Errorf("service failed - %s", err)
 	}
 
 	server.Close()
@@ -218,11 +219,11 @@ func createPidFile(name string) {
 	os.MkdirAll(path.Dir(name), 0755)
 	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.PanicErrorf(err, "create pid file %s err, panic", name)
+		log.Fatalf("create pid file %s err - %s", name, err)
 	}
 	defer f.Close()
 
 	if _, err = f.WriteString(fmt.Sprintf("%d", os.Getpid())); err != nil {
-		log.PanicErrorf(err, "write pid into pid file %s err, panic", name)
+		log.Fatalf("write pid into pid file %s err - %s", name, err)
 	}
 }

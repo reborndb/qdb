@@ -16,10 +16,10 @@ import (
 	"time"
 
 	"github.com/juju/errors"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/atomic2"
 	"github.com/reborndb/go/io/ioutils"
 	"github.com/reborndb/go/io/pipe"
-	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/qdb/pkg/store"
@@ -229,7 +229,7 @@ LOOP:
 			log.Infof("retry connect to master %s", h.masterAddr.Get())
 			c, err = h.replicationConnectMaster(h.masterAddr.Get())
 			if err != nil {
-				log.ErrorErrorf(err, "repliaction retry connect master %s err, try 1s later again", h.masterAddr.Get())
+				log.Errorf("repliaction retry connect master %s err, try 1s later again - %s", h.masterAddr.Get(), err)
 				retryTimer.Reset(time.Second)
 				continue LOOP
 			}
@@ -264,7 +264,7 @@ LOOP:
 				}()
 				defer c.Close()
 				err := h.psync(c, h.masterRunID, syncOffset)
-				log.InfoErrorf(err, "slave %s do psync err", c)
+				log.Warningf("slave %s do psync err - %s", c, err)
 			}(syncOffset)
 
 			h.syncSince.Set(time.Now().UnixNano() / int64(time.Millisecond))
@@ -362,7 +362,7 @@ func (h *Handler) openSyncPipe() (pipe.Reader, pipe.Writer) {
 	if filePath != "" {
 		f, err := pipe.OpenFile(filePath, false)
 		if err != nil {
-			log.ErrorErrorf(err, "open pipe file '%s' failed", filePath)
+			log.Errorf("open pipe file '%s' failed - %s", filePath, err)
 		} else {
 			file = f
 		}
@@ -468,7 +468,7 @@ func (h *Handler) doSyncFromMater(c *conn, counter *atomic2.Int64) error {
 				lastACKTime = n
 				// this command has no reply
 				if err := c.sendCommand("REPLCONF", "ACK", h.syncOffset.Get()); err != nil {
-					log.ErrorErrorf(err, "send REPLCONF ACK %d err", h.syncOffset.Get())
+					log.Errorf("send REPLCONF ACK %d err - %s", h.syncOffset.Get(), err)
 				}
 			}
 		}

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/juju/errors"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/bytesize"
-	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
 	"github.com/reborndb/qdb/pkg/store"
@@ -42,7 +42,7 @@ func (h *Handler) initReplication(bl *store.Store) error {
 					Args: nil}
 				if err := h.replicationFeedSlaves(f); err != nil {
 					// ping slaves
-					log.ErrorError(err, "ping slaves error")
+					log.Errorf("ping slaves error - %s", err)
 				}
 			}
 		}
@@ -115,7 +115,7 @@ func (h *Handler) feedReplicationBacklog(buf []byte) error {
 
 	_, err := h.repl.backlogBuf.Write(buf)
 	if err != nil {
-		log.ErrorError(err, "write replication backlog err, reset")
+		log.Errorf("write replication backlog err, reset - %s", err)
 		h.destoryReplicationBacklog()
 		return errors.Trace(err)
 	}
@@ -277,7 +277,7 @@ func (h *Handler) handleSyncCommand(opt string, arg0 interface{}, args [][]byte)
 		if !need {
 			// write CONTINUE and resume replication
 			if err := c.writeRESP(redis.NewString("CONTINUE")); err != nil {
-				log.ErrorErrorf(err, "reply slave %s psync CONTINUE err", c)
+				log.Errorf("reply slave %s psync CONTINUE err - %s", c, err)
 				c.Close()
 				return nil, errors.Trace(err)
 			}
@@ -322,7 +322,7 @@ func (h *Handler) replicationReplyFullReSync(c *conn) error {
 	c.Store().Release()
 
 	if err := c.writeRESP(redis.NewString(fmt.Sprintf("FULLRESYNC %s %d", h.runID, syncOffset))); err != nil {
-		log.ErrorErrorf(err, "reply slave %s psync FULLRESYNC err", c)
+		log.Errorf("reply slave %s psync FULLRESYNC err - %s", c, err)
 		c.Close()
 		return errors.Trace(err)
 	}
@@ -357,7 +357,7 @@ func (h *Handler) replicationSlaveFullSync(c *conn) (syncOffset int64, resp redi
 
 	if err = c.writeRDBFrom(rdbSize, rdb); err != nil {
 		// close this connection here???
-		log.ErrorErrorf(err, "slave %s sync rdb err", c)
+		log.Errorf("slave %s sync rdb err - %s", c, err)
 		c.Close()
 		return
 	}
@@ -373,14 +373,14 @@ func (h *Handler) needFullReSync(c *conn, args [][]byte) (bool, int64) {
 		if !bytes.Equal(masterRunID, []byte{'?'}) {
 			log.Infof("Partial resynchronization not accepted, runid mismatch, server is %s, but client is %s", h.runID, masterRunID)
 		} else {
-			log.Info("Full resync requested by slave.")
+			log.Infof("Full resync requested by slave.")
 		}
 		return true, 0
 	}
 
 	syncOffset, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		log.ErrorError(err, "PSYNC parse sync offset err, try full resync")
+		log.Errorf("PSYNC parse sync offset err, try full resync - %s", err)
 		return true, 0
 	}
 
@@ -437,7 +437,7 @@ func (h *Handler) startSlaveReplication(c *conn, syncOffset int64) {
 				for {
 					n, err := h.replicationSlaveSyncBacklog(c, buf)
 					if err != nil {
-						log.ErrorErrorf(err, "sync slave err, close replication")
+						log.Errorf("sync slave err, close replication - %s", err)
 						return
 					} else if n < len(buf) {
 						// we now sync all backlog, wait new incoming

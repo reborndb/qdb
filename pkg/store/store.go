@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/juju/errors"
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
@@ -66,7 +66,7 @@ func (s *Store) commit(bt *engine.Batch, fw *Forward) error {
 	s.travelPreCommitHandlers(fw)
 
 	if err := s.db.Commit(bt); err != nil {
-		log.WarnErrorf(err, "store commit failed")
+		log.Warningf("store commit failed - %s", err)
 		return err
 	}
 	for i := s.itlist.Len(); i != 0; i-- {
@@ -176,7 +176,7 @@ func (s *Store) Reset() error {
 	if err := s.db.Clear(); err != nil {
 		s.db.Close()
 		s.db = nil
-		log.ErrorErrorf(err, "store reset failed")
+		log.Errorf("store reset failed - %s", err)
 		return err
 	} else {
 		s.serial++
@@ -187,7 +187,7 @@ func (s *Store) Reset() error {
 
 func (s *Store) compact(start, limit []byte) error {
 	if err := s.db.Compact(start, limit); err != nil {
-		log.ErrorErrorf(err, "store compact failed")
+		log.Errorf("store compact failed - %s", err)
 		return err
 	} else {
 		return nil
@@ -196,6 +196,6 @@ func (s *Store) compact(start, limit []byte) error {
 
 func errArguments(format string, v ...interface{}) error {
 	err := errors.Errorf(format, v...)
-	log.DebugErrorf(err, "call store function with invalid arguments")
+	log.Warningf("call store function with invalid arguments - %s", err)
 	return err
 }

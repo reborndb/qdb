@@ -9,7 +9,7 @@ import (
 	"hash/crc32"
 	"time"
 
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
@@ -130,7 +130,7 @@ func (s *Store) SlotsRestore(db uint32, args ...interface{}) error {
 			log.Debugf("[%d] restore batch, db = %d, key = %v", i, e.DB, e.Key)
 		}
 		if err := s.restore(bt, e.DB, e.Key, e.ExpireAt, e.Value); err != nil {
-			log.DebugErrorf(err, "restore object failed, db = %d, key = %v", e.DB, e.Key)
+			log.Warningf("restore object failed, db = %d, key = %v, err = %s", e.DB, e.Key, err)
 			return err
 		}
 		ms.Set(e.Key)
@@ -289,7 +289,7 @@ func (s *Store) SlotsMgrtTagOne(db uint32, args ...interface{}) (int64, error) {
 func (s *Store) migrateOne(addr string, timeout time.Duration, db uint32, key []byte) (int64, error) {
 	n, err := s.migrate(addr, timeout, db, key)
 	if err != nil {
-		log.ErrorErrorf(err, "migrate one failed")
+		log.Errorf("migrate one failed - %s", err)
 		return 0, err
 	}
 	return n, nil
@@ -302,7 +302,7 @@ func (s *Store) migrateTag(addr string, timeout time.Duration, db uint32, tag []
 	}
 	n, err := s.migrate(addr, timeout, db, keys...)
 	if err != nil {
-		log.ErrorErrorf(err, "migrate tag failed")
+		log.Errorf("migrate tag failed - %s", err)
 		return 0, err
 	}
 	return n, nil
