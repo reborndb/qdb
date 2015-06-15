@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/juju/errors"
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
 )
@@ -56,12 +56,12 @@ func (c *conn) Do(cmd *redis.Array, timeout time.Duration) (redis.Resp, error) {
 	}
 	if err := c.encodeResp(cmd, timeout); err != nil {
 		c.err = err
-		log.WarnErrorf(err, "encode resp failed")
+		log.Warningf("encode resp failed - %s", err)
 		return nil, c.err
 	}
 	if rsp, err := c.decodeResp(timeout); err != nil {
 		c.err = err
-		log.WarnErrorf(err, "decode resp failed")
+		log.Warningf("decode resp failed - %s", err)
 		return nil, c.err
 	} else {
 		c.last = time.Now()
@@ -142,7 +142,7 @@ func getSockConn(addr string, timeout time.Duration) (*conn, error) {
 func putSockConn(addr string, c *conn) {
 	if c.err != nil {
 		c.sock.Close()
-		log.InfoErrorf(c.err, "close error connection %s : %s", addr, c)
+		log.Warningf("close error connection %s : %s - err = %s", addr, c, c.err)
 	} else {
 		poolmap.Lock()
 		pool := poolmap.m[addr]
@@ -158,7 +158,7 @@ func putSockConn(addr string, c *conn) {
 func doMigrate(addr string, timeout time.Duration, db uint32, bins []*rdb.BinEntry) error {
 	c, err := getSockConn(addr, timeout)
 	if err != nil {
-		log.WarnErrorf(err, "connect to %s failed, timeout = %d", addr, timeout)
+		log.Warningf("connect to %s failed, timeout = %d, err = %s", addr, timeout, err)
 		return err
 	}
 	defer putSockConn(addr, c)
@@ -168,10 +168,10 @@ func doMigrate(addr string, timeout time.Duration, db uint32, bins []*rdb.BinEnt
 	cmd1.AppendBulkBytes([]byte(FormatUint(uint64(db))))
 
 	if err := c.DoMustOK(cmd1, timeout); err != nil {
-		log.WarnErrorf(err, "command select failed, addr = %s, db = %d", addr, db)
+		log.Warningf("command select failed, addr = %s, db = %d, err = %s", addr, db, err)
 		return err
 	}
-	log.Debugf("command select ok, addr = %s, db = %d", addr, db)
+	log.Debugf("command select ok, addr = %s, db = %d, err = %s", addr, db, err)
 
 	cmd2 := redis.NewArray()
 	cmd2.AppendBulkBytes([]byte("slotsrestore"))
@@ -190,7 +190,7 @@ func doMigrate(addr string, timeout time.Duration, db uint32, bins []*rdb.BinEnt
 	}
 
 	if err := c.DoMustOK(cmd2, timeout); err != nil {
-		log.WarnErrorf(err, "command restore failed, addr = %s, db = %d, len(bins) = %d", addr, db, len(bins))
+		log.Warningf("command restore failed, addr = %s, db = %d, len(bins) = %d, err = %s", addr, db, len(bins), err)
 		return err
 	} else {
 		log.Debugf("command restore ok, addr = %s, db = %d, len(bins) = %d", addr, db, len(bins))

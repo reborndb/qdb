@@ -4,7 +4,7 @@
 package store
 
 import (
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 )
 
 type Forward struct {
@@ -38,7 +38,7 @@ func (s *Store) RegPostCommitHandler(h ForwardHandler) {
 func (s *Store) travelPreCommitHandlers(f *Forward) {
 	for _, h := range s.preCommitHandlers {
 		if err := h(f); err != nil {
-			log.WarnErrorf(err, "handle WillCommitHandler err")
+			log.Warningf("handle WillCommitHandler err - %s", err)
 		}
 	}
 }
@@ -46,7 +46,7 @@ func (s *Store) travelPreCommitHandlers(f *Forward) {
 func (s *Store) travelPostCommitHandlers(f *Forward) {
 	for _, h := range s.postCommitHandlers {
 		if err := h(f); err != nil {
-			log.WarnErrorf(err, "handle DidCommitHandler err")
+			log.Warningf("handle DidCommitHandler err - %s", err)
 		}
 	}
 }

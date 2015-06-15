@@ -18,7 +18,7 @@ import (
 	"time"
 
 	jerrors "github.com/juju/errors"
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/pools"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/qdb/pkg/engine/rocksdb"
@@ -423,7 +423,7 @@ var (
 )
 
 func init() {
-	log.SetLevel(log.LEVEL_ERROR)
+	log.SetLevel(log.LOG_LEVEL_ERROR)
 }
 
 func randomKey(c *C) string {

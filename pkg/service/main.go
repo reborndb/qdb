@@ -10,8 +10,8 @@ import (
 	"sync"
 
 	"github.com/juju/errors"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/atomic2"
-	"github.com/reborndb/go/log"
 	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
@@ -182,7 +182,7 @@ func (h *Handler) run() error {
 					if errors.Cause(err) == io.EOF {
 						log.Infof("connection lost: %s [io.EOF]", c)
 					} else {
-						log.InfoErrorf(err, "connection lost: %s", c)
+						log.Warningf("connection lost: %s, err = %s", c, err)
 					}
 				} else {
 					log.Infof("connection exit: %s", c)

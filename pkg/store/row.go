@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/juju/errors"
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
@@ -306,10 +306,10 @@ func encodeRawBytes(w *BufWriter, refs ...interface{}) {
 		case *scoreInt:
 			err = w.WriteUint64(uint64(*x))
 		default:
-			log.Panicf("unsupported type in row value: %+v", x)
+			log.Fatalf("unsupported type in row value: %+v", x)
 		}
 		if err != nil {
-			log.PanicErrorf(err, "encode raw bytes failed")
+			log.Fatalf("encode raw bytes failed - %s", err)
 		}
 	}
 }
@@ -381,7 +381,7 @@ func decodeRawBytes(r *BufReader, err error, refs ...interface{}) error {
 			}
 			*x = v
 		default:
-			log.Panicf("unsupported type in row value: %+v", x)
+			log.Fatalf("unsupported type in row value: %+v", x)
 		}
 	}
 	return nil

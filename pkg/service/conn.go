@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/juju/errors"
+	"github.com/ngaut/log"
 	"github.com/reborndb/go/atomic2"
-	"github.com/reborndb/go/log"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/qdb/pkg/store"
 )
@@ -112,7 +112,7 @@ func (c *conn) handleRequest(h *Handler) (redis.Resp, error) {
 	if err != nil {
 		h.counters.commandsFailed.Add(1)
 		b, _ := redis.EncodeToBytes(request)
-		log.WarnErrorf(err, "handle commands failed, conn = %s, request = '%s'", c, base64.StdEncoding.EncodeToString(b))
+		log.Warningf("handle commands failed, conn = %s, request = '%s', err = %s", c, base64.StdEncoding.EncodeToString(b), err)
 	}
 
 	return response, nil

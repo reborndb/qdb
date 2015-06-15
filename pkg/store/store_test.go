@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reborndb/go/log"
+	"github.com/ngaut/log"
 	"github.com/reborndb/qdb/pkg/engine/rocksdb"
 	. "gopkg.in/check.v1"
 )
@@ -67,8 +67,7 @@ func testCreateStore(c *C) *Store {
 }
 
 func init() {
-	log.SetFlags(log.Flags() | log.Lshortfile)
-	log.SetLevel(log.LEVEL_ERROR)
+	log.SetLevel(log.LOG_LEVEL_ERROR)
 }
 
 func sleepms(n int) {
