@@ -68,7 +68,13 @@ func (c *conn) String() string {
 }
 
 func (c *conn) serve(h *Handler) error {
-	defer h.removeSlave(c)
+	defer func() {
+		h.removeSlave(c)
+		h.removeConn(c)
+		c.Close()
+	}()
+
+	h.addConn(c)
 
 	for {
 		response, err := c.handleRequest(h)

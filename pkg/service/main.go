@@ -112,6 +112,12 @@ type Handler struct {
 
 		slaves map[*conn]chan struct{}
 	}
+
+	// conn mutex
+	mu sync.Mutex
+
+	// conn map
+	conns map[*conn]struct{}
 }
 
 func newHandler(c *Config, s *store.Store) (*Handler, error) {
@@ -121,6 +127,7 @@ func newHandler(c *Config, s *store.Store) (*Handler, error) {
 		signal:    make(chan int, 0),
 		store:     s,
 		bgSaveSem: sync2.NewSemaphore(1),
+		conns:     make(map[*conn]struct{}),
 	}
 
 	h.runID = make([]byte, 40)
@@ -148,11 +155,38 @@ func newHandler(c *Config, s *store.Store) (*Handler, error) {
 	return h, nil
 }
 
+func (h *Handler) addConn(c *conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.conns[c] = struct{}{}
+}
+
+func (h *Handler) removeConn(c *conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	delete(h.conns, c)
+}
+
+func (h *Handler) closeConns() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for c, _ := range h.conns {
+		c.Close()
+	}
+
+	h.conns = make(map[*conn]struct{})
+}
+
 func (h *Handler) close() {
 	if h.l != nil {
 		h.l.Close()
 		h.l = nil
 	}
+
+	h.closeConns()
 
 	h.closeReplication()
 
@@ -175,8 +209,9 @@ func (h *Handler) run() error {
 			go func() {
 				h.counters.clients.Add(1)
 				defer h.counters.clients.Sub(1)
+
 				c := newConn(nc, h.store, h.config.ConnTimeout)
-				defer c.Close()
+
 				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {
 					if errors.Cause(err) == io.EOF {
