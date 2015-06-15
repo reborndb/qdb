@@ -31,7 +31,7 @@ type testReplSuite struct {
 func (s *testReplSuite) SetUpSuite(c *C) {
 	_, err := exec.LookPath("redis-server")
 	s.redisExists = (err == nil)
-	if s.redisExists {
+	if !s.redisExists {
 		c.Skip("redis-server not found, skip replication tests")
 	}
 
