@@ -31,11 +31,12 @@ type testReplSuite struct {
 func (s *testReplSuite) SetUpSuite(c *C) {
 	_, err := exec.LookPath("redis-server")
 	s.redisExists = (err == nil)
+	if !s.redisExists {
+		c.Skip("redis-server not found, skip replication tests")
+	}
 
 	redisPort := 17777
-	if s.redisExists {
-		s.startRedis(c, redisPort)
-	}
+	s.startRedis(c, redisPort)
 
 	s.redisNode = &testReplRedisNode{redisPort, s}
 
@@ -52,12 +53,13 @@ func (s *testReplSuite) SetUpSuite(c *C) {
 }
 
 func (s *testReplSuite) TearDownSuite(c *C) {
-	for _, p := range s.connPools {
-		p.Close()
+	if !s.redisExists {
+		return
 	}
 
-	if s.redisExists {
-		s.stopRedis(c, s.redisNode.Port())
+	s.stopRedis(c, s.redisNode.Port())
+	for _, p := range s.connPools {
+		p.Close()
 	}
 
 	if s.srv1.s != nil {
@@ -280,17 +282,11 @@ func (s *testReplSuite) testReplication(c *C, master testReplNode, slave testRep
 }
 
 func (s *testReplSuite) TestRedisMaster(c *C) {
-	if !s.redisExists {
-		c.Skip("no redis, skip")
-	}
 	// redis is master, and svr1 is slave
 	s.testReplication(c, s.redisNode, s.srv1)
 }
 
 func (s *testReplSuite) TestRedisSlave(c *C) {
-	if !s.redisExists {
-		c.Skip("no redis, skip")
-	}
 	// redis is slave, and svr1 is master
 	s.testReplication(c, s.srv1, s.redisNode)
 }
