@@ -106,7 +106,7 @@ func testCreateServer(c *C, port int) *testServer {
 	cfg.Listen = fmt.Sprintf("127.0.0.1:%d", port)
 	cfg.DumpPath = path.Join(base, "rdb.dump")
 	cfg.SyncFilePath = path.Join(base, "sync.pipe")
-	cfg.ReplBacklogSize = bytesize.MB * 100
+	cfg.ReplBacklogSize = bytesize.MB
 
 	h, err := newHandler(cfg, store)
 	c.Assert(err, IsNil)
