@@ -164,10 +164,10 @@ func (s *testStoreSuite) TestTTL(c *C) {
 	s.kpexpireat(c, 0, "a", nowms()+100000, 1)
 	s.kttl(c, 0, "a", 100)
 
-	s.kpexpireat(c, 0, "a", nowms()+10, 1)
+	s.kpexpireat(c, 0, "a", nowms()+100, 1)
 	s.kttl(c, 0, "a", 0)
 	s.kexists(c, 0, "a", 1)
-	sleepms(20)
+	sleepms(200)
 	s.kttl(c, 0, "a", -2)
 	s.kexists(c, 0, "a", 0)
 	s.checkEmpty(c)
@@ -185,8 +185,8 @@ func (s *testStoreSuite) TestPTTL(c *C) {
 	s.kpttl(c, 0, "a", 100)
 	s.kexists(c, 0, "a", 1)
 
-	s.kpexpireat(c, 0, "a", nowms()+10, 1)
-	sleepms(20)
+	s.kpexpireat(c, 0, "a", nowms()+100, 1)
+	sleepms(200)
 	s.kpttl(c, 0, "a", -2)
 	s.kexists(c, 0, "a", 0)
 	s.checkEmpty(c)
@@ -198,8 +198,8 @@ func (s *testStoreSuite) TestPersist(c *C) {
 	s.kpexpireat(c, 0, "a", nowms()+100, 1)
 	s.kpersist(c, 0, "a", 1)
 
-	s.kpexpireat(c, 0, "a", nowms()+10, 1)
-	sleepms(20)
+	s.kpexpireat(c, 0, "a", nowms()+100, 1)
+	sleepms(200)
 	s.kpersist(c, 0, "a", 0)
 	s.kexists(c, 0, "a", 0)
 	s.checkEmpty(c)
@@ -227,8 +227,8 @@ func (s *testStoreSuite) TestPExpire(c *C) {
 	s.kttl(c, 0, "a", 0)
 	s.kpttl(c, 0, "a", 100)
 
-	s.kpexpire(c, 0, "a", 10, 1)
-	sleepms(20)
+	s.kpexpire(c, 0, "a", 100, 1)
+	sleepms(200)
 	s.ktype(c, 0, "a", 0)
 	s.checkEmpty(c)
 }
