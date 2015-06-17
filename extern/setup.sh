@@ -7,13 +7,13 @@ cd ./leveldb; make clean
 make -j4 && cd .. || exit 1
 
 cp -r leveldb/include/leveldb ${BUILD}
-cp -f leveldb/libleveldb.* ${BUILD}
+cp -f leveldb/libleveldb.a ${BUILD}
 
 cd ./rocksdb; make clean
-make -j4 && cd .. || exit 1
+make -j4 static_lib && cd .. || exit 1
 
 cp -rf rocksdb/include/rocksdb ${BUILD}
-cp -f rocksdb/librocksdb.* ${BUILD}
+cp -f rocksdb/librocksdb.a ${BUILD}
 
 cd ./levigo
 CGO_CFLAGS="-I${BUILD}" CGO_LDFLAGS="-L${BUILD} -lleveldb -lsnappy -lstdc++" go install ./
