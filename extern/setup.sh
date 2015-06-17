@@ -12,7 +12,7 @@ cp -r leveldb/include/leveldb ${BUILD}
 cp -f leveldb/libleveldb.* ${BUILD}
 
 cd ./rocksdb; make clean
-make -j4 shared_lib && cd .. || exit 1
+make -j4 shared_lib static_lib && cd .. || exit 1
 
 cp -rf rocksdb/include/rocksdb ${BUILD}
 cp -f rocksdb/librocksdb.* ${BUILD}
