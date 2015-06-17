@@ -152,9 +152,9 @@ func (s *testStoreSuite) srem(c *C, db uint32, key string, expect int64, members
 func (s *testStoreSuite) TestSRestore(c *C) {
 	s.srestore(c, 0, "set", 100, "hello", "world")
 	s.srestore(c, 0, "set", 0, "hello", "world", "!!")
-	s.srestore(c, 0, "set", 10, "z")
+	s.srestore(c, 0, "set", 100, "z")
 	s.scard(c, 0, "set", 1)
-	sleepms(20)
+	sleepms(200)
 	s.scard(c, 0, "set", 0)
 	s.kpttl(c, 0, "set", -2)
 	s.checkEmpty(c)
@@ -182,8 +182,8 @@ func (s *testStoreSuite) TestSAdd(c *C) {
 func (s *testStoreSuite) TestSMembers(c *C) {
 	s.sadd(c, 0, "set", 3, "0", "1", "2")
 	s.smembers(c, 0, "set", "0", "1", "2")
-	s.kpexpire(c, 0, "set", 10, 1)
-	sleepms(20)
+	s.kpexpire(c, 0, "set", 100, 1)
+	sleepms(200)
 	s.smembers(c, 0, "set")
 	s.kpexpire(c, 0, "set", 10, 0)
 	s.checkEmpty(c)
