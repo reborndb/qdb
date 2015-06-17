@@ -26,28 +26,28 @@ import (
 )
 
 // BGSAVE
-func (h *Handler) Bgsave(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func BgsaveCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
-	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+	if ok := c.h.bgSaveSem.AcquireTimeout(time.Second); !ok {
 		return toRespErrorf("wait others do bgsave timeout")
 	}
-	defer h.bgSaveSem.Release()
+	defer c.h.bgSaveSem.Release()
 
-	sp, err := s.Store().NewSnapshot()
+	sp, err := c.Store().NewSnapshot()
 	if err != nil {
 		return toRespError(err)
 	}
-	defer s.Store().ReleaseSnapshot(sp)
+	defer c.Store().ReleaseSnapshot(sp)
 
-	if err := h.bgsaveTo(sp, h.config.DumpPath); err != nil {
+	if err := c.h.bgsaveTo(sp, c.h.config.DumpPath); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -55,28 +55,28 @@ func (h *Handler) Bgsave(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // BGSAVETO path
-func (h *Handler) BgsaveTo(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func BgsaveToCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
-	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+	if ok := c.h.bgSaveSem.AcquireTimeout(time.Second); !ok {
 		return toRespErrorf("wait others do bgsave timeout")
 	}
-	defer h.bgSaveSem.Release()
+	defer c.h.bgSaveSem.Release()
 
-	sp, err := s.Store().NewSnapshot()
+	sp, err := c.Store().NewSnapshot()
 	if err != nil {
 		return toRespError(err)
 	}
-	defer s.Store().ReleaseSnapshot(sp)
+	defer c.Store().ReleaseSnapshot(sp)
 
-	if err := h.bgsaveTo(sp, string(args[0])); err != nil {
+	if err := c.h.bgsaveTo(sp, string(args[0])); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -129,32 +129,33 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 }
 
 // SLAVEOF host port
-func (h *Handler) SlaveOf(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlaveOfCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	_, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	addr := fmt.Sprintf("%s:%s", string(args[0]), string(args[1]))
 	log.Infof("set slave of %s", addr)
 
-	var c *conn
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
+
+	var cc *conn
+	var err error
 	if strings.ToLower(addr) != "no:one" {
-		if c, err = h.replicationConnectMaster(addr); err != nil {
+		if cc, err = c.h.replicationConnectMaster(addr); err != nil {
 			return toRespError(errors.Trace(err))
 		}
 	}
 	select {
-	case <-h.signal:
-		if c != nil {
-			c.Close()
+	case <-c.h.signal:
+		if cc != nil {
+			cc.Close()
 		}
 		return toRespErrorf("sync master has been closed")
-	case h.master <- c:
+	case c.h.master <- cc:
 		return redis.NewString("OK"), nil
 	}
 }
@@ -167,7 +168,7 @@ func (h *Handler) replicationConnectMaster(addr string) (*conn, error) {
 	}
 
 	// do AUTH if possible
-	c := newConn(nc, h.store, 0)
+	c := newConn(nc, h, 0)
 	if len(h.config.MasterAuth) > 0 {
 		if err = c.doMustOK("AUTH", h.config.MasterAuth); err != nil {
 			c.Close()
@@ -549,4 +550,10 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 			return l.Footer()
 		}
 	}
+}
+
+func init() {
+	Register("bgsave", BgsaveCmd)
+	Register("bgsaveto", BgsaveToCmd)
+	Register("slaveof", SlaveOfCmd)
 }

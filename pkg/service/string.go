@@ -9,14 +9,9 @@ import (
 )
 
 // GET key
-func (h *Handler) Get(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func GetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if b, err := s.Store().Get(s.DB(), iconvert(args)...); err != nil {
@@ -27,14 +22,9 @@ func (h *Handler) Get(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // APPEND key value
-func (h *Handler) Append(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func AppendCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().Append(s.DB(), iconvert(args)...); err != nil {
@@ -45,14 +35,9 @@ func (h *Handler) Append(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // SET key value
-func (h *Handler) Set(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().Set(s.DB(), iconvert(args)...); err != nil {
@@ -63,14 +48,9 @@ func (h *Handler) Set(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // PSETEX key milliseconds value
-func (h *Handler) PSetEX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func PSetEXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().PSetEX(s.DB(), iconvert(args)...); err != nil {
@@ -81,14 +61,9 @@ func (h *Handler) PSetEX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // SETEX key seconds value
-func (h *Handler) SetEX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SetEXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().SetEX(s.DB(), iconvert(args)...); err != nil {
@@ -99,14 +74,9 @@ func (h *Handler) SetEX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // SETNX key value
-func (h *Handler) SetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SetNXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().SetNX(s.DB(), iconvert(args)...); err != nil {
@@ -117,14 +87,9 @@ func (h *Handler) SetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // GETSET key value
-func (h *Handler) GetSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func GetSetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if b, err := s.Store().GetSet(s.DB(), iconvert(args)...); err != nil {
@@ -135,14 +100,9 @@ func (h *Handler) GetSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // INCR key
-func (h *Handler) Incr(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func IncrCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().Incr(s.DB(), iconvert(args)...); err != nil {
@@ -153,14 +113,9 @@ func (h *Handler) Incr(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // INCRBY key delta
-func (h *Handler) IncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func IncrByCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().IncrBy(s.DB(), iconvert(args)...); err != nil {
@@ -171,14 +126,9 @@ func (h *Handler) IncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // DECR key
-func (h *Handler) Decr(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func DecrCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().Decr(s.DB(), iconvert(args)...); err != nil {
@@ -189,14 +139,9 @@ func (h *Handler) Decr(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // DECRBY key delta
-func (h *Handler) DecrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func DecrByCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().DecrBy(s.DB(), iconvert(args)...); err != nil {
@@ -207,14 +152,9 @@ func (h *Handler) DecrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // INCRBYFLOAT key delta
-func (h *Handler) IncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func IncrByFloatCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().IncrByFloat(s.DB(), iconvert(args)...); err != nil {
@@ -225,14 +165,9 @@ func (h *Handler) IncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, erro
 }
 
 // SETBIT key offset value
-func (h *Handler) SetBit(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SetBitCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().SetBit(s.DB(), iconvert(args)...); err != nil {
@@ -243,14 +178,9 @@ func (h *Handler) SetBit(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // SETRANGE key offset value
-func (h *Handler) SetRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SetRangeCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().SetRange(s.DB(), iconvert(args)...); err != nil {
@@ -261,14 +191,9 @@ func (h *Handler) SetRange(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 }
 
 // MSET key value [key value ...]
-func (h *Handler) MSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func MSetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 || len(args)%2 != 0 {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().MSet(s.DB(), iconvert(args)...); err != nil {
@@ -279,14 +204,9 @@ func (h *Handler) MSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // MSETNX key value [key value ...]
-func (h *Handler) MSetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func MSetNXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 || len(args)%2 != 0 {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().MSetNX(s.DB(), iconvert(args)...); err != nil {
@@ -297,14 +217,9 @@ func (h *Handler) MSetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // MGET key [key ...]
-func (h *Handler) MGet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func MGetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 1 {
 		return toRespErrorf("len(args) = %d, expect >= 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if a, err := s.Store().MGet(s.DB(), iconvert(args)...); err != nil {
@@ -316,4 +231,24 @@ func (h *Handler) MGet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		}
 		return resp, nil
 	}
+}
+
+func init() {
+	Register("get", GetCmd)
+	Register("append", AppendCmd)
+	Register("set", SetCmd)
+	Register("psetex", PSetEXCmd)
+	Register("setex", SetEXCmd)
+	Register("setnx", SetNXCmd)
+	Register("getset", GetSetCmd)
+	Register("incr", IncrCmd)
+	Register("incrby", IncrByCmd)
+	Register("decr", DecrCmd)
+	Register("decrby", DecrByCmd)
+	Register("incrbyfloat", IncrByFloatCmd)
+	Register("setbit", SetBitCmd)
+	Register("setrange", SetRangeCmd)
+	Register("mset", MSetCmd)
+	Register("msetnx", MSetNXCmd)
+	Register("mget", MGetCmd)
 }

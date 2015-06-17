@@ -28,7 +28,7 @@ type conn struct {
 
 	db uint32
 	nc net.Conn
-	bl *store.Store
+	h  *Handler
 
 	// summary for this connection
 	summ    string
@@ -49,11 +49,12 @@ type conn struct {
 	authenticated bool
 }
 
-func newConn(nc net.Conn, bl *store.Store, timeout int) *conn {
+func newConn(nc net.Conn, h *Handler, timeout int) *conn {
 	c := &conn{
 		nc: nc,
-		bl: bl,
+		h:  h,
 	}
+
 	c.r = bufio.NewReader(nc)
 	c.w = bufio.NewWriter(nc)
 	c.summ = fmt.Sprintf("<local> %s -- %s <remote>", nc.LocalAddr(), nc.RemoteAddr())
@@ -138,7 +139,7 @@ func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
 			return toRespErrorf("NOAUTH Authentication required")
 		}
 
-		return f(c, args...)
+		return f(c, args)
 	}
 }
 
@@ -269,6 +270,7 @@ func (c *conn) writeRaw(buf []byte) error {
 
 func (c *conn) Close() {
 	c.nc.Close()
+	c = nil
 }
 
 func (c *conn) DB() uint32 {
@@ -280,5 +282,5 @@ func (c *conn) SetDB(db uint32) {
 }
 
 func (c *conn) Store() *store.Store {
-	return c.bl
+	return c.h.store
 }

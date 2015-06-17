@@ -10,23 +10,24 @@ import (
 	"os"
 	"strings"
 
+	"github.com/juju/errors"
 	redis "github.com/reborndb/go/redis/resp"
 )
 
 // AUTH password
-func (h *Handler) Auth(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func AuthCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	c, err := checkConn(arg0, args)
-	if err != nil {
-		return toRespError(err)
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
-	if len(h.config.Auth) == 0 {
+	if len(c.h.config.Auth) == 0 {
 		return toRespErrorf("Client sent AUTH, but no password is set")
-	} else if h.config.Auth == string(args[0]) {
+	} else if c.h.config.Auth == string(args[0]) {
 		c.authenticated = true
 		return redis.NewString("OK"), nil
 	} else {
@@ -36,40 +37,27 @@ func (h *Handler) Auth(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // PING
-func (h *Handler) Ping(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func PingCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
 	}
 
-	_, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
 	return redis.NewString("PONG"), nil
 }
 
 // ECHO text
-func (h *Handler) Echo(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func EchoCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	_, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
 	return redis.NewBulkBytes(args[0]), nil
 }
 
 // FLUSHALL
-func (h *Handler) FlushAll(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func FlushAllCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().Reset(); err != nil {
@@ -80,14 +68,9 @@ func (h *Handler) FlushAll(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 }
 
 // COMPACTALL
-func (h *Handler) CompactAll(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func CompactAllCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().CompactAll(); err != nil {
@@ -98,21 +81,21 @@ func (h *Handler) CompactAll(arg0 interface{}, args [][]byte) (redis.Resp, error
 }
 
 // SHUTDOWN
-func (h *Handler) Shutdown(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func ShutdownCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
-	s.Store().Close()
+	c.Store().Close()
 
-	if len(h.config.PidFile) > 0 {
+	if len(c.h.config.PidFile) > 0 {
 		// shutdown gracefully, remove pidfile
-		os.Remove(h.config.PidFile)
+		os.Remove(c.h.config.PidFile)
 	}
 
 	os.Exit(0)
@@ -120,9 +103,14 @@ func (h *Handler) Shutdown(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 }
 
 // INFO [section]
-func (h *Handler) Info(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func InfoCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 && len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 0|1", len(args))
+	}
+
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
 	section := "all"
@@ -134,16 +122,16 @@ func (h *Handler) Info(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 
 	switch section {
 	case "database":
-		h.infoDataBase(&b)
+		c.h.infoDataBase(&b)
 	case "config":
-		h.infoConfig(&b)
+		c.h.infoConfig(&b)
 	case "clients":
-		h.infoClients(&b)
+		c.h.infoClients(&b)
 	case "replication":
-		h.infoReplication(&b)
+		c.h.infoReplication(&b)
 	default:
 		// all
-		h.infoAll(&b)
+		c.h.infoAll(&b)
 	}
 
 	fmt.Fprintf(&b, "\r\n")
@@ -231,9 +219,14 @@ func (h *Handler) infoReplication(w io.Writer) {
 }
 
 // CONFIG get key / set key value
-func (h *Handler) Config(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func ConfigCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 && len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 2 or 3", len(args))
+	}
+
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
 	sub := strings.ToLower(string(args[0]))
@@ -260,8 +253,19 @@ func (h *Handler) Config(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 			return toRespErrorf("unknown entry %s", e)
 		case "requirepass":
 			auth := string(args[2])
-			h.config.Auth = auth
+			c.h.config.Auth = auth
 			return redis.NewString("OK"), nil
 		}
 	}
+}
+
+func init() {
+	Register("auth", AuthCmd)
+	Register("ping", PingCmd)
+	Register("echo", EchoCmd)
+	Register("flushall", FlushAllCmd)
+	Register("compactall", CompactAllCmd)
+	Register("shutdown", ShutdownCmd)
+	Register("info", InfoCmd)
+	Register("config", ConfigCmd)
 }

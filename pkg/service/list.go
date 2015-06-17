@@ -6,14 +6,9 @@ package service
 import redis "github.com/reborndb/go/redis/resp"
 
 // LINDEX key index
-func (h *Handler) LIndex(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LIndexCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().LIndex(s.DB(), iconvert(args)...); err != nil {
@@ -24,14 +19,9 @@ func (h *Handler) LIndex(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LLEN key
-func (h *Handler) LLen(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LLenCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().LLen(s.DB(), iconvert(args)...); err != nil {
@@ -42,14 +32,9 @@ func (h *Handler) LLen(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LRANGE key beg end
-func (h *Handler) LRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LRangeCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if a, err := s.Store().LRange(s.DB(), iconvert(args)...); err != nil {
@@ -64,14 +49,9 @@ func (h *Handler) LRange(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LSET key index value
-func (h *Handler) LSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LSetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().LSet(s.DB(), iconvert(args)...); err != nil {
@@ -82,14 +62,9 @@ func (h *Handler) LSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LTRIM key beg end
-func (h *Handler) LTrim(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LTrimCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().LTrim(s.DB(), iconvert(args)...); err != nil {
@@ -100,14 +75,9 @@ func (h *Handler) LTrim(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LPOP key
-func (h *Handler) LPop(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LPopCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().LPop(s.DB(), iconvert(args)...); err != nil {
@@ -118,14 +88,9 @@ func (h *Handler) LPop(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // RPOP key
-func (h *Handler) RPop(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func RPopCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if v, err := s.Store().RPop(s.DB(), iconvert(args)...); err != nil {
@@ -136,14 +101,9 @@ func (h *Handler) RPop(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LPUSH key value [value ...]
-func (h *Handler) LPush(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LPushCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().LPush(s.DB(), iconvert(args)...); err != nil {
@@ -154,14 +114,9 @@ func (h *Handler) LPush(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LPUSHX key value [value ...]
-func (h *Handler) LPushX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func LPushXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().LPushX(s.DB(), iconvert(args)...); err != nil {
@@ -172,14 +127,9 @@ func (h *Handler) LPushX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // RPUSH key value [value ...]
-func (h *Handler) RPush(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func RPushCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().RPush(s.DB(), iconvert(args)...); err != nil {
@@ -190,14 +140,9 @@ func (h *Handler) RPush(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // LPUSHX key value [value ...]
-func (h *Handler) RPushX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func RPushXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().RPushX(s.DB(), iconvert(args)...); err != nil {
@@ -205,4 +150,18 @@ func (h *Handler) RPushX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	} else {
 		return redis.NewInt(n), nil
 	}
+}
+
+func init() {
+	Register("lindex", LIndexCmd)
+	Register("llen", LLenCmd)
+	Register("lrange", LRangeCmd)
+	Register("lset", LSetCmd)
+	Register("ltrim", LTrimCmd)
+	Register("lpop", LPopCmd)
+	Register("rpop", RPopCmd)
+	Register("lpush", LPushCmd)
+	Register("lpushx", LPushXCmd)
+	Register("rpush", RPushCmd)
+	Register("rpushx", RPushXCmd)
 }

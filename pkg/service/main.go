@@ -12,7 +12,6 @@ import (
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
 	"github.com/reborndb/go/atomic2"
-	"github.com/reborndb/go/redis/handler"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
 	"github.com/reborndb/go/sync2"
@@ -56,7 +55,7 @@ type Session interface {
 
 type Handler struct {
 	config *Config
-	htable handler.HandlerTable
+	htable map[string]CommandFunc
 
 	store *store.Store
 
@@ -145,12 +144,9 @@ func newHandler(c *Config, s *store.Store) (*Handler, error) {
 		return nil, errors.Trace(err)
 	}
 
-	if h.htable, err = handler.NewHandlerTable(h); err != nil {
-		h.close()
-		return nil, errors.Trace(err)
-	} else {
-		go h.daemonSyncMaster()
-	}
+	h.htable = globalCommands
+
+	go h.daemonSyncMaster()
 
 	return h, nil
 }
@@ -210,7 +206,7 @@ func (h *Handler) run() error {
 				h.counters.clients.Add(1)
 				defer h.counters.clients.Sub(1)
 
-				c := newConn(nc, h.store, h.config.ConnTimeout)
+				c := newConn(nc, h, h.config.ConnTimeout)
 
 				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {
@@ -235,15 +231,6 @@ func toRespError(err error) (redis.Resp, error) {
 func toRespErrorf(format string, args ...interface{}) (redis.Resp, error) {
 	err := errors.Errorf(format, args...)
 	return toRespError(err)
-}
-
-func session(arg0 interface{}, args [][]byte) (Session, error) {
-	s, _ := arg0.(Session)
-	if s == nil {
-		return nil, errors.New("invalid session")
-	}
-
-	return s, nil
 }
 
 func iconvert(args [][]byte) []interface{} {

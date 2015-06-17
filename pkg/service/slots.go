@@ -9,14 +9,9 @@ import (
 )
 
 // SLOTSRESTORE key ttlms value [key ttlms value ...]
-func (h *Handler) SlotsRestore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsRestoreCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 || len(args)%3 != 0 {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 3 == 0", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().SlotsRestore(s.DB(), iconvert(args)...); err != nil {
@@ -27,14 +22,9 @@ func (h *Handler) SlotsRestore(arg0 interface{}, args [][]byte) (redis.Resp, err
 }
 
 // SLOTSMGRTSLOT host port timeout slot
-func (h *Handler) SlotsMgrtSlot(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtSlotCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().SlotsMgrtSlot(s.DB(), iconvert(args)...); err != nil {
@@ -52,14 +42,9 @@ func (h *Handler) SlotsMgrtSlot(arg0 interface{}, args [][]byte) (redis.Resp, er
 }
 
 // SLOTSMGRTTAGSLOT host port timeout slot
-func (h *Handler) SlotsMgrtTagSlot(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtTagSlotCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().SlotsMgrtTagSlot(s.DB(), iconvert(args)...); err != nil {
@@ -77,14 +62,9 @@ func (h *Handler) SlotsMgrtTagSlot(arg0 interface{}, args [][]byte) (redis.Resp,
 }
 
 // SLOTSMGRTONE host port timeout key
-func (h *Handler) SlotsMgrtOne(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtOneCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().SlotsMgrtOne(s.DB(), iconvert(args)...); err != nil {
@@ -95,14 +75,9 @@ func (h *Handler) SlotsMgrtOne(arg0 interface{}, args [][]byte) (redis.Resp, err
 }
 
 // SLOTSMGRTTAGONE host port timeout key
-func (h *Handler) SlotsMgrtTagOne(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtTagOneCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().SlotsMgrtTagOne(s.DB(), iconvert(args)...); err != nil {
@@ -113,14 +88,9 @@ func (h *Handler) SlotsMgrtTagOne(arg0 interface{}, args [][]byte) (redis.Resp, 
 }
 
 // SLOTSINFO [start [count]]
-func (h *Handler) SlotsInfo(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsInfoCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) > 2 {
 		return toRespErrorf("len(args) = %d, expect <= 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if m, err := s.Store().SlotsInfo(s.DB(), iconvert(args)...); err != nil {
@@ -141,14 +111,9 @@ func (h *Handler) SlotsInfo(arg0 interface{}, args [][]byte) (redis.Resp, error)
 }
 
 // SLOTSHASHKEY key [key...]
-func (h *Handler) SlotsHashKey(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SlotsHashKeyCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 {
 		return toRespErrorf("len(args) = %d, expect != 1", len(args))
-	}
-
-	_, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	resp := redis.NewArray()
@@ -157,4 +122,14 @@ func (h *Handler) SlotsHashKey(arg0 interface{}, args [][]byte) (redis.Resp, err
 		resp.AppendInt(int64(slot))
 	}
 	return resp, nil
+}
+
+func init() {
+	Register("slotsrestore", SlotsRestoreCmd)
+	Register("slotsmgrtslot", SlotsMgrtSlotCmd)
+	Register("slotsmgrttagslot", SlotsMgrtTagSlotCmd)
+	Register("slotsmgrtone", SlotsMgrtOneCmd)
+	Register("slotsmgrttagone", SlotsMgrtTagOneCmd)
+	Register("slotsinfo", SlotsInfoCmd)
+	Register("slotshashkey", SlotsHashKeyCmd)
 }

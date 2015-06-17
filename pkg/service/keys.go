@@ -12,14 +12,9 @@ import (
 )
 
 // SELECT db
-func (h *Handler) Select(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func SelectCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if db, err := store.ParseUint(args[0]); err != nil {
@@ -33,14 +28,9 @@ func (h *Handler) Select(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // DEL key [key ...]
-func (h *Handler) Del(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func DelCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 {
 		return toRespErrorf("len(args) = %d, expect != 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if n, err := s.Store().Del(s.DB(), iconvert(args)...); err != nil {
@@ -51,14 +41,9 @@ func (h *Handler) Del(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // DUMP key
-func (h *Handler) Dump(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func DumpCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().Dump(s.DB(), iconvert(args)...); err != nil {
@@ -71,14 +56,9 @@ func (h *Handler) Dump(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // TYPE key
-func (h *Handler) Type(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func TypeCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if c, err := s.Store().Type(s.DB(), iconvert(args)...); err != nil {
@@ -89,14 +69,9 @@ func (h *Handler) Type(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // EXISTS key
-func (h *Handler) Exists(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func ExistsCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().Exists(s.DB(), iconvert(args)...); err != nil {
@@ -107,14 +82,9 @@ func (h *Handler) Exists(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // TTL key
-func (h *Handler) TTL(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func TTLCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().TTL(s.DB(), iconvert(args)...); err != nil {
@@ -125,14 +95,9 @@ func (h *Handler) TTL(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // PTTL key
-func (h *Handler) PTTL(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func PTTLCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().PTTL(s.DB(), iconvert(args)...); err != nil {
@@ -143,14 +108,9 @@ func (h *Handler) PTTL(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // PERSIST key
-func (h *Handler) Persist(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func PersistCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().Persist(s.DB(), iconvert(args)...); err != nil {
@@ -161,14 +121,9 @@ func (h *Handler) Persist(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // EXPIRE key seconds
-func (h *Handler) Expire(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func ExpireCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().Expire(s.DB(), iconvert(args)...); err != nil {
@@ -179,14 +134,9 @@ func (h *Handler) Expire(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // PEXPIRE key milliseconds
-func (h *Handler) PExpire(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func PExpireCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().PExpire(s.DB(), iconvert(args)...); err != nil {
@@ -197,14 +147,9 @@ func (h *Handler) PExpire(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // EXPIREAT key timestamp
-func (h *Handler) ExpireAt(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func ExpireAtCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().ExpireAt(s.DB(), iconvert(args)...); err != nil {
@@ -215,14 +160,9 @@ func (h *Handler) ExpireAt(arg0 interface{}, args [][]byte) (redis.Resp, error) 
 }
 
 // PEXPIREAT key timestamp
-func (h *Handler) PExpireAt(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func PExpireAtCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if x, err := s.Store().PExpireAt(s.DB(), iconvert(args)...); err != nil {
@@ -233,14 +173,9 @@ func (h *Handler) PExpireAt(arg0 interface{}, args [][]byte) (redis.Resp, error)
 }
 
 // RESTORE key ttlms value
-func (h *Handler) Restore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func RestoreCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
-	}
-
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
 	}
 
 	if err := s.Store().Restore(s.DB(), iconvert(args)...); err != nil {
@@ -248,4 +183,20 @@ func (h *Handler) Restore(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 	} else {
 		return redis.NewString("OK"), nil
 	}
+}
+
+func init() {
+	Register("select", SelectCmd)
+	Register("del", DelCmd)
+	Register("dump", DumpCmd)
+	Register("type", TypeCmd)
+	Register("exists", ExistsCmd)
+	Register("ttl", TTLCmd)
+	Register("pttl", PTTLCmd)
+	Register("persist", PersistCmd)
+	Register("expire", ExpireCmd)
+	Register("pexpire", PExpireCmd)
+	Register("expireat", ExpireAtCmd)
+	Register("pexpireat", PExpireAtCmd)
+	Register("restore", RestoreCmd)
 }
