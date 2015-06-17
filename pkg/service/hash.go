@@ -9,17 +9,12 @@ import (
 )
 
 // HGETALL key
-func (h *Handler) HGetAll(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HGetAllCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if a, err := s.Store().HGetAll(s.DB(), iconvert(args)...); err != nil {
+	if a, err := c.Store().HGetAll(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -31,17 +26,12 @@ func (h *Handler) HGetAll(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HDEL key field [field ...]
-func (h *Handler) HDel(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HDelCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if n, err := s.Store().HDel(s.DB(), iconvert(args)...); err != nil {
+	if n, err := c.Store().HDel(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -49,17 +39,12 @@ func (h *Handler) HDel(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HEXISTS key field
-func (h *Handler) HExists(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HExistsCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if x, err := s.Store().HExists(s.DB(), iconvert(args)...); err != nil {
+	if x, err := c.Store().HExists(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -67,17 +52,12 @@ func (h *Handler) HExists(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HGET key field
-func (h *Handler) HGet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HGetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if b, err := s.Store().HGet(s.DB(), iconvert(args)...); err != nil {
+	if b, err := c.Store().HGet(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytes(b), nil
@@ -85,17 +65,12 @@ func (h *Handler) HGet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HLEN key
-func (h *Handler) HLen(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HLenCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if n, err := s.Store().HLen(s.DB(), iconvert(args)...); err != nil {
+	if n, err := c.Store().HLen(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -103,17 +78,12 @@ func (h *Handler) HLen(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HINCRBY key field delta
-func (h *Handler) HIncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HIncrByCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if v, err := s.Store().HIncrBy(s.DB(), iconvert(args)...); err != nil {
+	if v, err := c.Store().HIncrBy(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(v), nil
@@ -121,17 +91,12 @@ func (h *Handler) HIncrBy(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HINCRBYFLOAT key field delta
-func (h *Handler) HIncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HIncrByFloatCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if v, err := s.Store().HIncrByFloat(s.DB(), iconvert(args)...); err != nil {
+	if v, err := c.Store().HIncrByFloat(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytesWithString(store.FormatFloatString(v)), nil
@@ -139,17 +104,12 @@ func (h *Handler) HIncrByFloat(arg0 interface{}, args [][]byte) (redis.Resp, err
 }
 
 // HKEYS key
-func (h *Handler) HKeys(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HKeysCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if a, err := s.Store().HKeys(s.DB(), iconvert(args)...); err != nil {
+	if a, err := c.Store().HKeys(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -161,17 +121,12 @@ func (h *Handler) HKeys(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HVALS key
-func (h *Handler) HVals(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HValsCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if a, err := s.Store().HVals(s.DB(), iconvert(args)...); err != nil {
+	if a, err := c.Store().HVals(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -183,17 +138,12 @@ func (h *Handler) HVals(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HSET key field value
-func (h *Handler) HSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HSetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if x, err := s.Store().HSet(s.DB(), iconvert(args)...); err != nil {
+	if x, err := c.Store().HSet(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -201,17 +151,12 @@ func (h *Handler) HSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HSETNX key field value
-func (h *Handler) HSetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HSetNXCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if x, err := s.Store().HSetNX(s.DB(), iconvert(args)...); err != nil {
+	if x, err := c.Store().HSetNX(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -219,17 +164,12 @@ func (h *Handler) HSetNX(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HMSET key field value [field value ...]
-func (h *Handler) HMSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HMSetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) == 1 || len(args)%2 != 1 {
 		return toRespErrorf("len(args) = %d, expect != 1 && mod 2 = 1", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if err := s.Store().HMSet(s.DB(), iconvert(args)...); err != nil {
+	if err := c.Store().HMSet(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -237,17 +177,12 @@ func (h *Handler) HMSet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 }
 
 // HMGET key field [field ...]
-func (h *Handler) HMGet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
+func HMGetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
 	}
 
-	s, err := session(arg0, args)
-	if err != nil {
-		return toRespError(err)
-	}
-
-	if a, err := s.Store().HMGet(s.DB(), iconvert(args)...); err != nil {
+	if a, err := c.Store().HMGet(c.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -256,4 +191,20 @@ func (h *Handler) HMGet(arg0 interface{}, args [][]byte) (redis.Resp, error) {
 		}
 		return resp, nil
 	}
+}
+
+func init() {
+	Register("hgetall", HGetAllCmd)
+	Register("hdel", HDelCmd)
+	Register("hexists", HExistsCmd)
+	Register("hget", HGetCmd)
+	Register("hlen", HLenCmd)
+	Register("hincrby", HIncrByCmd)
+	Register("hincrbyfloat", HIncrByFloatCmd)
+	Register("hkeys", HKeysCmd)
+	Register("hvals", HValsCmd)
+	Register("hset", HSetCmd)
+	Register("hsetnx", HSetNXCmd)
+	Register("hmset", HMSetCmd)
+	Register("hmget", HMGetCmd)
 }
