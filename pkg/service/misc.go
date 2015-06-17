@@ -82,9 +82,10 @@ func ShutdownCmd(c *conn, args [][]byte) (redis.Resp, error) {
 
 	c.Store().Close()
 
-	if len(c.Handler().Config().PidFile) > 0 {
+	h := c.Handler()
+	if len(h.Config().PidFile) > 0 {
 		// shutdown gracefully, remove pidfile
-		os.Remove(c.Handler().Config().PidFile)
+		os.Remove(h.Config().PidFile)
 	}
 
 	os.Exit(0)
@@ -102,20 +103,22 @@ func InfoCmd(c *conn, args [][]byte) (redis.Resp, error) {
 		section = strings.ToLower(string(args[0]))
 	}
 
+	h := c.Handler()
+
 	var b bytes.Buffer
 
 	switch section {
 	case "database":
-		c.Handler().infoDataBase(&b)
+		h.infoDataBase(&b)
 	case "config":
-		c.Handler().infoConfig(&b)
+		h.infoConfig(&b)
 	case "clients":
-		c.Handler().infoClients(&b)
+		h.infoClients(&b)
 	case "replication":
-		c.Handler().infoReplication(&b)
+		h.infoReplication(&b)
 	default:
 		// all
-		c.Handler().infoAll(&b)
+		h.infoAll(&b)
 	}
 
 	fmt.Fprintf(&b, "\r\n")
