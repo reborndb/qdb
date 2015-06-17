@@ -274,9 +274,9 @@ func (s *testStoreSuite) TestZRestore(c *C) {
 	for i := 0; i < len(ms); i += 2 {
 		ms[i], ms[i+1] = strconv.Itoa(rand.Int()), rand.NormFloat64()
 	}
-	s.zrestore(c, 0, "zset", 500, ms...)
+	s.zrestore(c, 0, "zset", 100, ms...)
 	s.zcard(c, 0, "zset", 32)
-	sleepms(1000)
+	sleepms(200)
 	s.kpttl(c, 0, "zset", -2)
 	s.zdel(c, 0, "zset", 0)
 	s.checkEmpty(c)
