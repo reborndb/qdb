@@ -1,7 +1,6 @@
 language: go
 go: 
     1.3.3
-    1.4
 
 before_install:
   - go get github.com/tools/godep
@@ -12,7 +11,7 @@ before_install:
   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
   - cd ./extern && sh ./setup.sh && cd ..
-  - export LD_LIBRARY_PATH=./extern/tmp
+  - export LD_LIBRARY_PATH=`pwd`/extern/tmp
 
 script:
   - godep go test --race -tags 'all' -cover -v ./pkg/... ./cmd/...
