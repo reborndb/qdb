@@ -19,6 +19,7 @@ import (
 
 	jerrors "github.com/juju/errors"
 	"github.com/ngaut/log"
+	"github.com/reborndb/go/bytesize"
 	"github.com/reborndb/go/pools"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/qdb/pkg/engine/rocksdb"
@@ -105,6 +106,7 @@ func testCreateServer(c *C, port int) *testServer {
 	cfg.Listen = fmt.Sprintf("127.0.0.1:%d", port)
 	cfg.DumpPath = path.Join(base, "rdb.dump")
 	cfg.SyncFilePath = path.Join(base, "sync.pipe")
+	cfg.ReplBacklogSize = bytesize.MB
 
 	h, err := newHandler(cfg, store)
 	c.Assert(err, IsNil)
@@ -212,6 +214,7 @@ func (pc *testPoolConn) doCmd(c *C, cmd string, args ...interface{}) redis.Resp 
 
 	resp, err := redis.Decode(r)
 	c.Assert(err, IsNil)
+
 	return resp
 }
 
@@ -233,6 +236,7 @@ func (pc *testPoolConn) checkOK(c *C, cmd string, args ...interface{}) {
 
 func (pc *testPoolConn) checkString(c *C, expect string, cmd string, args ...interface{}) {
 	resp := pc.doCmd(c, cmd, args...)
+
 	switch x := resp.(type) {
 	case *redis.String:
 		c.Assert(x.Value, Equals, expect)
