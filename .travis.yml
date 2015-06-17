@@ -10,10 +10,12 @@ before_install:
   - sudo apt-get install -y -qq gcc-4.8 g++-4.8 zlib1g-dev libbz2-dev libsnappy-dev libjemalloc-dev
   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
-  - cd ./extern && sh ./setup.sh && cd $TRAVIS_BUILD_DIR
-  - export C_INCLUDE_PATH=$TRAVIS_BUILD_DIR/extern/tmp
-  - export LIBRARY_PATH=$TRAVIS_BUILD_DIR/extern/tmp
-  - export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/extern/tmp
+  - cd $TRAVIS_BUILD_DIR/extern/rocksdb && make shared_lib
+  - sudo cp -rf $TRAVIS_BUILD_DIR/extern/rocksdb/include/rocksdb /usr/local/include 
+  - sudo cp -f $TRAVIS_BUILD_DIR/extern/rocksdb/librocksdb.so /usr/local/lib 
+  - export CGO_LDFLAGS="-lsnappy -llz4 -lbz2 -lz -lm"
+  - cd $TRAVIS_BUILD_DIR/extern/gorocks && go install ./ && cd $TRAVIS_BUILD_DIR
+  - export LD_LIBRARY_PATH=/usr/local/lib
 
 script:
-  - godep go test --race -tags 'all' -cover -v ./pkg/... ./cmd/...
+  - godep go test --race -tags 'rocksdb' -cover -v ./pkg/...
