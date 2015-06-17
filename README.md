@@ -6,16 +6,15 @@ A fast, high availability, fully Redis compatible store.
 
 See [commands](./doc/commands.md) for more.
 
-## Performance
+## Setup
 
-### Setup
-
-    1. install gorocks.a & levigo.a to GOPATH
-    $ cd extern && bash setup.sh
+    1. install qdb environment(only support linux now)
+    $ bash bootstrap.sh
 
     2. run qdb-server with specifed config file
-    $ qdb-server -c conf/config.toml -n 4 --create
+    $ ./bin/qdb-server -c conf/config.toml -n 4
 
+## Performance
 ### redis-benchmark against qdb-server (default config, see conf/config.toml)
 
     $ ./redis-benchmark -q -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange -c 100 -p 6380 -r 1000 -n 100000
@@ -31,3 +30,11 @@ See [commands](./doc/commands.md) for more.
     LRANGE_300 (first 300 elements): 1202.59 requests per second
     LRANGE_500 (first 450 elements): 849.21 requests per second
     LRANGE_600 (first 600 elements): 640.11 requests per second
+
+## Links
+
+* [leveldb](https://github.com/google/leveldb)
+* [rocksdb](https://github.com/facebook/rocksdb)
+* [goleveldb](https://github.com/syndtr/goleveldb)
+* [levigo](https://github.com/jmhodges/levigo)
+* [influxdb/rocksdb](https://github.com/influxdb/rocksdb)
