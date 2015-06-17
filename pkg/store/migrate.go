@@ -90,6 +90,8 @@ func (c *conn) String() string {
 	return c.summ
 }
 
+const maxConnIdleTime = 10 * time.Second
+
 func init() {
 	poolmap.m = make(map[string]*list.List)
 	go func() {
@@ -99,7 +101,7 @@ func init() {
 			for addr, pool := range poolmap.m {
 				for i := pool.Len(); i != 0; i-- {
 					c := pool.Remove(pool.Front()).(*conn)
-					if time.Now().Before(c.last.Add(time.Second * 5)) {
+					if time.Now().Before(c.last.Add(maxConnIdleTime)) {
 						pool.PushBack(c)
 					} else {
 						c.sock.Close()
@@ -150,6 +152,7 @@ func putSockConn(addr string, c *conn) {
 			pool = list.New()
 			poolmap.m[addr] = pool
 		}
+		c.last = time.Now()
 		pool.PushFront(c)
 		poolmap.Unlock()
 	}
