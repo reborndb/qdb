@@ -47,6 +47,12 @@ func (s *Server) Close() {
 	}
 }
 
+type Session interface {
+	DB() uint32
+	SetDB(db uint32)
+	Store() *store.Store
+}
+
 type Handler struct {
 	config *Config
 	htable map[string]CommandFunc
@@ -145,10 +151,6 @@ func newHandler(c *Config, s *store.Store) (*Handler, error) {
 	return h, nil
 }
 
-func (h *Handler) Config() *Config {
-	return h.config
-}
-
 func (h *Handler) addConn(c *conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -204,7 +206,7 @@ func (h *Handler) run() error {
 				h.counters.clients.Add(1)
 				defer h.counters.clients.Sub(1)
 
-				c := newConn(nc, h, h.Config().ConnTimeout)
+				c := newConn(nc, h, h.config.ConnTimeout)
 
 				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {

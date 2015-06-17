@@ -12,7 +12,7 @@ import (
 )
 
 // SELECT db
-func SelectCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SelectCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
@@ -22,18 +22,18 @@ func SelectCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	} else if db > math.MaxUint32 {
 		return toRespErrorf("parse db = %d", db)
 	} else {
-		c.SetDB(uint32(db))
+		s.SetDB(uint32(db))
 		return redis.NewString("OK"), nil
 	}
 }
 
 // DEL key [key ...]
-func DelCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func DelCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 {
 		return toRespErrorf("len(args) = %d, expect != 1", len(args))
 	}
 
-	if n, err := c.Store().Del(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().Del(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -41,12 +41,12 @@ func DelCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // DUMP key
-func DumpCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func DumpCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if x, err := c.Store().Dump(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Dump(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else if dump, err := rdb.EncodeDump(x); err != nil {
 		return toRespError(err)
@@ -56,12 +56,12 @@ func DumpCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // TYPE key
-func TypeCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func TypeCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if c, err := c.Store().Type(c.DB(), iconvert(args)...); err != nil {
+	if c, err := s.Store().Type(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString(c.String()), nil
@@ -69,12 +69,12 @@ func TypeCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // EXISTS key
-func ExistsCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func ExistsCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if x, err := c.Store().Exists(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Exists(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -82,12 +82,12 @@ func ExistsCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // TTL key
-func TTLCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func TTLCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if x, err := c.Store().TTL(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().TTL(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -95,12 +95,12 @@ func TTLCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // PTTL key
-func PTTLCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func PTTLCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if x, err := c.Store().PTTL(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().PTTL(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -108,12 +108,12 @@ func PTTLCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // PERSIST key
-func PersistCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func PersistCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if x, err := c.Store().Persist(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Persist(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -121,12 +121,12 @@ func PersistCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // EXPIRE key seconds
-func ExpireCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func ExpireCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if x, err := c.Store().Expire(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().Expire(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -134,12 +134,12 @@ func ExpireCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // PEXPIRE key milliseconds
-func PExpireCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func PExpireCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if x, err := c.Store().PExpire(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().PExpire(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -147,12 +147,12 @@ func PExpireCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // EXPIREAT key timestamp
-func ExpireAtCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func ExpireAtCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if x, err := c.Store().ExpireAt(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().ExpireAt(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -160,12 +160,12 @@ func ExpireAtCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // PEXPIREAT key timestamp
-func PExpireAtCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func PExpireAtCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if x, err := c.Store().PExpireAt(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().PExpireAt(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -173,12 +173,12 @@ func PExpireAtCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // RESTORE key ttlms value
-func RestoreCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func RestoreCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	if err := c.Store().Restore(c.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().Restore(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil

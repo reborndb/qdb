@@ -284,7 +284,3 @@ func (c *conn) SetDB(db uint32) {
 func (c *conn) Store() *store.Store {
 	return c.h.store
 }
-
-func (c *conn) Handler() *Handler {
-	return c.h
-}

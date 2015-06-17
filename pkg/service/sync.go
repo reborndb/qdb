@@ -26,17 +26,20 @@ import (
 )
 
 // BGSAVE
-func BgsaveCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func BgsaveCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
 	}
 
-	h := c.Handler()
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
 
-	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+	if ok := c.h.bgSaveSem.AcquireTimeout(time.Second); !ok {
 		return toRespErrorf("wait others do bgsave timeout")
 	}
-	defer h.bgSaveSem.Release()
+	defer c.h.bgSaveSem.Release()
 
 	sp, err := c.Store().NewSnapshot()
 	if err != nil {
@@ -44,7 +47,7 @@ func BgsaveCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	}
 	defer c.Store().ReleaseSnapshot(sp)
 
-	if err := h.bgsaveTo(sp, h.config.DumpPath); err != nil {
+	if err := c.h.bgsaveTo(sp, c.h.config.DumpPath); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -52,17 +55,20 @@ func BgsaveCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // BGSAVETO path
-func BgsaveToCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func BgsaveToCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	h := c.Handler()
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
 
-	if ok := h.bgSaveSem.AcquireTimeout(time.Second); !ok {
+	if ok := c.h.bgSaveSem.AcquireTimeout(time.Second); !ok {
 		return toRespErrorf("wait others do bgsave timeout")
 	}
-	defer h.bgSaveSem.Release()
+	defer c.h.bgSaveSem.Release()
 
 	sp, err := c.Store().NewSnapshot()
 	if err != nil {
@@ -70,7 +76,7 @@ func BgsaveToCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	}
 	defer c.Store().ReleaseSnapshot(sp)
 
-	if err := h.bgsaveTo(sp, string(args[0])); err != nil {
+	if err := c.h.bgsaveTo(sp, string(args[0])); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -123,7 +129,7 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 }
 
 // SLAVEOF host port
-func SlaveOfCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlaveOfCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
@@ -131,22 +137,25 @@ func SlaveOfCmd(c *conn, args [][]byte) (redis.Resp, error) {
 	addr := fmt.Sprintf("%s:%s", string(args[0]), string(args[1]))
 	log.Infof("set slave of %s", addr)
 
-	h := c.Handler()
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
 
 	var cc *conn
 	var err error
 	if strings.ToLower(addr) != "no:one" {
-		if cc, err = h.replicationConnectMaster(addr); err != nil {
+		if cc, err = c.h.replicationConnectMaster(addr); err != nil {
 			return toRespError(errors.Trace(err))
 		}
 	}
 	select {
-	case <-h.signal:
+	case <-c.h.signal:
 		if cc != nil {
 			cc.Close()
 		}
 		return toRespErrorf("sync master has been closed")
-	case h.master <- cc:
+	case c.h.master <- cc:
 		return redis.NewString("OK"), nil
 	}
 }

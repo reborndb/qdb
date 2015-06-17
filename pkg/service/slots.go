@@ -9,12 +9,12 @@ import (
 )
 
 // SLOTSRESTORE key ttlms value [key ttlms value ...]
-func SlotsRestoreCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsRestoreCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 || len(args)%3 != 0 {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 3 == 0", len(args))
 	}
 
-	if err := c.Store().SlotsRestore(c.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().SlotsRestore(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -22,12 +22,12 @@ func SlotsRestoreCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SLOTSMGRTSLOT host port timeout slot
-func SlotsMgrtSlotCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtSlotCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
 	}
 
-	if n, err := c.Store().SlotsMgrtSlot(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SlotsMgrtSlot(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -42,12 +42,12 @@ func SlotsMgrtSlotCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SLOTSMGRTTAGSLOT host port timeout slot
-func SlotsMgrtTagSlotCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtTagSlotCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
 	}
 
-	if n, err := c.Store().SlotsMgrtTagSlot(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SlotsMgrtTagSlot(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -62,12 +62,12 @@ func SlotsMgrtTagSlotCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SLOTSMGRTONE host port timeout key
-func SlotsMgrtOneCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtOneCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
 	}
 
-	if n, err := c.Store().SlotsMgrtOne(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SlotsMgrtOne(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -75,12 +75,12 @@ func SlotsMgrtOneCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SLOTSMGRTTAGONE host port timeout key
-func SlotsMgrtTagOneCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsMgrtTagOneCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 4 {
 		return toRespErrorf("len(args) = %d, expect = 4", len(args))
 	}
 
-	if n, err := c.Store().SlotsMgrtTagOne(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SlotsMgrtTagOne(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -88,12 +88,12 @@ func SlotsMgrtTagOneCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SLOTSINFO [start [count]]
-func SlotsInfoCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsInfoCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) > 2 {
 		return toRespErrorf("len(args) = %d, expect <= 2", len(args))
 	}
 
-	if m, err := c.Store().SlotsInfo(c.DB(), iconvert(args)...); err != nil {
+	if m, err := s.Store().SlotsInfo(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -111,7 +111,7 @@ func SlotsInfoCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SLOTSHASHKEY key [key...]
-func SlotsHashKeyCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SlotsHashKeyCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 {
 		return toRespErrorf("len(args) = %d, expect != 1", len(args))
 	}

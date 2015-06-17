@@ -10,7 +10,7 @@ import (
 	redis "github.com/reborndb/go/redis/resp"
 )
 
-type CommandFunc func(c *conn, args [][]byte) (redis.Resp, error)
+type CommandFunc func(s Session, args [][]byte) (redis.Resp, error)
 
 var globalCommands = make(map[string]CommandFunc)
 

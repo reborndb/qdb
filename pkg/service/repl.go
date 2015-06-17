@@ -204,9 +204,14 @@ func (h *Handler) replicationNoticeSlavesSyncing() error {
 }
 
 // REPLCONF listening-port port / ack sync-offset
-func ReplConfCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func ReplConfCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
+	}
+
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
 	}
 
 	switch strings.ToLower(string(args[0])) {
@@ -233,16 +238,27 @@ func ReplConfCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SYNC
-func SyncCmd(c *conn, args [][]byte) (redis.Resp, error) {
-	return c.Handler().handleSyncCommand("sync", c, args)
+func SyncCmd(s Session, args [][]byte) (redis.Resp, error) {
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
+
+	return c.h.handleSyncCommand("sync", c, args)
 }
 
 // PSYNC run-id sync-offset
-func PSyncCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func PSyncCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
-	return c.Handler().handleSyncCommand("psync", c, args)
+
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
+
+	return c.h.handleSyncCommand("psync", c, args)
 }
 
 func (h *Handler) handleSyncCommand(opt string, c *conn, args [][]byte) (redis.Resp, error) {
@@ -294,6 +310,7 @@ func (h *Handler) replicationReplyFullReSync(c *conn) error {
 	if err := c.Store().Acquire(); err != nil {
 		return errors.Trace(err)
 	}
+
 	syncOffset := h.repl.masterOffset
 	if h.repl.backlogBuf == nil {
 		// we will increment the master offset by one when backlog buffer created
@@ -535,22 +552,26 @@ const (
 )
 
 // ROLE
-func RoleCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func RoleCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 0 {
 		return toRespErrorf("len(args) = %d, expect = 0", len(args))
 	}
 
-	h := c.Handler()
+	c, _ := s.(*conn)
+	if c == nil {
+		return nil, errors.New("invalid connection")
+	}
+
 	ay := redis.NewArray()
-	if masterAddr := c.Handler().masterAddr.Get(); masterAddr == "" {
+	if masterAddr := c.h.masterAddr.Get(); masterAddr == "" {
 		// master
 		ay.Append(redis.NewBulkBytesWithString("master"))
-		h.repl.RLock()
-		defer h.repl.RUnlock()
+		c.h.repl.RLock()
+		defer c.h.repl.RUnlock()
 
-		ay.Append(redis.NewInt(h.repl.masterOffset))
+		ay.Append(redis.NewInt(c.h.repl.masterOffset))
 		slaves := redis.NewArray()
-		for slave, _ := range h.repl.slaves {
+		for slave, _ := range c.h.repl.slaves {
 			a := redis.NewArray()
 			if addr := slave.nc.RemoteAddr(); addr == nil {
 				continue
@@ -577,8 +598,8 @@ func RoleCmd(c *conn, args [][]byte) (redis.Resp, error) {
 		} else {
 			return toRespErrorf("invalid master addr, must ip:port, but %s", masterAddr)
 		}
-		ay.Append(redis.NewBulkBytesWithString(h.masterConnState.Get()))
-		ay.Append(redis.NewInt(h.syncOffset.Get()))
+		ay.Append(redis.NewBulkBytesWithString(c.h.masterConnState.Get()))
+		ay.Append(redis.NewInt(c.h.syncOffset.Get()))
 	}
 	return ay, nil
 }

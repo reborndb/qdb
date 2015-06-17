@@ -9,12 +9,12 @@ import (
 )
 
 // GET key
-func GetCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func GetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if b, err := c.Store().Get(c.DB(), iconvert(args)...); err != nil {
+	if b, err := s.Store().Get(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytes(b), nil
@@ -22,12 +22,12 @@ func GetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // APPEND key value
-func AppendCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func AppendCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if n, err := c.Store().Append(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().Append(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -35,12 +35,12 @@ func AppendCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SET key value
-func SetCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if err := c.Store().Set(c.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().Set(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -48,12 +48,12 @@ func SetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // PSETEX key milliseconds value
-func PSetEXCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func PSetEXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	if err := c.Store().PSetEX(c.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().PSetEX(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -61,12 +61,12 @@ func PSetEXCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SETEX key seconds value
-func SetEXCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SetEXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	if err := c.Store().SetEX(c.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().SetEX(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -74,12 +74,12 @@ func SetEXCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SETNX key value
-func SetNXCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SetNXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if n, err := c.Store().SetNX(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SetNX(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -87,12 +87,12 @@ func SetNXCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // GETSET key value
-func GetSetCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func GetSetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if b, err := c.Store().GetSet(c.DB(), iconvert(args)...); err != nil {
+	if b, err := s.Store().GetSet(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytes(b), nil
@@ -100,12 +100,12 @@ func GetSetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // INCR key
-func IncrCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func IncrCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if v, err := c.Store().Incr(c.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().Incr(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(v), nil
@@ -113,12 +113,12 @@ func IncrCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // INCRBY key delta
-func IncrByCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func IncrByCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if v, err := c.Store().IncrBy(c.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().IncrBy(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(v), nil
@@ -126,12 +126,12 @@ func IncrByCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // DECR key
-func DecrCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func DecrCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if v, err := c.Store().Decr(c.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().Decr(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(v), nil
@@ -139,12 +139,12 @@ func DecrCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // DECRBY key delta
-func DecrByCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func DecrByCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if v, err := c.Store().DecrBy(c.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().DecrBy(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(v), nil
@@ -152,12 +152,12 @@ func DecrByCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // INCRBYFLOAT key delta
-func IncrByFloatCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func IncrByFloatCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if v, err := c.Store().IncrByFloat(c.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().IncrByFloat(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytesWithString(store.FormatFloatString(v)), nil
@@ -165,12 +165,12 @@ func IncrByFloatCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SETBIT key offset value
-func SetBitCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SetBitCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	if x, err := c.Store().SetBit(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().SetBit(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -178,12 +178,12 @@ func SetBitCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SETRANGE key offset value
-func SetRangeCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SetRangeCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 3 {
 		return toRespErrorf("len(args) = %d, expect = 3", len(args))
 	}
 
-	if x, err := c.Store().SetRange(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().SetRange(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -191,12 +191,12 @@ func SetRangeCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // MSET key value [key value ...]
-func MSetCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func MSetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 || len(args)%2 != 0 {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
 	}
 
-	if err := c.Store().MSet(c.DB(), iconvert(args)...); err != nil {
+	if err := s.Store().MSet(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewString("OK"), nil
@@ -204,12 +204,12 @@ func MSetCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // MSETNX key value [key value ...]
-func MSetNXCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func MSetNXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) == 0 || len(args)%2 != 0 {
 		return toRespErrorf("len(args) = %d, expect != 0 && mod 2 = 0", len(args))
 	}
 
-	if n, err := c.Store().MSetNX(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().MSetNX(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -217,12 +217,12 @@ func MSetNXCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // MGET key [key ...]
-func MGetCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func MGetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 1 {
 		return toRespErrorf("len(args) = %d, expect >= 1", len(args))
 	}
 
-	if a, err := c.Store().MGet(c.DB(), iconvert(args)...); err != nil {
+	if a, err := s.Store().MGet(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()

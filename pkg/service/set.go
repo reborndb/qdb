@@ -6,12 +6,12 @@ package service
 import redis "github.com/reborndb/go/redis/resp"
 
 // SADD key member [member ...]
-func SAddCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SAddCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
 	}
 
-	if n, err := c.Store().SAdd(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SAdd(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -19,12 +19,12 @@ func SAddCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SCARD key
-func SCardCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SCardCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if n, err := c.Store().SCard(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SCard(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
@@ -32,12 +32,12 @@ func SCardCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SISMEMBER key member
-func SIsMemberCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SIsMemberCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 2", len(args))
 	}
 
-	if x, err := c.Store().SIsMember(c.DB(), iconvert(args)...); err != nil {
+	if x, err := s.Store().SIsMember(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(x), nil
@@ -45,12 +45,12 @@ func SIsMemberCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SMEMBERS key
-func SMembersCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SMembersCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if a, err := c.Store().SMembers(c.DB(), iconvert(args)...); err != nil {
+	if a, err := s.Store().SMembers(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -62,12 +62,12 @@ func SMembersCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SPOP key
-func SPopCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SPopCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 {
 		return toRespErrorf("len(args) = %d, expect = 1", len(args))
 	}
 
-	if v, err := c.Store().SPop(c.DB(), iconvert(args)...); err != nil {
+	if v, err := s.Store().SPop(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewBulkBytes(v), nil
@@ -75,12 +75,12 @@ func SPopCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SRANDMEMBER key [count]
-func SRandMemberCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SRandMemberCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) != 1 && len(args) != 2 {
 		return toRespErrorf("len(args) = %d, expect = 1 or 2", len(args))
 	}
 
-	if a, err := c.Store().SRandMember(c.DB(), iconvert(args)...); err != nil {
+	if a, err := s.Store().SRandMember(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		resp := redis.NewArray()
@@ -92,12 +92,12 @@ func SRandMemberCmd(c *conn, args [][]byte) (redis.Resp, error) {
 }
 
 // SREM key member [member ...]
-func SRemCmd(c *conn, args [][]byte) (redis.Resp, error) {
+func SRemCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if len(args) < 2 {
 		return toRespErrorf("len(args) = %d, expect >= 2", len(args))
 	}
 
-	if n, err := c.Store().SRem(c.DB(), iconvert(args)...); err != nil {
+	if n, err := s.Store().SRem(s.DB(), iconvert(args)...); err != nil {
 		return toRespError(err)
 	} else {
 		return redis.NewInt(n), nil
