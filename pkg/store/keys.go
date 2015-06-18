@@ -360,11 +360,11 @@ func (s *Store) Restore(db uint32, args [][]byte) error {
 	}
 
 	key := args[0]
-	value := args[1]
-	ttlms, err := ParseInt(args[2])
+	ttlms, err := ParseInt(args[1])
 	if err != nil {
 		return errArguments("parse args failed - %s", err)
 	}
+	value := args[2]
 
 	expireat := int64(0)
 	if ttlms != 0 {

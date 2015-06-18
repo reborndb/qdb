@@ -51,7 +51,7 @@ func (s *testStoreSuite) TestSnapshot(c *C) {
 			}
 			ok = true
 			c.Assert(string(obj.Key), Equals, "hash")
-			c.Assert(obj.ExpireAt, Equals, now+int64(db+37)*1000)
+			c.Assert(int64(obj.ExpireAt), Equals, now+int64(db+37)*1000)
 
 			x := obj.Value.(rdb.Hash)
 			c.Assert(err, IsNil)

@@ -199,11 +199,11 @@ func (s *Store) LSet(db uint32, args [][]byte) error {
 	}
 
 	key := args[0]
-	value := args[1]
-	index, err := ParseInt(args[2])
+	index, err := ParseInt(args[1])
 	if err != nil {
 		return errArguments("parse args failed - %s", err)
 	}
+	value := args[2]
 
 	if err := s.acquire(); err != nil {
 		return err

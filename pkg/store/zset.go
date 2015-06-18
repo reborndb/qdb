@@ -935,7 +935,7 @@ func (s *Store) genericZRange(db uint32, args [][]byte, reverse bool) ([][]byte,
 	if err != nil {
 		return nil, errArguments("parse args failed - %s", err)
 	}
-	stop, err := ParseInt(args[1])
+	stop, err := ParseInt(args[2])
 	if err != nil {
 		return nil, errArguments("parse args failed - %s", err)
 	}
@@ -1323,7 +1323,7 @@ func (s *Store) ZRemRangeByRank(db uint32, args [][]byte) (int64, error) {
 	if err != nil {
 		return 0, errArguments("parse args failed - %s", err)
 	}
-	stop, err := ParseInt(args[1])
+	stop, err := ParseInt(args[2])
 	if err != nil {
 		return 0, errArguments("parse args failed - %s", err)
 	}

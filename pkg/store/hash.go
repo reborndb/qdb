@@ -620,7 +620,7 @@ func (s *Store) HMGet(db uint32, args [][]byte) ([][]byte, error) {
 	}
 
 	key := args[0]
-	fields := args[0:]
+	fields := args[1:]
 
 	var values = make([][]byte, len(fields))
 

@@ -92,11 +92,11 @@ func (s *Store) SlotsRestore(db uint32, args [][]byte) error {
 	objs := make([]*rdb.ObjEntry, len(args)/3)
 	for i := 0; i < len(objs); i++ {
 		key := args[i*3]
-		value := args[i*3+1]
-		ttlms, err := ParseInt(args[i*3+2])
+		ttlms, err := ParseInt(args[i*3+1])
 		if err != nil {
 			return errArguments("parse args failed - %s", err)
 		}
+		value := args[i*3+2]
 
 		expireat := int64(0)
 		if ttlms != 0 {

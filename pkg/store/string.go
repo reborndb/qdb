@@ -742,7 +742,7 @@ func (s *Store) GetRange(db uint32, args [][]byte) ([]byte, error) {
 	if err != nil {
 		return nil, errArguments("parse args failed - %s", err)
 	}
-	end, err := ParseInt(args[1])
+	end, err := ParseInt(args[2])
 	if err != nil {
 		return nil, errArguments("parse args failed - %s", err)
 	}
