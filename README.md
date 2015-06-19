@@ -2,6 +2,8 @@
 
 A fast, high availability, fully Redis compatible store.
 
+[![Build Status](https://travis-ci.org/reborndb/qdb.svg?branch=master)](https://travis-ci.org/reborndb/qdb)
+
 ## Redis Command Support
 
 See [commands](./doc/commands.md) for more.
