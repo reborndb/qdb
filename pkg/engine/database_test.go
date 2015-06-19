@@ -5,6 +5,7 @@ package engine_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/reborndb/qdb/pkg/engine"
@@ -26,6 +27,9 @@ var _ = Suite(&testEngineSuite{})
 func (s *testEngineSuite) testOpen(c *C, name string, conf interface{}) Database {
 	path := fmt.Sprintf("/tmp/test_qdb/engine/%s", name)
 	db, err := Open(name, path, conf, false)
+	if err != nil && strings.Contains(err.Error(), "not registered") {
+		c.Skip(err.Error())
+	}
 	c.Assert(err, IsNil)
 	return db
 }

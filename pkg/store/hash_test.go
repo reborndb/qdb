@@ -298,8 +298,8 @@ func (s *testStoreSuite) TestHDel(c *C) {
 
 	s.hlen(c, 0, "hash", int64(len(ss)/2)-3)
 	s.hgetall(c, 0, "hash", ss[6:]...)
-	s.kpexpire(c, 0, "hash", 10, 1)
-	sleepms(20)
+	s.kpexpire(c, 0, "hash", 100, 1)
+	sleepms(200)
 	s.hdelall(c, 0, "hash", 0)
 
 	for i := 0; i < 10; i++ {
@@ -329,9 +329,9 @@ func (s *testStoreSuite) TestHRestore(c *C) {
 		ss[i] = strconv.Itoa(rand.Int())
 	}
 
-	s.hrestore(c, 0, "hash", 50, ss...)
+	s.hrestore(c, 0, "hash", 100, ss...)
 	s.hgetall(c, 0, "hash", ss...)
-	sleepms(100)
+	sleepms(200)
 	s.hlen(c, 0, "hash", 0)
 	s.kpttl(c, 0, "hash", -2)
 	s.hdelall(c, 0, "hash", 0)
@@ -377,8 +377,8 @@ func (s *testStoreSuite) TestHSetNX(c *C) {
 	s.hsetnx(c, 0, "hash", "129", "129", 0)
 	s.hlen(c, 0, "hash", 18)
 
-	s.kpexpire(c, 0, "hash", 10, 1)
-	sleepms(20)
+	s.kpexpire(c, 0, "hash", 100, 1)
+	sleepms(200)
 	s.hsetnx(c, 0, "hash", "0", "1", 1)
 	s.hsetnx(c, 0, "hash", "0", "2", 0)
 	s.hdel(c, 0, "hash", 1, "0")

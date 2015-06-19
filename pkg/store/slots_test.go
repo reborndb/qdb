@@ -368,8 +368,8 @@ func (s *testStoreSuite) TestSlotsMgrtTagOne(c *C) {
 	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 1, "key{tag}2", 0))
 
 	s.xset(c, 2, "key{tag3}", "test")
-	s.kpexpire(c, 2, "key{tag3}", 10, 1)
-	sleepms(20)
+	s.kpexpire(c, 2, "key{tag3}", 100, 1)
+	sleepms(200)
 	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 2, "key{tag}3", 0))
 	s.xdel(c, 2, "key{tag3}", 0)
 

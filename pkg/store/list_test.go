@@ -171,9 +171,9 @@ func (s *testStoreSuite) TestLRestore(c *C) {
 	s.kpttl(c, 0, "list", -1)
 	s.llen(c, 0, "list", 3)
 
-	s.lrestore(c, 0, "list", 10, "a1", "b1", "c1")
+	s.lrestore(c, 0, "list", 100, "a1", "b1", "c1")
 	s.llen(c, 0, "list", 3)
-	sleepms(20)
+	sleepms(200)
 	s.llen(c, 0, "list", 0)
 	s.kpttl(c, 0, "list", -2)
 	s.llen(c, 0, "list", 0)
