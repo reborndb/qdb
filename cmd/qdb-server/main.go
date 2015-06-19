@@ -106,6 +106,7 @@ Options:
 	}
 
 	if s, ok := d["-L"].(string); ok && len(s) > 0 {
+		log.SetHighlighting(false)
 		err = log.SetOutputByName(s)
 		if err != nil {
 			log.Fatalf("set log name failed - %s", err)
