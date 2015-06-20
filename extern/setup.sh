@@ -43,7 +43,7 @@ EOF
       }
 EOF
     if [ "$?" -ne 0 ]; then
-        cd $BUILD_PATH/rocksdb && make -j4 shared_lib static_lib
+        cd $BUILD_PATH/rocksdb && make -j4 shared_lib
         cp -rf $BUILD_PATH/rocksdb/include/rocksdb $INSTALL_PATH/include 
         cp -f $BUILD_PATH/rocksdb/librocksdb.* $INSTALL_PATH/lib
     fi
