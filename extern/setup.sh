@@ -27,6 +27,7 @@ EOF
       #include <leveldb/c.h>
       int main() {
         leveldb_major_version();  
+        return 0;
       }
 EOF
     if [ "$?" -ne 0 ]; then
@@ -40,6 +41,7 @@ EOF
       #include <rocksdb/c.h>
       int main() {
         rocksdb_options_create();
+        return 0;
       }
 EOF
     if [ "$?" -ne 0 ]; then
