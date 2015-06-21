@@ -10,6 +10,10 @@ INSTALL_PATH=/usr/local
 
 CXX=gcc
 
+# Check $INSTALL_PATH/include and $INSTALL_PATH/lib
+test -d $INSTALL_PATH/include || mkdir -p $INSTALL_PATH/include
+test -d $INSTALL_PATH/lib || mkdir -p $INSTALL_PATH/lib
+
 # Test whether Snappy library is installed
 # We must install Snappy
 # http://code.google.com/p/snappy/
@@ -50,8 +54,3 @@ EOF
         cp -f $BUILD_PATH/rocksdb/librocksdb.* $INSTALL_PATH/lib
     fi
 
-cd $BUILD_PATH/levigo && go clean -i ./ && CGO_LDFLAGS="-lsnappy" go install ./
-
-cd $BUILD_PATH/gorocks && go clean -i ./ && CGO_LDFLAGS="-lsnappy" go install ./
-
-cd $BUILD_PATH

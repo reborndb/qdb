@@ -8,17 +8,38 @@ A fast, high availability, fully Redis compatible store.
 
 See [commands](./doc/commands.md) for more.
 
-## Performance
+## Install 
 
-### Setup
+### Install backend engine support
 
-    1. install gorocks.a & levigo.a to GOPATH
-    $ cd extern && bash setup.sh
++ You must first install Snappy library.
++ Install Rocksdb and LevelDB
+```
+   cd extern
+   ./engine_install.sh 
+```
 
-    2. run qdb-server with specifed config file
+    engine_install.sh will check whether rocksdb/leveldb is installed first, if not, it will install rocksdb/leveldb in standard path `/usr/local/lib`.
+
+    You may use `sudo` to run this script for permisson.
+
++ Install go wrapper library for Rocksdb and LevelDB.
+```
+    cd extern
+    ./golib_install.sh
+```
+
+## Install qdb and run
+
++ `make`, it will install qdb-server in `./bin`.
++ run `qdb-server` with specifed config file
+```
     $ qdb-server -c conf/config.toml -n 4 --create
+```
 
-### redis-benchmark against qdb-server (default config, see conf/config.toml)
+## Benchmark
+
+    redis-benchmark against qdb-server (default config, see conf/config.toml)
 
     $ ./redis-benchmark -q -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange -c 100 -p 6380 -r 1000 -n 100000
     SET: 31094.53 requests per second
