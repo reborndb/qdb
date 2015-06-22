@@ -10,9 +10,17 @@ See [commands](./doc/commands.md) for more.
 
 ## Install 
 
+### Install godep
+
+```
+go get github.com/tools/godep
+```
+
+We will use godep to build our application, the godep will be installed in `$GOPATH/bin`, you may append it to your system path, e.g, `$PATH=$PATH:$GOPATH/bin`.
+
 ### Install backend engine support
 
-+ You must first install Snappy library.
++ You must first install [Snappy](https://github.com/google/snappy) library.
 + Install Rocksdb and LevelDB
 ```
    cd extern
