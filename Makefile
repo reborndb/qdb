@@ -1,23 +1,32 @@
+# if we install godep, we will use godep to build our application.
+GODEP_PATH:=$(shell godep path 2>/dev/null)
+
+GO=go 
+ifdef GODEP_PATH
+GO=godep go
+endif
+
 all: build
 
 build:
-	go build -tags 'all' -o bin/qdb-server ./cmd/qdb-server 
+	$(GO) build -tags 'all' -o bin/qdb-server ./cmd/qdb-server 
 
 build_leveldb:
-	go build -tags 'leveldb' -o bin/qdb-server ./cmd/qdb-server  
+	$(GO) build -tags 'leveldb' -o bin/qdb-server ./cmd/qdb-server  
 
 build_rocksdb:
-	go build -tags 'rocksdb' -o bin/qdb-server ./cmd/qdb-server 
+	$(GO) build -tags 'rocksdb' -o bin/qdb-server ./cmd/qdb-server 
 
 build_goleveldb:
-	go build -o bin/qdb-server ./cmd/qdb-server  
+	$(GO) build -o bin/qdb-server ./cmd/qdb-server  
 
 clean:
+	$(GO) clean -i ./...
 	rm -rf bin/* var/*
 
 run:
-	go build -tags 'all' -o bin/qdb-server ./cmd/qdb-server  
+	$(GO) build -tags 'all' -o bin/qdb-server ./cmd/qdb-server  
 	./bin/qdb-server -c conf/config.toml -n 4
 
 gotest:
-	go test --race -tags 'all' -cover -v ./pkg/... ./cmd/...
+	$(GO) test --race -tags 'all' -cover -v ./pkg/... ./cmd/...

@@ -16,7 +16,7 @@ test -d $INSTALL_PATH/lib || mkdir -p $INSTALL_PATH/lib
 
 # Test whether Snappy library is installed
 # We must install Snappy
-# http://code.google.com/p/snappy/
+# https://github.com/google/snappy
     $CXX -x c++ - -o /dev/null 2>/dev/null  <<EOF
       #include <snappy.h>
       int main() {}
