@@ -19,7 +19,9 @@ import (
 )
 
 type Server struct {
-	h *Handler
+	mu     sync.Mutex
+	h      *Handler
+	closed bool
 }
 
 func NewServer(c *Config, s *store.Store) (*Server, error) {
@@ -28,7 +30,7 @@ func NewServer(c *Config, s *store.Store) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	server := &Server{h: h}
+	server := &Server{h: h, closed: false}
 	return server, nil
 }
 
@@ -42,9 +44,18 @@ func (s *Server) Serve() error {
 }
 
 func (s *Server) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return
+	}
+
 	if s.h != nil {
 		s.h.close()
 	}
+
+	s.closed = true
 }
 
 type Session interface {
