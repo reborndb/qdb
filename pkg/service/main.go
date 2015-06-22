@@ -71,6 +71,8 @@ type Handler struct {
 	masterRunID string
 	// replication master connection
 	master chan *conn
+	// replication slaveof reply channel
+	slaveofReply chan struct{}
 	// replication master connection state
 	masterConnState atomic2.String
 
@@ -121,12 +123,13 @@ type Handler struct {
 
 func newHandler(c *Config, s *store.Store) (*Handler, error) {
 	h := &Handler{
-		config:    c,
-		master:    make(chan *conn, 0),
-		signal:    make(chan int, 0),
-		store:     s,
-		bgSaveSem: sync2.NewSemaphore(1),
-		conns:     make(map[*conn]struct{}),
+		config:       c,
+		master:       make(chan *conn, 0),
+		slaveofReply: make(chan struct{}, 1),
+		signal:       make(chan int, 0),
+		store:        s,
+		bgSaveSem:    sync2.NewSemaphore(1),
+		conns:        make(map[*conn]struct{}),
 	}
 
 	h.runID = make([]byte, 40)
