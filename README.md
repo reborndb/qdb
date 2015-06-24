@@ -46,19 +46,28 @@ We will use godep to build our application, the godep will be installed in `$GOP
 ```
 
 ## Benchmark
+```
+OS:   Ubuntu SMP x86_64 GNU/Linux
+CPU:  Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz(8 cores)
+Mem:  16G
+Disk: 256G SSD
+```
 
-    redis-benchmark against qdb-server (default config, see conf/config.toml)
+```
+redis-benchmark against qdb-server (default config, see conf/config.toml)
 
-    $ ./redis-benchmark -q -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange -c 100 -p 6380 -r 1000 -n 100000
-    SET: 31094.53 requests per second
-    GET: 53361.79 requests per second
-    INCR: 36049.03 requests per second
-    LPUSH: 43346.34 requests per second
-    LPOP: 37965.07 requests per second
-    SADD: 40899.80 requests per second
-    SPOP: 53333.33 requests per second
-    LPUSH (needed to benchmark LRANGE): 40567.95 requests per second
-    LRANGE_100 (first 100 elements): 3395.12 requests per second
-    LRANGE_300 (first 300 elements): 1202.59 requests per second
-    LRANGE_500 (first 450 elements): 849.21 requests per second
-    LRANGE_600 (first 600 elements): 640.11 requests per second
+$ redis-benchmark -q -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange -c 100 -p 6380 -r 1000 -n 100000
+SET: 19516.00 requests per second
+GET: 37979.49 requests per second
+INCR: 18875.05 requests per second
+LPUSH: 26730.82 requests per second
+LPOP: 22862.37 requests per second
+SADD: 27012.43 requests per second
+SPOP: 21547.08 requests per second
+LPUSH (needed to benchmark LRANGE): 24906.60 requests per second
+LRANGE_100 (first 100 elements): 1492.94 requests per second
+LRANGE_300 (first 300 elements): 552.51 requests per second
+LRANGE_500 (first 450 elements): 414.38 requests per second
+LRANGE_600 (first 600 elements): 319.44 requests per second
+```
+
