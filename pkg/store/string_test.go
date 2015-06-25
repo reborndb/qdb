@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 
+	. "github.com/reborndb/go/gocheck2"
 	"github.com/reborndb/go/redis/rdb"
 	. "gopkg.in/check.v1"
 )
@@ -46,12 +47,23 @@ func (s *testStoreSuite) xrestore(c *C, db uint32, key string, ttlms uint64, val
 	}
 }
 
-func (s *testStoreSuite) xset(c *C, db uint32, key, value string) {
-	err := s.s.Set(db, FormatBytes(key, value))
+func (s *testStoreSuite) xset(c *C, db uint32, args ...interface{}) {
+	c.Assert(len(args), GreaterEqual, 2)
+
+	_, ok := args[0].(string)
+	c.Assert(ok, Equals, true)
+	_, ok = args[1].(string)
+	c.Assert(ok, Equals, true)
+
+	err := s.s.Set(db, FormatBytes(args...))
 	c.Assert(err, IsNil)
 
-	s.kttl(c, db, key, -1)
-	s.xget(c, db, key, value)
+	if len(args) == 2 {
+		key := args[0].(string)
+		value := args[1].(string)
+		s.kttl(c, db, key, -1)
+		s.xget(c, db, key, value)
+	}
 }
 
 func (s *testStoreSuite) xget(c *C, db uint32, key string, expect string) {
@@ -285,6 +297,15 @@ func (s *testStoreSuite) TestXSet(c *C) {
 	s.xset(c, 0, "string", "test2")
 	s.xdel(c, 0, "string", 1)
 	s.kpttl(c, 0, "string", -2)
+
+	s.xset(c, 0, "string", "test2", "EX", 200, "PX", 10, "NX")
+	sleepms(20)
+	s.kpttl(c, 0, "string", -2)
+
+	s.xset(c, 0, "string", "test2", "PX", 2000000, "EX", 1, "NX")
+	sleepms(2000)
+	s.kpttl(c, 0, "string", -2)
+
 	s.checkEmpty(c)
 }
 
