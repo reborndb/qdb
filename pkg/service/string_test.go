@@ -87,6 +87,8 @@ func (s *testServiceSuite) TestXSet(c *C) {
 	s.checkBytes(c, nil, "set", k, "hello", "EX", 1000, "NX")
 	s.checkOK(c, "set", k, "hello", "EX", 2000, "XX")
 	s.checkIntApprox(c, 2000, 5, "ttl", k)
+	s.checkOK(c, "set", k, "hello", "EX", 2000, "PX", 1000*1000, "XX")
+	s.checkIntApprox(c, 1000, 5, "ttl", k)
 }
 
 func (s *testServiceSuite) TestXPSetEX(c *C) {
