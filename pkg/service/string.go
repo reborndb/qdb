@@ -26,10 +26,12 @@ func AppendCmd(s Session, args [][]byte) (redis.Resp, error) {
 	}
 }
 
-// SET key value
+// SET key value [EX seconds] [PX milliseconds] [NX|XX]
 func SetCmd(s Session, args [][]byte) (redis.Resp, error) {
-	if err := s.Store().Set(s.DB(), args); err != nil {
+	if err := s.Store().Set(s.DB(), args); err != nil && err != store.ErrSetAborted {
 		return toRespError(err)
+	} else if err == store.ErrSetAborted {
+		return redis.NewBulkBytes(nil), nil
 	} else {
 		return redis.NewString("OK"), nil
 	}

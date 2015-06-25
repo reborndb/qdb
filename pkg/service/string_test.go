@@ -73,10 +73,20 @@ func (s *testServiceSuite) TestXIncrByFloat(c *C) {
 
 func (s *testServiceSuite) TestXSet(c *C) {
 	k := randomKey(c)
-	s.checkOK(c, "set", k, "hello")
-	s.checkString(c, "hello", "get", k)
 	s.checkOK(c, "set", k, "")
 	s.checkString(c, "", "get", k)
+	s.checkOK(c, "set", k, "hello")
+	s.checkString(c, "hello", "get", k)
+	s.checkOK(c, "set", k, "hello1", "XX")
+	s.checkString(c, "hello1", "get", k)
+	s.checkBytes(c, nil, "SET", k, "hello", "NX")
+	s.checkInt(c, 1, "del", k)
+	s.checkBytes(c, nil, "SET", k, "hello", "XX")
+	s.checkOK(c, "set", k, "hello", "NX")
+	s.checkString(c, "hello", "get", k)
+	s.checkBytes(c, nil, "set", k, "hello", "EX", 1000, "NX")
+	s.checkOK(c, "set", k, "hello", "EX", 2000, "XX")
+	s.checkIntApprox(c, 2000, 5, "ttl", k)
 }
 
 func (s *testServiceSuite) TestXPSetEX(c *C) {

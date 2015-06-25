@@ -5,11 +5,14 @@ package store
 
 import (
 	"math"
+	"strings"
 
 	"github.com/juju/errors"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
+
+var ErrSetAborted = errors.New("SET flow is aborted because of NX|XX condition met")
 
 type stringRow struct {
 	*storeRowHelper
@@ -133,19 +136,81 @@ func (s *Store) Append(db uint32, args [][]byte) (int64, error) {
 	return int64(len(o.Value)), s.commit(bt, fw)
 }
 
-// SET key value
+const (
+	setNXFlag uint8 = 1 << 0
+	setXXFlag uint8 = 1 << 1
+)
+
+// SET key value [EX seconds] [PX milliseconds] [NX|XX]
 func (s *Store) Set(db uint32, args [][]byte) error {
-	if len(args) != 2 {
-		return errArguments("len(args) = %d, expect = 2", len(args))
+	if len(args) < 2 {
+		return errArguments("len(args) = %d, expect >= 2", len(args))
 	}
 
 	key := args[0]
 	value := args[1]
 
+	expireat := int64(0)
+	flag := uint8(0)
+
+	for i := 2; i < len(args); {
+		switch strings.ToUpper(string(args[i])) {
+		case "EX":
+			if i+1 >= len(args) {
+				return errArguments("invalid set argument for EX")
+			}
+			ttls, err := ParseInt(args[i+1])
+			if err != nil {
+				return errArguments("parse EX arg failed %v", err)
+			}
+
+			if v, ok := TTLsToExpireAt(ttls); ok && v > 0 {
+				expireat = v
+			} else {
+				return errArguments("invalid EX seconds = %d", ttls)
+			}
+			i += 2
+		case "PX":
+			if i+1 >= len(args) {
+				return errArguments("invalid set argument for PX")
+			}
+			ttlms, err := ParseInt(args[i+1])
+			if err != nil {
+				return errArguments("parse PX arg failed %v", err)
+			}
+			if v, ok := TTLmsToExpireAt(ttlms); ok && v > 0 {
+				expireat = v
+			} else {
+				return errArguments("invalid PX milliseconds = %d", ttlms)
+			}
+			i += 2
+		case "NX":
+			flag |= setNXFlag
+			i++
+		case "XX":
+			flag |= setXXFlag
+			i++
+		default:
+			return errArguments("invalid set argument at %d", i)
+		}
+	}
+
 	if err := s.acquire(); err != nil {
 		return err
 	}
 	defer s.release()
+
+	if flag > 0 {
+		o, err := s.loadStoreRow(db, key, true)
+		if err != nil {
+			return err
+		}
+
+		if ((flag&setNXFlag > 0) && o != nil) ||
+			((flag&setXXFlag > 0) && o == nil) {
+			return ErrSetAborted
+		}
+	}
 
 	bt := engine.NewBatch()
 	_, err := s.deleteIfExists(bt, db, key)
@@ -155,6 +220,7 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 
 	o := newStringRow(db, key)
 	o.Value = value
+	o.ExpireAt = expireat
 	bt.Set(o.DataKey(), o.DataValue())
 	bt.Set(o.MetaKey(), o.MetaValue())
 	fw := &Forward{DB: db, Op: "Set", Args: args}
