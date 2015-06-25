@@ -274,13 +274,13 @@ func ConfigCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("select", SelectCmd)
 	Register("auth", AuthCmd)
-	Register("ping", PingCmd)
+	Register("compactall", CompactAllCmd)
+	Register("config", ConfigCmd)
 	Register("echo", EchoCmd)
 	Register("flushall", FlushAllCmd)
-	Register("compactall", CompactAllCmd)
-	Register("shutdown", ShutdownCmd)
 	Register("info", InfoCmd)
-	Register("config", ConfigCmd)
+	Register("ping", PingCmd)
+	Register("select", SelectCmd)
+	Register("shutdown", ShutdownCmd)
 }
