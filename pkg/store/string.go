@@ -200,29 +200,36 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 	}
 	defer s.release()
 
-	if flag > 0 {
-		o, err := s.loadStoreRow(db, key, true)
-		if err != nil {
-			return err
-		}
-
-		if ((flag&setNXFlag > 0) && o != nil) ||
-			((flag&setXXFlag > 0) && o == nil) {
-			return ErrSetAborted
-		}
-	}
-
 	bt := engine.NewBatch()
-	_, err := s.deleteIfExists(bt, db, key)
-	if err != nil {
+
+	if o, err := s.loadStoreRow(db, key, false); err != nil {
 		return err
+	} else {
+		// handle NX and XX flag
+		// NX: key is nil or expired
+		// XX: key is not nil and not expired
+		// otherwise, abort
+		if flag > 0 {
+			if ((flag&setNXFlag > 0) && (o != nil && !o.IsExpired())) ||
+				((flag&setXXFlag > 0) && (o == nil || o.IsExpired())) {
+				return ErrSetAborted
+			}
+		}
+
+		// if we are string type, we will overwrite it directly
+		// if not, we may delete it first
+		if o != nil && o.Code() != StringCode {
+			if err := o.deleteObject(s, bt); err != nil {
+				return err
+			}
+		}
 	}
 
-	o := newStringRow(db, key)
-	o.Value = value
-	o.ExpireAt = expireat
-	bt.Set(o.DataKey(), o.DataValue())
-	bt.Set(o.MetaKey(), o.MetaValue())
+	no := newStringRow(db, key)
+	no.Value = value
+	no.ExpireAt = expireat
+	bt.Set(no.DataKey(), no.DataValue())
+	bt.Set(no.MetaKey(), no.MetaValue())
 	fw := &Forward{DB: db, Op: "Set", Args: args}
 	return s.commit(bt, fw)
 }
