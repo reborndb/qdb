@@ -14,7 +14,6 @@
    ```
    SELECT db
    ```
-   - QUIT(Not)
 
  - Keys 
    - DEL
@@ -214,7 +213,6 @@
    ```
    LRANGE key beg end
    ```
-   - LREM(Not)
    - LSET
    ```
    LSET key index value
