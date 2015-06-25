@@ -594,8 +594,8 @@ func RoleCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("replconf", ReplConfCmd)
-	Register("sync", SyncCmd)
 	Register("psync", PSyncCmd)
+	Register("replconf", ReplConfCmd)
 	Register("role", RoleCmd)
+	Register("sync", SyncCmd)
 }

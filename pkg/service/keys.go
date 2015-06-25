@@ -4,24 +4,9 @@
 package service
 
 import (
-	"math"
-
 	"github.com/reborndb/go/redis/rdb"
 	redis "github.com/reborndb/go/redis/resp"
-	"github.com/reborndb/qdb/pkg/store"
 )
-
-// SELECT db
-func SelectCmd(s Session, args [][]byte) (redis.Resp, error) {
-	if db, err := store.ParseUint(args[0]); err != nil {
-		return toRespError(err)
-	} else if db > math.MaxUint32 {
-		return toRespErrorf("parse db = %d", db)
-	} else {
-		s.SetDB(uint32(db))
-		return redis.NewString("OK"), nil
-	}
-}
 
 // DEL key [key ...]
 func DelCmd(s Session, args [][]byte) (redis.Resp, error) {
@@ -134,17 +119,16 @@ func RestoreCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("select", SelectCmd)
 	Register("del", DelCmd)
 	Register("dump", DumpCmd)
-	Register("type", TypeCmd)
 	Register("exists", ExistsCmd)
-	Register("ttl", TTLCmd)
-	Register("pttl", PTTLCmd)
-	Register("persist", PersistCmd)
 	Register("expire", ExpireCmd)
-	Register("pexpire", PExpireCmd)
 	Register("expireat", ExpireAtCmd)
+	Register("persist", PersistCmd)
+	Register("pexpire", PExpireCmd)
 	Register("pexpireat", PExpireAtCmd)
+	Register("pttl", PTTLCmd)
 	Register("restore", RestoreCmd)
+	Register("ttl", TTLCmd)
+	Register("type", TypeCmd)
 }

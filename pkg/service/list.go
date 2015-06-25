@@ -99,7 +99,7 @@ func RPushCmd(s Session, args [][]byte) (redis.Resp, error) {
 	}
 }
 
-// LPUSHX key value [value ...]
+// RPUSHX key value [value ...]
 func RPushXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if n, err := s.Store().RPushX(s.DB(), args); err != nil {
 		return toRespError(err)
@@ -111,13 +111,13 @@ func RPushXCmd(s Session, args [][]byte) (redis.Resp, error) {
 func init() {
 	Register("lindex", LIndexCmd)
 	Register("llen", LLenCmd)
+	Register("lpop", LPopCmd)
+	Register("lpush", LPushCmd)
+	Register("lpushx", LPushXCmd)
 	Register("lrange", LRangeCmd)
 	Register("lset", LSetCmd)
 	Register("ltrim", LTrimCmd)
-	Register("lpop", LPopCmd)
 	Register("rpop", RPopCmd)
-	Register("lpush", LPushCmd)
-	Register("lpushx", LPushXCmd)
 	Register("rpush", RPushCmd)
 	Register("rpushx", RPushXCmd)
 }

@@ -142,17 +142,17 @@ func HMGetCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("hgetall", HGetAllCmd)
 	Register("hdel", HDelCmd)
 	Register("hexists", HExistsCmd)
 	Register("hget", HGetCmd)
-	Register("hlen", HLenCmd)
+	Register("hgetall", HGetAllCmd)
 	Register("hincrby", HIncrByCmd)
 	Register("hincrbyfloat", HIncrByFloatCmd)
 	Register("hkeys", HKeysCmd)
-	Register("hvals", HValsCmd)
+	Register("hlen", HLenCmd)
+	Register("hmget", HMGetCmd)
+	Register("hmset", HMSetCmd)
 	Register("hset", HSetCmd)
 	Register("hsetnx", HSetNXCmd)
-	Register("hmset", HMSetCmd)
-	Register("hmget", HMGetCmd)
+	Register("hvals", HValsCmd)
 }
