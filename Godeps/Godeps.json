@@ -40,6 +40,10 @@
 			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
 		},
 		{
+			"ImportPath": "github.com/reborndb/go/gocheck2",
+			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+		},
+		{
 			"ImportPath": "github.com/reborndb/go/io/ioutils",
 			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
 		},
