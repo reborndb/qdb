@@ -209,11 +209,10 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 		// NX: key is nil or expired
 		// XX: key is not nil and not expired
 		// otherwise, abort
-		if flag > 0 {
-			if ((flag&setNXFlag > 0) && (o != nil && !o.IsExpired())) ||
-				((flag&setXXFlag > 0) && (o == nil || o.IsExpired())) {
-				return ErrSetAborted
-			}
+		if (flag&setNXFlag > 0) && (o != nil && !o.IsExpired()) {
+			return ErrSetAborted
+		} else if (flag&setXXFlag > 0) && (o == nil || o.IsExpired()) {
+			return ErrSetAborted
 		}
 
 		// if we are string type, we will overwrite it directly
