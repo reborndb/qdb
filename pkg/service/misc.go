@@ -7,12 +7,26 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 
 	"github.com/juju/errors"
 	redis "github.com/reborndb/go/redis/resp"
+	"github.com/reborndb/qdb/pkg/store"
 )
+
+// SELECT db
+func SelectCmd(s Session, args [][]byte) (redis.Resp, error) {
+	if db, err := store.ParseUint(args[0]); err != nil {
+		return toRespError(err)
+	} else if db > math.MaxUint32 {
+		return toRespErrorf("parse db = %d", db)
+	} else {
+		s.SetDB(uint32(db))
+		return redis.NewString("OK"), nil
+	}
+}
 
 // AUTH password
 func AuthCmd(s Session, args [][]byte) (redis.Resp, error) {
@@ -260,6 +274,7 @@ func ConfigCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
+	Register("select", SelectCmd)
 	Register("auth", AuthCmd)
 	Register("ping", PingCmd)
 	Register("echo", EchoCmd)

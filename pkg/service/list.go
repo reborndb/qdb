@@ -99,7 +99,7 @@ func RPushCmd(s Session, args [][]byte) (redis.Resp, error) {
 	}
 }
 
-// LPUSHX key value [value ...]
+// RPUSHX key value [value ...]
 func RPushXCmd(s Session, args [][]byte) (redis.Resp, error) {
 	if n, err := s.Store().RPushX(s.DB(), args); err != nil {
 		return toRespError(err)

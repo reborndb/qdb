@@ -165,6 +165,15 @@ func MGetCmd(s Session, args [][]byte) (redis.Resp, error) {
 	}
 }
 
+// STRLEN key
+func StrlenCmd(s Session, args [][]byte) (redis.Resp, error) {
+	if n, err := s.Store().Strlen(s.DB(), args); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(n), nil
+	}
+}
+
 func init() {
 	Register("get", GetCmd)
 	Register("append", AppendCmd)
@@ -183,4 +192,5 @@ func init() {
 	Register("mset", MSetCmd)
 	Register("msetnx", MSetNXCmd)
 	Register("mget", MGetCmd)
+	Register("strlen", StrlenCmd)
 }
