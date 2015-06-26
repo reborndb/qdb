@@ -97,11 +97,11 @@ func SlotsHashKeyCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("slotshashkey", SlotsHashKeyCmd, ReadCommandFlag)
-	Register("slotsinfo", SlotsInfoCmd, ReadCommandFlag)
-	Register("slotsmgrtone", SlotsMgrtOneCmd, WriteCommandFlag)
-	Register("slotsmgrtslot", SlotsMgrtSlotCmd, WriteCommandFlag)
-	Register("slotsmgrttagone", SlotsMgrtTagOneCmd, WriteCommandFlag)
-	Register("slotsmgrttagslot", SlotsMgrtTagSlotCmd, WriteCommandFlag)
-	Register("slotsrestore", SlotsRestoreCmd, WriteCommandFlag)
+	Register("slotshashkey", SlotsHashKeyCmd, CmdReadonly)
+	Register("slotsinfo", SlotsInfoCmd, CmdReadonly)
+	Register("slotsmgrtone", SlotsMgrtOneCmd, CmdWrite)
+	Register("slotsmgrtslot", SlotsMgrtSlotCmd, CmdWrite)
+	Register("slotsmgrttagone", SlotsMgrtTagOneCmd, CmdWrite)
+	Register("slotsmgrttagslot", SlotsMgrtTagSlotCmd, CmdWrite)
+	Register("slotsrestore", SlotsRestoreCmd, CmdWrite)
 }

@@ -48,8 +48,8 @@ type CommandOKFunc func(s Session, args [][]byte) error
 type CommandFlag uint32
 
 const (
-	ReadCommandFlag CommandFlag = 1 << iota
-	WriteCommandFlag
+	CmdWrite CommandFlag = 1 << iota
+	CmdReadonly
 )
 
 func Register(name string, f CommandFunc, flag CommandFlag) {

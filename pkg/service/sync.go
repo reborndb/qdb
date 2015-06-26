@@ -561,7 +561,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 }
 
 func init() {
-	Register("bgsave", BgsaveCmd, ReadCommandFlag)
-	Register("bgsaveto", BgsaveToCmd, ReadCommandFlag)
-	Register("slaveof", SlaveOfCmd, ReadCommandFlag)
+	Register("bgsave", BgsaveCmd, CmdReadonly)
+	Register("bgsaveto", BgsaveToCmd, CmdReadonly)
+	Register("slaveof", SlaveOfCmd, CmdReadonly)
 }

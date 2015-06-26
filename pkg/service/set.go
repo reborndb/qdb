@@ -77,11 +77,11 @@ func SRemCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("sadd", SAddCmd, WriteCommandFlag)
-	Register("scard", SCardCmd, ReadCommandFlag)
-	Register("sismember", SIsMemberCmd, ReadCommandFlag)
-	Register("smembers", SMembersCmd, ReadCommandFlag)
-	Register("spop", SPopCmd, WriteCommandFlag)
-	Register("srandmember", SRandMemberCmd, ReadCommandFlag)
-	Register("srem", SRemCmd, WriteCommandFlag)
+	Register("sadd", SAddCmd, CmdWrite)
+	Register("scard", SCardCmd, CmdReadonly)
+	Register("sismember", SIsMemberCmd, CmdReadonly)
+	Register("smembers", SMembersCmd, CmdReadonly)
+	Register("spop", SPopCmd, CmdWrite)
+	Register("srandmember", SRandMemberCmd, CmdReadonly)
+	Register("srem", SRemCmd, CmdWrite)
 }
