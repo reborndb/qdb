@@ -594,8 +594,9 @@ func RoleCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("psync", PSyncCmd)
-	Register("replconf", ReplConfCmd)
-	Register("role", RoleCmd)
-	Register("sync", SyncCmd)
+	// redis set sync/psync read flag, so we set read flag here too
+	Register("psync", PSyncCmd, CmdReadonly)
+	Register("replconf", ReplConfCmd, CmdReadonly)
+	Register("role", RoleCmd, CmdReadonly)
+	Register("sync", SyncCmd, CmdReadonly)
 }
