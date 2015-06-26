@@ -5,11 +5,14 @@ package store
 
 import (
 	"math"
+	"strings"
 
 	"github.com/juju/errors"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
+
+var ErrSetAborted = errors.New("SET flow is aborted because of NX|XX condition met")
 
 type stringRow struct {
 	*storeRowHelper
@@ -133,14 +136,64 @@ func (s *Store) Append(db uint32, args [][]byte) (int64, error) {
 	return int64(len(o.Value)), s.commit(bt, fw)
 }
 
-// SET key value
+const (
+	setNXFlag uint8 = 1 << 0
+	setXXFlag uint8 = 1 << 1
+)
+
+// SET key value [EX seconds] [PX milliseconds] [NX|XX]
 func (s *Store) Set(db uint32, args [][]byte) error {
-	if len(args) != 2 {
-		return errArguments("len(args) = %d, expect = 2", len(args))
+	if len(args) < 2 {
+		return errArguments("len(args) = %d, expect >= 2", len(args))
 	}
 
 	key := args[0]
 	value := args[1]
+
+	expireat := int64(0)
+	flag := uint8(0)
+
+	for i := 2; i < len(args); {
+		switch strings.ToUpper(string(args[i])) {
+		case "EX":
+			if i+1 >= len(args) {
+				return errArguments("invalid set argument for EX")
+			}
+			ttls, err := ParseInt(args[i+1])
+			if err != nil {
+				return errArguments("parse EX arg failed %v", err)
+			}
+
+			if v, ok := TTLsToExpireAt(ttls); ok && v > 0 {
+				expireat = v
+			} else {
+				return errArguments("invalid EX seconds = %d", ttls)
+			}
+			i += 2
+		case "PX":
+			if i+1 >= len(args) {
+				return errArguments("invalid set argument for PX")
+			}
+			ttlms, err := ParseInt(args[i+1])
+			if err != nil {
+				return errArguments("parse PX arg failed %v", err)
+			}
+			if v, ok := TTLmsToExpireAt(ttlms); ok && v > 0 {
+				expireat = v
+			} else {
+				return errArguments("invalid PX milliseconds = %d", ttlms)
+			}
+			i += 2
+		case "NX":
+			flag |= setNXFlag
+			i++
+		case "XX":
+			flag |= setXXFlag
+			i++
+		default:
+			return errArguments("invalid set argument at %d", i)
+		}
+	}
 
 	if err := s.acquire(); err != nil {
 		return err
@@ -148,15 +201,34 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 	defer s.release()
 
 	bt := engine.NewBatch()
-	_, err := s.deleteIfExists(bt, db, key)
-	if err != nil {
+
+	if o, err := s.loadStoreRow(db, key, false); err != nil {
 		return err
+	} else {
+		// handle NX and XX flag
+		// NX: key is nil or expired
+		// XX: key is not nil and not expired
+		// otherwise, abort
+		if (flag&setNXFlag > 0) && (o != nil && !o.IsExpired()) {
+			return ErrSetAborted
+		} else if (flag&setXXFlag > 0) && (o == nil || o.IsExpired()) {
+			return ErrSetAborted
+		}
+
+		// if we are string type, we will overwrite it directly
+		// if not, we may delete it first
+		if o != nil && o.Code() != StringCode {
+			if err := o.deleteObject(s, bt); err != nil {
+				return err
+			}
+		}
 	}
 
-	o := newStringRow(db, key)
-	o.Value = value
-	bt.Set(o.DataKey(), o.DataValue())
-	bt.Set(o.MetaKey(), o.MetaValue())
+	no := newStringRow(db, key)
+	no.Value = value
+	no.ExpireAt = expireat
+	bt.Set(no.DataKey(), no.DataValue())
+	bt.Set(no.MetaKey(), no.MetaValue())
 	fw := &Forward{DB: db, Op: "Set", Args: args}
 	return s.commit(bt, fw)
 }
