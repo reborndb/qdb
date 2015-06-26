@@ -139,7 +139,7 @@ func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
 			return toRespErrorf("NOAUTH Authentication required")
 		}
 
-		return f(c, args)
+		return f.f(c, args)
 	}
 }
 

@@ -109,15 +109,15 @@ func RPushXCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("lindex", LIndexCmd)
-	Register("llen", LLenCmd)
-	Register("lpop", LPopCmd)
-	Register("lpush", LPushCmd)
-	Register("lpushx", LPushXCmd)
-	Register("lrange", LRangeCmd)
-	Register("lset", LSetCmd)
-	Register("ltrim", LTrimCmd)
-	Register("rpop", RPopCmd)
-	Register("rpush", RPushCmd)
-	Register("rpushx", RPushXCmd)
+	Register("lindex", LIndexCmd, ReadCommandFlag)
+	Register("llen", LLenCmd, ReadCommandFlag)
+	Register("lpop", LPopCmd, WriteCommandFlag)
+	Register("lpush", LPushCmd, WriteCommandFlag)
+	Register("lpushx", LPushXCmd, WriteCommandFlag)
+	Register("lrange", LRangeCmd, ReadCommandFlag)
+	Register("lset", LSetCmd, WriteCommandFlag)
+	Register("ltrim", LTrimCmd, WriteCommandFlag)
+	Register("rpop", RPopCmd, WriteCommandFlag)
+	Register("rpush", RPushCmd, WriteCommandFlag)
+	Register("rpushx", RPushXCmd, WriteCommandFlag)
 }

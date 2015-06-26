@@ -119,16 +119,16 @@ func RestoreCmd(s Session, args [][]byte) (redis.Resp, error) {
 }
 
 func init() {
-	Register("del", DelCmd)
-	Register("dump", DumpCmd)
-	Register("exists", ExistsCmd)
-	Register("expire", ExpireCmd)
-	Register("expireat", ExpireAtCmd)
-	Register("persist", PersistCmd)
-	Register("pexpire", PExpireCmd)
-	Register("pexpireat", PExpireAtCmd)
-	Register("pttl", PTTLCmd)
-	Register("restore", RestoreCmd)
-	Register("ttl", TTLCmd)
-	Register("type", TypeCmd)
+	Register("del", DelCmd, WriteCommandFlag)
+	Register("dump", DumpCmd, ReadCommandFlag)
+	Register("exists", ExistsCmd, ReadCommandFlag)
+	Register("expire", ExpireCmd, WriteCommandFlag)
+	Register("expireat", ExpireAtCmd, WriteCommandFlag)
+	Register("persist", PersistCmd, WriteCommandFlag)
+	Register("pexpire", PExpireCmd, WriteCommandFlag)
+	Register("pexpireat", PExpireAtCmd, WriteCommandFlag)
+	Register("pttl", PTTLCmd, ReadCommandFlag)
+	Register("restore", RestoreCmd, WriteCommandFlag)
+	Register("ttl", TTLCmd, ReadCommandFlag)
+	Register("type", TypeCmd, ReadCommandFlag)
 }

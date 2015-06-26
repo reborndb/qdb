@@ -66,7 +66,7 @@ type Session interface {
 
 type Handler struct {
 	config *Config
-	htable map[string]CommandFunc
+	htable map[string]*command
 
 	store *store.Store
 
