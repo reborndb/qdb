@@ -191,19 +191,13 @@ func (h *Handler) closeConns() {
 }
 
 func (h *Handler) close() {
-	if h.l != nil {
-		h.l.Close()
-		h.l = nil
-	}
+	h.l.Close()
 
 	h.closeConns()
 
 	h.closeReplication()
 
-	if h.store != nil {
-		h.store.Close()
-		h.store = nil
-	}
+	h.store.Close()
 
 	close(h.signal)
 }
