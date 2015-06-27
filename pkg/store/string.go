@@ -295,45 +295,10 @@ func (s *Store) PSetEX(db uint32, args [][]byte) error {
 	}
 
 	key := args[0]
-	ttlms, err := ParseInt(args[1])
-	if err != nil {
-		return errArguments("parse args failed - %s", err)
-	}
+	milliseconds := args[1]
 	value := args[2]
 
-	if ttlms == 0 {
-		return errArguments("invalid ttlms = %d", ttlms)
-	}
-
-	expireat := int64(0)
-	if v, ok := TTLmsToExpireAt(ttlms); ok && v > 0 {
-		expireat = v
-	} else {
-		return errArguments("invalid ttlms = %d", ttlms)
-	}
-
-	if err := s.acquire(); err != nil {
-		return err
-	}
-	defer s.release()
-
-	bt := engine.NewBatch()
-	_, err = s.deleteIfExists(bt, db, key)
-	if err != nil {
-		return err
-	}
-
-	if !IsExpired(expireat) {
-		o := newStringRow(db, key)
-		o.ExpireAt, o.Value = expireat, value
-		bt.Set(o.DataKey(), o.DataValue())
-		bt.Set(o.MetaKey(), o.MetaValue())
-		fw := &Forward{DB: db, Op: "PSetEX", Args: args}
-		return s.commit(bt, fw)
-	} else {
-		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
-		return s.commit(bt, fw)
-	}
+	return s.Set(db, [][]byte{key, value, []byte("PX"), milliseconds})
 }
 
 // SETEX key seconds value
@@ -343,44 +308,10 @@ func (s *Store) SetEX(db uint32, args [][]byte) error {
 	}
 
 	key := args[0]
-	ttls, err := ParseInt(args[1])
-	if err != nil {
-		return errArguments("parse args failed - %s", err)
-	}
+	seconds := args[1]
 	value := args[2]
 
-	if ttls == 0 {
-		return errArguments("invalid ttls = %d", ttls)
-	}
-	expireat := int64(0)
-	if v, ok := TTLsToExpireAt(ttls); ok && v > 0 {
-		expireat = v
-	} else {
-		return errArguments("invalid ttls = %d", ttls)
-	}
-
-	if err := s.acquire(); err != nil {
-		return err
-	}
-	defer s.release()
-
-	bt := engine.NewBatch()
-	_, err = s.deleteIfExists(bt, db, key)
-	if err != nil {
-		return err
-	}
-
-	if !IsExpired(expireat) {
-		o := newStringRow(db, key)
-		o.ExpireAt, o.Value = expireat, value
-		bt.Set(o.DataKey(), o.DataValue())
-		bt.Set(o.MetaKey(), o.MetaValue())
-		fw := &Forward{DB: db, Op: "SetEX", Args: args}
-		return s.commit(bt, fw)
-	} else {
-		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
-		return s.commit(bt, fw)
-	}
+	return s.Set(db, [][]byte{key, value, []byte("EX"), seconds})
 }
 
 // SETNX key value
@@ -392,23 +323,18 @@ func (s *Store) SetNX(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 	value := args[1]
 
-	if err := s.acquire(); err != nil {
-		return 0, err
-	}
-	defer s.release()
+	err := s.Set(db, [][]byte{key, value, []byte("NX")})
 
-	o, err := s.loadStoreRow(db, key, true)
-	if err != nil || o != nil {
-		return 0, err
-	} else {
-		o := newStringRow(db, key)
-		o.Value = value
-		bt := engine.NewBatch()
-		bt.Set(o.DataKey(), o.DataValue())
-		bt.Set(o.MetaKey(), o.MetaValue())
-		fw := &Forward{DB: db, Op: "Set", Args: args}
-		return 1, s.commit(bt, fw)
+	if err != nil {
+		// key exists
+		if err == ErrSetAborted {
+			return 0, nil
+		} else {
+			return 0, err
+		}
 	}
+
+	return 1, nil
 }
 
 // GETSET key value
