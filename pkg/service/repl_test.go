@@ -272,9 +272,22 @@ func (s *testReplSuite) testReplication(c *C, master testReplNode, slave testRep
 
 	s.doCmdMustOK(c, master.Port(), "SET", "c", "")
 
+	// set another value with TTL
+	s.doCmdMustOK(c, master.Port(), "SET", "ttl_key", "1", "PX", 100)
+
 	time.Sleep(500 * time.Millisecond)
 	resp = s.doCmd(c, slave.Port(), "GET", "c")
 	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString(""))
+
+	// get expired key to let master force delete it
+	resp = s.doCmd(c, master.Port(), "GET", "ttl_key")
+	c.Assert(resp, DeepEquals, redis.NewBulkBytes(nil))
+
+	time.Sleep(500 * time.Millisecond)
+
+	// the key must be deleted from master repliction
+	resp = s.doCmd(c, slave.Port(), "GET", "ttl_key")
+	c.Assert(resp, DeepEquals, redis.NewBulkBytes(nil))
 
 	offset = slave.SyncOffset(c)
 	// now close replication connection
