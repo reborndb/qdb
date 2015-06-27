@@ -263,6 +263,10 @@ LOOP:
 
 			h.masterAddr.Set(masterAddr)
 
+			// we are slave now, so can not delete expired key automatically
+			// master will send us del command to handle it
+			h.store.SetDeleteIfExpired(false)
+
 			go func(syncOffset int64) {
 				defer func() {
 					lost <- 0
@@ -279,6 +283,9 @@ LOOP:
 			h.syncOffset.Set(-1)
 			h.masterRunID = "?"
 			h.syncSince.Set(0)
+
+			// we are master now, so can delete expired key automatically
+			h.store.SetDeleteIfExpired(true)
 			log.Infof("slaveof no one")
 		}
 
