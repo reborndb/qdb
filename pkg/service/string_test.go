@@ -135,13 +135,13 @@ func (s *testServiceSuite) TestXSetRange(c *C) {
 func (s *testServiceSuite) TestXSetBit(c *C) {
 	k := randomKey(c)
 	s.checkInt(c, 0, "setbit", k, 3, 1)
-	s.checkString(c, "\x08", "get", k)
+	s.checkString(c, "\x10", "get", k)
 	s.checkInt(c, 1, "setbit", k, 3, 1)
-	s.checkString(c, "\x08", "get", k)
+	s.checkString(c, "\x10", "get", k)
 	s.checkInt(c, 1, "setbit", k, 3, 0)
 	s.checkString(c, "\x00", "get", k)
 	s.checkInt(c, 0, "setbit", k, 8, 1)
-	s.checkString(c, "\x00\x01", "get", k)
+	s.checkString(c, "\x00\x80", "get", k)
 }
 
 func (s *testServiceSuite) TestXMSet(c *C) {
@@ -178,4 +178,44 @@ func (s *testServiceSuite) TestMGet(c *C) {
 	a := s.checkBytesArray(c, "mget", k, k+"1", k+"2", k+"3", k+"4")
 	c.Assert(a, HasLen, 5)
 	c.Assert(a, DeepEquals, [][]byte{[]byte("0"), []byte("1"), []byte("2"), []byte("3"), []byte("")})
+}
+
+func (s *testServiceSuite) TestBitCount(c *C) {
+	k := randomKey(c)
+	s.checkInt(c, 0, "setbit", k, 0, 1)
+	s.checkInt(c, 0, "setbit", k, 1, 1)
+	s.checkInt(c, 0, "setbit", k, 2, 1)
+	s.checkInt(c, 0, "setbit", k, 3, 1)
+	s.checkInt(c, 4, "bitcount", k)
+	s.checkInt(c, 1, "setbit", k, 3, 0)
+	s.checkInt(c, 3, "bitcount", k)
+	s.checkInt(c, 3, "bitcount", k, 0, 1)
+	s.checkInt(c, 3, "bitcount", k, 0, -1)
+}
+
+func (s *testServiceSuite) TestBitOp(c *C) {
+	k1 := randomKey(c)
+	s.checkOK(c, "set", k1, "a")
+
+	k2 := randomKey(c)
+	s.checkOK(c, "set", k2, "b")
+
+	k3 := randomKey(c)
+	s.checkContainError(c, "BITOP NOT must be called with a single source key", "bitop", "not", k3, k1, k2)
+
+	s.checkInt(c, 1, "bitop", "and", k3, k1, k2)
+	s.checkString(c, "`", "get", k3)
+
+	s.checkOK(c, "set", k2, "bbbb")
+	s.checkInt(c, 4, "bitop", "and", k3, k1, k2)
+	s.checkString(c, "`\x00\x00\x00", "get", k3)
+
+	s.checkInt(c, 4, "bitop", "or", k3, k1, k2)
+	s.checkString(c, "cbbb", "get", k3)
+
+	s.checkInt(c, 4, "bitop", "xor", k3, k1, k2)
+	s.checkString(c, "\x03bbb", "get", k3)
+
+	s.checkInt(c, 1, "bitop", "not", k3, k1)
+	s.checkString(c, "\x9e", "get", k3)
 }

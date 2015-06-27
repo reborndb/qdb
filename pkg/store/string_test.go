@@ -175,6 +175,18 @@ func (s *testStoreSuite) xsetbit(c *C, db uint32, key string, offset uint, value
 	s.xgetbit(c, db, key, offset, value)
 }
 
+func (s *testStoreSuite) xbitcount(c *C, db uint32, expect int64, args ...interface{}) {
+	x, err := s.s.BitCount(db, FormatBytes(args...))
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
+}
+
+func (s *testStoreSuite) xbitop(c *C, db uint32, expect int64, args ...interface{}) {
+	x, err := s.s.BitOp(db, FormatBytes(args...))
+	c.Assert(err, IsNil)
+	c.Assert(x, Equals, expect)
+}
+
 func (s *testStoreSuite) xgetbit(c *C, db uint32, key string, offset uint, expect int64) {
 	x, err := s.s.GetBit(db, FormatBytes(key, offset))
 	c.Assert(err, IsNil)
@@ -439,39 +451,39 @@ func (s *testStoreSuite) TestXIncrByFloat(c *C) {
 
 func (s *testStoreSuite) TestXSetBit(c *C) {
 	s.xsetbit(c, 0, "string", 0, 1, 0)
-	s.xget(c, 0, "string", "\x01")
+	s.xget(c, 0, "string", "\x80")
 	s.xsetbit(c, 0, "string", 1, 1, 0)
-	s.xget(c, 0, "string", "\x03")
+	s.xget(c, 0, "string", "\xc0")
 	s.xsetbit(c, 0, "string", 2, 1, 0)
-	s.xget(c, 0, "string", "\x07")
+	s.xget(c, 0, "string", "\xe0")
 	s.xsetbit(c, 0, "string", 3, 1, 0)
-	s.xget(c, 0, "string", "\x0f")
+	s.xget(c, 0, "string", "\xf0")
 	s.xsetbit(c, 0, "string", 4, 1, 0)
-	s.xget(c, 0, "string", "\x1f")
+	s.xget(c, 0, "string", "\xf8")
 	s.xsetbit(c, 0, "string", 5, 1, 0)
-	s.xget(c, 0, "string", "\x3f")
+	s.xget(c, 0, "string", "\xfc")
 	s.xsetbit(c, 0, "string", 6, 1, 0)
-	s.xget(c, 0, "string", "\x7f")
+	s.xget(c, 0, "string", "\xfe")
 	s.xsetbit(c, 0, "string", 7, 1, 0)
 	s.xget(c, 0, "string", "\xff")
 	s.xsetbit(c, 0, "string", 8, 1, 0)
-	s.xget(c, 0, "string", "\xff\x01")
+	s.xget(c, 0, "string", "\xff\x80")
 	s.xsetbit(c, 0, "string", 0, 0, 1)
-	s.xget(c, 0, "string", "\xfe\x01")
+	s.xget(c, 0, "string", "\x7f\x80")
 	s.xsetbit(c, 0, "string", 1, 0, 1)
-	s.xget(c, 0, "string", "\xfc\x01")
+	s.xget(c, 0, "string", "?\x80")
 	s.xsetbit(c, 0, "string", 2, 0, 1)
-	s.xget(c, 0, "string", "\xf8\x01")
+	s.xget(c, 0, "string", "\x1f\x80")
 	s.xsetbit(c, 0, "string", 3, 0, 1)
-	s.xget(c, 0, "string", "\xf0\x01")
+	s.xget(c, 0, "string", "\x0f\x80")
 	s.xsetbit(c, 0, "string", 4, 0, 1)
-	s.xget(c, 0, "string", "\xe0\x01")
+	s.xget(c, 0, "string", "\a\x80")
 	s.xsetbit(c, 0, "string", 5, 0, 1)
-	s.xget(c, 0, "string", "\xc0\x01")
+	s.xget(c, 0, "string", "\x03\x80")
 	s.xsetbit(c, 0, "string", 6, 0, 1)
-	s.xget(c, 0, "string", "\x80\x01")
+	s.xget(c, 0, "string", "\x01\x80")
 	s.xsetbit(c, 0, "string", 7, 0, 1)
-	s.xget(c, 0, "string", "\x00\x01")
+	s.xget(c, 0, "string", "\x00\x80")
 	s.xsetbit(c, 0, "string", 8, 0, 1)
 	s.xget(c, 0, "string", "\x00\x00")
 	s.xsetbit(c, 0, "string", 16, 0, 0)
@@ -495,10 +507,10 @@ func (s *testStoreSuite) TestGetBit(c *C) {
 	s.xgetbit(c, 0, "string", 0, 0)
 	s.xgetbit(c, 0, "string", 1000, 0)
 	s.xset(c, 0, "string", "\x01\x03")
-	s.xgetbit(c, 0, "string", 0, 1)
-	s.xgetbit(c, 0, "string", 1, 0)
-	s.xgetbit(c, 0, "string", 8, 1)
-	s.xgetbit(c, 0, "string", 9, 1)
+	s.xgetbit(c, 0, "string", 0, 0)
+	s.xgetbit(c, 0, "string", 7, 1)
+	s.xgetbit(c, 0, "string", 14, 1)
+	s.xgetbit(c, 0, "string", 15, 1)
 	s.xdel(c, 0, "string", 1)
 
 	for i := 0; i < 32; i += 2 {
@@ -581,5 +593,67 @@ func (s *testStoreSuite) TestMGet(c *C) {
 
 	s.xmget(c, 0, "a", "", "b", "2", "c", "3", "d", "")
 	s.kdel(c, 0, 2, "a", "b", "c")
+	s.checkEmpty(c)
+}
+
+func (s *testStoreSuite) TestBitCount(c *C) {
+	s.xsetbit(c, 0, "string", 0, 1, 0)
+	s.xbitcount(c, 0, 1, "string")
+	s.xsetbit(c, 0, "string", 1, 1, 0)
+	s.xbitcount(c, 0, 2, "string")
+	s.xsetbit(c, 0, "string", 2, 1, 0)
+	s.xbitcount(c, 0, 3, "string")
+	s.xsetbit(c, 0, "string", 3, 1, 0)
+	s.xbitcount(c, 0, 4, "string")
+	s.xbitcount(c, 0, 4, "string", 0, 1)
+	s.xbitcount(c, 0, 0, "string", 1, 1)
+	s.xbitcount(c, 0, 0, "string", 1, -1)
+	s.xbitcount(c, 0, 4, "string", 0, -1)
+	s.xsetbit(c, 0, "string", 8, 1, 0)
+	s.xbitcount(c, 0, 5, "string")
+	s.xbitcount(c, 0, 1, "string", 1, 2)
+	s.xbitcount(c, 0, 1, "string", 1, -1)
+	s.xsetbit(c, 0, "string", 8, 0, 1)
+	s.xbitcount(c, 0, 0, "string", 1, 2)
+	s.xbitcount(c, 0, 0, "string", 1, -1)
+	s.xbitcount(c, 0, 4, "string")
+	s.xbitcount(c, 0, 4, "string", 0, 1)
+	s.xbitcount(c, 0, 4, "string", 0, -1)
+
+	s.xdel(c, 0, "string", 1)
+	s.checkEmpty(c)
+}
+
+func (s *testStoreSuite) TestBitOp(c *C) {
+	s.xset(c, 0, "a", "a")
+	s.xset(c, 0, "b", "b")
+	s.xbitop(c, 0, 1, "and", "c", "a", "b")
+	s.xget(c, 0, "c", "`")
+
+	s.xset(c, 0, "b", "bbbb")
+	s.xbitop(c, 0, 4, "and", "c", "a", "b")
+	s.xget(c, 0, "c", "`\x00\x00\x00")
+
+	s.xbitop(c, 0, 4, "or", "c", "a", "b")
+	s.xget(c, 0, "c", "cbbb")
+
+	s.xbitop(c, 0, 4, "xor", "c", "a", "b")
+	s.xget(c, 0, "c", "\x03bbb")
+
+	s.xbitop(c, 0, 1, "not", "c", "a")
+	s.xget(c, 0, "c", "\x9e")
+
+	s.xbitop(c, 0, 4, "and", "c", "a", "b", "d")
+	s.xget(c, 0, "c", "\x00\x00\x00\x00")
+
+	s.xbitop(c, 0, 4, "or", "c", "a", "b", "d")
+	s.xget(c, 0, "c", "cbbb")
+
+	s.xbitop(c, 0, 4, "xor", "c", "a", "b", "d")
+	s.xget(c, 0, "c", "\x03bbb")
+
+	s.xdel(c, 0, "a", 1)
+	s.xdel(c, 0, "b", 1)
+	s.xdel(c, 0, "c", 1)
 	s.checkEmpty(c)
 }

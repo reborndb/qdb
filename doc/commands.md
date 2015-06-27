@@ -65,6 +65,14 @@
    ```
    APPEND key value
    ```
+   - BITCOUNT
+   ```
+   BITCOUNT key [beg end]
+   ```
+   - BITOP
+   ```
+   BITOP op destkey key [key ...]
+   ```
    - DECR
    ```
    DECR key
@@ -76,6 +84,10 @@
    - GET
    ```
    GET key
+   ```
+   - GETBIT
+   ```
+   GETBIT key offset value
    ```
    - GETSET
    ```
