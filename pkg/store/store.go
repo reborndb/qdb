@@ -9,6 +9,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
+	"github.com/reborndb/go/atomic2"
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
@@ -26,6 +27,8 @@ type Store struct {
 
 	preCommitHandlers  []ForwardHandler
 	postCommitHandlers []ForwardHandler
+
+	deleteIfExpired atomic2.Int64
 }
 
 func New(db engine.Database) *Store {
@@ -33,6 +36,8 @@ func New(db engine.Database) *Store {
 
 	s.preCommitHandlers = make([]ForwardHandler, 0)
 	s.postCommitHandlers = make([]ForwardHandler, 0)
+
+	s.deleteIfExpired.Set(1)
 
 	return s
 }
@@ -183,6 +188,18 @@ func (s *Store) Reset() error {
 		log.Infof("store is reset")
 		return nil
 	}
+}
+
+func (s *Store) SetDeleteIfExpired(b bool) {
+	if b {
+		s.deleteIfExpired.Set(1)
+	} else {
+		s.deleteIfExpired.Set(0)
+	}
+}
+
+func (s *Store) needDeleteIfExpired() bool {
+	return s.deleteIfExpired.Get() == 1
 }
 
 func (s *Store) compact(start, limit []byte) error {

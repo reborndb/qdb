@@ -21,13 +21,20 @@ func (s *Store) loadStoreRow(db uint32, key []byte, deleteIfExpired bool) (store
 	if err != nil || o == nil {
 		return nil, err
 	}
+
 	if deleteIfExpired && o.IsExpired() {
-		bt := engine.NewBatch()
-		if err := o.deleteObject(s, bt); err != nil {
-			return nil, err
+		if s.needDeleteIfExpired() {
+			bt := engine.NewBatch()
+			if err := o.deleteObject(s, bt); err != nil {
+				return nil, err
+			}
+			fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
+			return nil, s.commit(bt, fw)
+		} else {
+			// sometimes, we will not delete expired key automatically and let outer use Del command to delete it.
+			// here is very dangerous if you disable delete expired key but do some other write operations except Del
+			return nil, nil
 		}
-		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
-		return nil, s.commit(bt, fw)
 	}
 	return o, nil
 }
