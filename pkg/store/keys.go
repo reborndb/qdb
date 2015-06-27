@@ -65,13 +65,6 @@ func (s *Store) Del(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	// for _, key := range keys {
-	// 	_, err := s.loadStoreRow(db, key, true)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// }
-
 	ms := &markSet{}
 	bt := engine.NewBatch()
 	for _, key := range keys {
