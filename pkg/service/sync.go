@@ -383,9 +383,11 @@ func (h *Handler) openSyncPipe() (pipe.Reader, pipe.Writer) {
 }
 
 func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
+	c.isSyncing = true
 	defer func() {
 		h.counters.syncTotalBytes.Set(0)
 		h.counters.syncCacheBytes.Set(0)
+		c.isSyncing = false
 	}()
 
 	pr, pw := h.openSyncPipe()

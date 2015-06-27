@@ -259,6 +259,11 @@ func (s *testReplSuite) testReplication(c *C, master testReplNode, slave testRep
 	c.Assert(slave.SyncOffset(c), Not(Equals), int64(-1))
 	c.Assert(resp, DeepEquals, redis.NewBulkBytesWithString("100"))
 
+	// write to a slave, must error
+	resp = s.doCmd(c, slave.Port(), "SET", "e", "1")
+	c.Assert(resp, FitsTypeOf, (*redis.Error)(nil))
+	c.Assert(resp.(*redis.Error).Value, Matches, "READONLY.*")
+
 	s.doCmdMustOK(c, master.Port(), "SET", "b", "100")
 
 	time.Sleep(500 * time.Millisecond)
