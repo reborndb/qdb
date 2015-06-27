@@ -44,7 +44,9 @@ func (s *Store) deleteIfExists(bt *engine.Batch, db uint32, key []byte) (bool, e
 	if err != nil || o == nil {
 		return false, err
 	}
-	return true, o.deleteObject(s, bt)
+	// if key is already expired, we think it is not exists
+	exists := !o.IsExpired()
+	return exists, o.deleteObject(s, bt)
 }
 
 // DEL key [key ...]
@@ -60,12 +62,12 @@ func (s *Store) Del(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	for _, key := range keys {
-		_, err := s.loadStoreRow(db, key, true)
-		if err != nil {
-			return 0, err
-		}
-	}
+	// for _, key := range keys {
+	// 	_, err := s.loadStoreRow(db, key, true)
+	// 	if err != nil {
+	// 		return 0, err
+	// 	}
+	// }
 
 	ms := &markSet{}
 	bt := engine.NewBatch()

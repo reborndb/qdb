@@ -138,6 +138,8 @@ func (s *testStoreSuite) TestDel(c *C) {
 	s.xset(c, 0, "a", "a")
 	s.xset(c, 0, "b", "b")
 	s.kdel(c, 0, 2, "a", "b", "c", "d")
+	s.xset(c, 0, "a", "a")
+	s.kdel(c, 0, 1, "a", "a")
 	s.checkEmpty(c)
 }
 
