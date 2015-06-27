@@ -270,14 +270,16 @@ func (s *Store) SetNX(db uint32, args [][]byte) (int64, error) {
 
 	err := s.Set(db, [][]byte{key, value, []byte("NX")})
 
-	if err != nil && err != ErrSetAborted {
-		return 0, err
-	} else if err == ErrSetAborted {
+	if err != nil {
 		// key exists
-		return 0, nil
-	} else {
-		return 1, nil
+		if err == ErrSetAborted {
+			return 0, nil
+		} else {
+			return 0, err
+		}
 	}
+
+	return 1, nil
 }
 
 // GETSET key value
