@@ -17,6 +17,8 @@ const (
 )
 
 func (s *Store) loadStoreRow(db uint32, key []byte, deleteIfExpired bool) (storeRow, error) {
+	// will refactor deleteIfExpired later, because the argument deleteIfExpired is true for nearly all operations
+
 	o, err := loadStoreRow(s, db, key)
 	if err != nil || o == nil {
 		return nil, err
@@ -33,7 +35,8 @@ func (s *Store) loadStoreRow(db uint32, key []byte, deleteIfExpired bool) (store
 		} else {
 			// sometimes, we will not delete expired key automatically and let outer use Del command to delete it.
 			// here is very dangerous if you disable delete expired key but do some other write operations except Del
-			return nil, nil
+			// we will return the expired data, for slave redis, we can still get a expired data if it is not deleted from master.
+			return o, nil
 		}
 	}
 	return o, nil
