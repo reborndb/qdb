@@ -47,6 +47,9 @@ type conn struct {
 	backlogACKTime atomic2.Int64
 
 	authenticated bool
+
+	// whether sync from master or not
+	isSyncing bool
 }
 
 func newConn(nc net.Conn, h *Handler, timeout int) *conn {
@@ -60,6 +63,7 @@ func newConn(nc net.Conn, h *Handler, timeout int) *conn {
 	c.summ = fmt.Sprintf("<local> %s -- %s <remote>", nc.LocalAddr(), nc.RemoteAddr())
 	c.timeout = time.Duration(timeout) * time.Second
 	c.authenticated = false
+	c.isSyncing = false
 
 	return c
 }
@@ -137,6 +141,12 @@ func (c *conn) dispatch(h *Handler, request redis.Resp) (redis.Resp, error) {
 	} else {
 		if len(h.config.Auth) > 0 && !c.authenticated && strings.ToLower(cmd) != "auth" {
 			return toRespErrorf("NOAUTH Authentication required")
+		}
+
+		masterAddr := c.h.masterAddr.Get()
+		if len(masterAddr) > 0 && f.flag&CmdWrite > 0 && !c.isSyncing {
+			// we are a slave, so can not receive any write operations except from master in syncing
+			return toRespErrorf("READONLY You can't write against a read only slave.")
 		}
 
 		return f.f(c, args)

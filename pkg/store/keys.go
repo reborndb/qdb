@@ -17,17 +17,27 @@ const (
 )
 
 func (s *Store) loadStoreRow(db uint32, key []byte, deleteIfExpired bool) (storeRow, error) {
+	// will refactor deleteIfExpired later, because the argument deleteIfExpired is true for nearly all operations
+
 	o, err := loadStoreRow(s, db, key)
 	if err != nil || o == nil {
 		return nil, err
 	}
+
 	if deleteIfExpired && o.IsExpired() {
-		bt := engine.NewBatch()
-		if err := o.deleteObject(s, bt); err != nil {
-			return nil, err
+		if s.needDeleteIfExpired() {
+			bt := engine.NewBatch()
+			if err := o.deleteObject(s, bt); err != nil {
+				return nil, err
+			}
+			fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
+			return nil, s.commit(bt, fw)
+		} else {
+			// sometimes, we will not delete expired key automatically and let outer use Del command to delete it.
+			// here is very dangerous if you disable delete expired key but do some other write operations except Del
+			// we will return the expired data, for slave redis, we can still get an expired data if it is not deleted from master.
+			return o, nil
 		}
-		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
-		return nil, s.commit(bt, fw)
 	}
 	return o, nil
 }
@@ -37,7 +47,9 @@ func (s *Store) deleteIfExists(bt *engine.Batch, db uint32, key []byte) (bool, e
 	if err != nil || o == nil {
 		return false, err
 	}
-	return true, o.deleteObject(s, bt)
+	// if key is already expired, we think it is not exists
+	exists := !o.IsExpired()
+	return exists, o.deleteObject(s, bt)
 }
 
 // DEL key [key ...]
@@ -52,13 +64,6 @@ func (s *Store) Del(db uint32, args [][]byte) (int64, error) {
 		return 0, err
 	}
 	defer s.release()
-
-	for _, key := range keys {
-		_, err := s.loadStoreRow(db, key, true)
-		if err != nil {
-			return 0, err
-		}
-	}
 
 	ms := &markSet{}
 	bt := engine.NewBatch()
