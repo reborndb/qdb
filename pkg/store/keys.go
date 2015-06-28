@@ -35,7 +35,7 @@ func (s *Store) loadStoreRow(db uint32, key []byte, deleteIfExpired bool) (store
 		} else {
 			// sometimes, we will not delete expired key automatically and let outer use Del command to delete it.
 			// here is very dangerous if you disable delete expired key but do some other write operations except Del
-			// we will return the expired data, for slave redis, we can still get a expired data if it is not deleted from master.
+			// we will return the expired data, for slave redis, we can still get an expired data if it is not deleted from master.
 			return o, nil
 		}
 	}
