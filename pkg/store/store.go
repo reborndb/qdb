@@ -190,6 +190,10 @@ func (s *Store) Reset() error {
 	}
 }
 
+// Caveat: if you set false, we will not delete expired automatically except
+// you call del command explicitly.
+// You may get a expired data, so any write operations may be incorrect.
+// Why support this? We will use it for outer service slave mode like redis slave.
 func (s *Store) SetDeleteIfExpired(b bool) {
 	if b {
 		s.deleteIfExpired.Set(1)
