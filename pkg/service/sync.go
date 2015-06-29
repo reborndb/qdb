@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,7 +99,7 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 		return err
 	}
 
-	ncpu := runtime.GOMAXPROCS(runtime.NumCPU() / 2)
+	ncpu := 1
 	cron := time.Millisecond * time.Duration(100)
 	for {
 		objs, more, err := sp.LoadObjCron(cron, ncpu, 1024)
@@ -505,7 +504,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 		return err
 	}
 
-	ncpu := runtime.GOMAXPROCS(runtime.NumCPU() / 2)
+	ncpu := 1
 	errs := make(chan error, ncpu)
 
 	var lock sync.Mutex
@@ -524,31 +523,29 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 		return entry, nil
 	}
 
-	for i := 0; i < ncpu; i++ {
-		go func() {
-			defer flag.Set(1)
-			for {
-				entry, err := loadNextEntry()
-				if err != nil || entry == nil {
-					errs <- err
-					return
-				}
-				db, key, value := entry.DB, entry.Key, entry.Value
-				ttlms := int64(0)
-				if entry.ExpireAt != 0 {
-					if v, ok := store.ExpireAtToTTLms(int64(entry.ExpireAt)); ok && v > 0 {
-						ttlms = v
-					} else {
-						ttlms = 1
-					}
-				}
-				if err := c.Store().SlotsRestore(db, [][]byte{key, store.FormatInt(ttlms), value}); err != nil {
-					errs <- err
-					return
+	go func() {
+		defer flag.Set(1)
+		for {
+			entry, err := loadNextEntry()
+			if err != nil || entry == nil {
+				errs <- err
+				return
+			}
+			db, key, value := entry.DB, entry.Key, entry.Value
+			ttlms := int64(0)
+			if entry.ExpireAt != 0 {
+				if v, ok := store.ExpireAtToTTLms(int64(entry.ExpireAt)); ok && v > 0 {
+					ttlms = v
+				} else {
+					ttlms = 1
 				}
 			}
-		}()
-	}
+			if err := c.Store().SlotsRestore(db, [][]byte{key, store.FormatInt(ttlms), value}); err != nil {
+				errs <- err
+				return
+			}
+		}
+	}()
 
 	for {
 		select {
