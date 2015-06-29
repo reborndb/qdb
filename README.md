@@ -6,7 +6,7 @@ A fast, high availability, fully Redis compatible store.
 
 ## Redis Command Support
 
-See [commands](./doc/commands.md) for more.
+See [commands](https://github.com/reborndb/qdb/wiki/Redis-Commands-Support) for more.
 
 ## Install 
 

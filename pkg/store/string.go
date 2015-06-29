@@ -4,6 +4,8 @@
 package store
 
 import (
+	"encoding/binary"
+	"fmt"
 	"math"
 	"strings"
 
@@ -12,7 +14,57 @@ import (
 	"github.com/reborndb/qdb/pkg/engine"
 )
 
+const (
+	BitAND = "and"
+	BitOR  = "or"
+	BitXOR = "xor"
+	BitNot = "not"
+)
+
 var ErrSetAborted = errors.New("SET flow is aborted because of NX|XX condition met")
+
+func adjustIndex(index int64, min, max int64) int64 {
+	if index >= 0 {
+		return index + min
+	} else {
+		return index + max
+	}
+}
+
+func minIntValue(v1, v2 int64) int64 {
+	if v1 < v2 {
+		return v1
+	} else {
+		return v2
+	}
+}
+
+func maxIntValue(v1, v2 int64) int64 {
+	if v1 < v2 {
+		return v2
+	} else {
+		return v1
+	}
+}
+
+var bitsInByte = [256]int32{0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3,
+	4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2, 3,
+	3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4,
+	5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4,
+	3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4,
+	5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 1, 2,
+	2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3,
+	4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+	3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 2, 3, 3, 4, 3, 4, 4,
+	5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6,
+	6, 7, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 4, 5, 5, 6, 5,
+	6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8}
+
+func numberBitCount(i uint32) uint32 {
+	i = i - ((i >> 1) & 0x55555555)
+	i = (i & 0x33333333) + ((i >> 2) & 0x33333333)
+	return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24
+}
 
 type stringRow struct {
 	*storeRowHelper
@@ -56,6 +108,7 @@ func (o *stringRow) loadObjectValue(r storeReader) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return rdb.String(o.Value), nil
 }
 
@@ -133,6 +186,7 @@ func (s *Store) Append(db uint32, args [][]byte) (int64, error) {
 
 	bt.Set(o.DataKey(), o.DataValue())
 	fw := &Forward{DB: db, Op: "Append", Args: args}
+
 	return int64(len(o.Value)), s.commit(bt, fw)
 }
 
@@ -229,6 +283,7 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 	no.ExpireAt = expireat
 	bt.Set(no.DataKey(), no.DataValue())
 	bt.Set(no.MetaKey(), no.MetaValue())
+
 	fw := &Forward{DB: db, Op: "Set", Args: args}
 	return s.commit(bt, fw)
 }
@@ -319,6 +374,7 @@ func (s *Store) GetSet(db uint32, args [][]byte) ([]byte, error) {
 
 	o.Value, value = value, o.Value
 	bt.Set(o.DataKey(), o.DataValue())
+
 	fw := &Forward{DB: db, Op: "Set", Args: args}
 	return value, s.commit(bt, fw)
 }
@@ -347,6 +403,7 @@ func (s *Store) incrInt(db uint32, key []byte, delta int64) (int64, error) {
 
 	o.Value = FormatInt(delta)
 	bt.Set(o.DataKey(), o.DataValue())
+
 	fw := &Forward{DB: db, Op: "IncrBy", Args: [][]byte{key, FormatInt(delta)}}
 	return delta, s.commit(bt, fw)
 }
@@ -379,6 +436,7 @@ func (s *Store) incrFloat(db uint32, key []byte, delta float64) (float64, error)
 
 	o.Value = FormatFloat(delta)
 	bt.Set(o.DataKey(), o.DataValue())
+
 	fw := &Forward{DB: db, Op: "IncrByFloat", Args: [][]byte{key, FormatFloat(delta)}}
 	return delta, s.commit(bt, fw)
 }
@@ -484,18 +542,20 @@ func (s *Store) SetBit(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 	offset, err := ParseUint(args[1])
 	if err != nil {
-		return 0, errArguments("parse args failed - %s", err)
+		return 0, errArguments("bit offset is not an integer or out of range - %s", err)
 	}
 	value, err := ParseUint(args[2])
 	if err != nil {
-		return 0, errArguments("parse args failed - %s", err)
+		return 0, errArguments("bit is not an integer or out of range - %s", err)
 	}
 
 	if offset > maxVarbytesLen {
-		return 0, errArguments("offset = %d", offset)
+		return 0, errArguments("bit offset is not an integer or out of range, offset = %d", offset)
 	}
 
-	var bit bool = value != 0
+	if value != 0 && value != 1 {
+		return 0, errArguments("bit is not an integer or out of range, bit = %d", value)
+	}
 
 	if err := s.acquire(); err != nil {
 		return 0, err
@@ -517,23 +577,29 @@ func (s *Store) SetBit(db uint32, args [][]byte) (int64, error) {
 		o = newStringRow(db, key)
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
-	ipos := offset / 8
-	if n := int(ipos) + 1; n > len(o.Value) {
-		o.Value = append(o.Value, make([]byte, n-len(o.Value))...)
+
+	byteOffset := int(uint32(offset) >> 3)
+	extra := byteOffset + 1 - len(o.Value)
+	if extra > 0 {
+		o.Value = append(o.Value, make([]byte, extra)...)
 	}
-	mask := byte(1 << (offset % 8))
-	orig := o.Value[ipos] & mask
-	if bit {
-		o.Value[ipos] |= mask
-	} else {
-		o.Value[ipos] &= ^mask
-	}
+
+	byteVal := o.Value[byteOffset]
+	bit := 7 - uint8(uint32(offset)&0x7)
+	bitVal := byteVal & (1 << bit)
+
+	byteVal &= ^(1 << bit)
+	byteVal |= (uint8(value&0x1) << bit)
+
+	o.Value[byteOffset] = byteVal
+
 	bt.Set(o.DataKey(), o.DataValue())
 
 	var n int64 = 0
-	if orig != 0 {
+	if bitVal > 0 {
 		n = 1
 	}
+
 	fw := &Forward{DB: db, Op: "SetBit", Args: args}
 	return n, s.commit(bt, fw)
 }
@@ -575,11 +641,14 @@ func (s *Store) SetRange(db uint32, args [][]byte) (int64, error) {
 		o = newStringRow(db, key)
 		bt.Set(o.MetaKey(), o.MetaValue())
 	}
+
 	if n := int(offset) + len(value); n > len(o.Value) {
 		o.Value = append(o.Value, make([]byte, n-len(o.Value))...)
 	}
+
 	copy(o.Value[offset:], value)
 	bt.Set(o.DataKey(), o.DataValue())
+
 	fw := &Forward{DB: db, Op: "SetRange", Args: args}
 	return int64(len(o.Value)), s.commit(bt, fw)
 }
@@ -611,6 +680,7 @@ func (s *Store) MSet(db uint32, args [][]byte) error {
 			ms.Set(key)
 		}
 	}
+
 	fw := &Forward{DB: db, Op: "MSet", Args: args}
 	return s.commit(bt, fw)
 }
@@ -645,6 +715,7 @@ func (s *Store) MSetNX(db uint32, args [][]byte) (int64, error) {
 			ms.Set(key)
 		}
 	}
+
 	fw := &Forward{DB: db, Op: "MSet", Args: args}
 	return 1, s.commit(bt, fw)
 }
@@ -684,6 +755,7 @@ func (s *Store) MGet(db uint32, args [][]byte) ([][]byte, error) {
 			values[i] = o.Value
 		}
 	}
+
 	return values, nil
 }
 
@@ -696,11 +768,11 @@ func (s *Store) GetBit(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 	offset, err := ParseUint(args[1])
 	if err != nil {
-		return 0, errArguments("parse args failed - %s", err)
+		return 0, errArguments("bit offset is not an integer or out of range - %s", err)
 	}
 
 	if offset > maxVarbytesLen {
-		return 0, errArguments("offset = %d", offset)
+		return 0, errArguments("bit offset is not an integer or out of range, offset=%d", offset)
 	}
 
 	if err := s.acquire(); err != nil {
@@ -717,17 +789,19 @@ func (s *Store) GetBit(db uint32, args [][]byte) (int64, error) {
 		return 0, err
 	}
 
-	ipos := offset / 8
-	if n := int(ipos) + 1; n > len(o.Value) {
+	byteOffset := uint32(offset) >> 3
+	bit := 7 - uint8(uint32(offset)&0x7)
+
+	if byteOffset >= uint32(len(o.Value)) {
 		return 0, nil
 	}
-	mask := byte(1 << (offset % 8))
-	orig := o.Value[ipos] & mask
-	if orig != 0 {
+
+	bitVal := o.Value[byteOffset] & (1 << bit)
+	if bitVal > 0 {
 		return 1, nil
-	} else {
-		return 0, nil
 	}
+
+	return 0, nil
 }
 
 // GETRANGE key beg end
@@ -761,6 +835,7 @@ func (s *Store) GetRange(db uint32, args [][]byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		min, max := int64(0), int64(len(o.Value))
 		beg = maxIntValue(adjustIndex(beg, min, max), min)
 		end = minIntValue(adjustIndex(end, min, max), max-1)
@@ -768,31 +843,8 @@ func (s *Store) GetRange(db uint32, args [][]byte) ([]byte, error) {
 			return o.Value[beg : end+1], nil
 		}
 	}
+
 	return nil, nil
-}
-
-func adjustIndex(index int64, min, max int64) int64 {
-	if index >= 0 {
-		return index + min
-	} else {
-		return index + max
-	}
-}
-
-func minIntValue(v1, v2 int64) int64 {
-	if v1 < v2 {
-		return v1
-	} else {
-		return v2
-	}
-}
-
-func maxIntValue(v1, v2 int64) int64 {
-	if v1 < v2 {
-		return v2
-	} else {
-		return v1
-	}
 }
 
 // STRLEN key
@@ -818,7 +870,171 @@ func (s *Store) Strlen(db uint32, args [][]byte) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
+
 		return int64(len(o.Value)), nil
 	}
+
 	return 0, nil
+}
+
+// BITCOUNT key [beg end]
+func (s *Store) BitCount(db uint32, args [][]byte) (int64, error) {
+	if len(args) != 1 && len(args) != 3 {
+		return 0, errArguments("len(args) = %d, expect = 1 || expect == 3", len(args))
+	}
+
+	key := args[0]
+
+	var beg, end int64 = 0, -1
+	if len(args) == 3 {
+		var err error
+		beg, err = ParseInt(args[1])
+		if err != nil {
+			return 0, errArguments("value is not an integer or out of range - %s", err)
+		}
+
+		end, err = ParseInt(args[2])
+		if err != nil {
+			return 0, errArguments("value is not an integer or out of range - %s", err)
+		}
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	o, err := s.loadStringRow(db, key, true)
+	if err != nil {
+		return 0, err
+	}
+
+	var n int64 = 0
+
+	if o != nil {
+		_, err := o.LoadDataValue(s)
+		if err != nil {
+			return 0, err
+		}
+
+		min, max := int64(0), int64(len(o.Value))
+		beg = maxIntValue(adjustIndex(beg, min, max), min)
+		end = minIntValue(adjustIndex(end, min, max), max-1)
+		if beg > end {
+			return 0, nil
+		}
+
+		o.Value = o.Value[beg : end+1]
+
+		pos := 0
+		for ; pos+4 <= len(o.Value); pos = pos + 4 {
+			n += int64(numberBitCount(binary.BigEndian.Uint32(o.Value[pos : pos+4])))
+		}
+
+		for ; pos < len(o.Value); pos++ {
+			n += int64(bitsInByte[o.Value[pos]])
+		}
+	}
+
+	return n, nil
+}
+
+// BITOP op destkey key [key ...]
+func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
+	if len(args) < 3 {
+		return 0, errArguments("len(args) = %d, expect >= 3", len(args))
+	}
+
+	op := args[0]
+	destKey := args[1]
+	srcKeys := args[2:]
+
+	if string(op) == BitNot && len(srcKeys) > 1 {
+		return 0, errArguments("BITOP NOT must be called with a single source key, len(srcKeys)=%d", len(srcKeys))
+	}
+
+	if err := s.acquire(); err != nil {
+		return 0, err
+	}
+	defer s.release()
+
+	var value []byte
+	o, err := s.loadStringRow(db, srcKeys[0], true)
+	if err != nil {
+		return 0, err
+	}
+
+	if o != nil {
+		_, err := o.LoadDataValue(s)
+		if err != nil {
+			return 0, err
+		}
+
+		if string(op) == BitNot {
+			for i := 0; i < len(o.Value); i++ {
+				o.Value[i] = ^o.Value[i]
+			}
+		}
+
+		value = o.Value
+	}
+
+	for i := 1; i < len(srcKeys); i++ {
+		ro, err := s.loadStringRow(db, srcKeys[i], true)
+		if err != nil {
+			return 0, err
+		}
+
+		if ro != nil {
+			_, err = ro.LoadDataValue(s)
+			if err != nil {
+				return 0, err
+			}
+		} else {
+			ro = newStringRow(db, srcKeys[i])
+		}
+
+		if len(value) < len(ro.Value) {
+			value, ro.Value = ro.Value, value
+		}
+
+		for j := 0; j < len(ro.Value); j++ {
+			switch string(op) {
+			case BitAND:
+				value[j] &= ro.Value[j]
+			case BitOR:
+				value[j] |= ro.Value[j]
+			case BitXOR:
+				value[j] ^= ro.Value[j]
+			default:
+				return 0, fmt.Errorf("invalid op type: %s", op)
+			}
+		}
+
+		for j := len(ro.Value); j < len(value); j++ {
+			switch string(op) {
+			case BitAND:
+				value[j] &= 0
+			case BitOR:
+				value[j] |= 0
+			case BitXOR:
+				value[j] ^= 0
+			}
+		}
+	}
+
+	bt := engine.NewBatch()
+
+	_, err = s.deleteIfExists(bt, db, destKey)
+	if err != nil {
+		return 0, err
+	}
+
+	no := newStringRow(db, destKey)
+	no.Value = value
+	bt.Set(no.DataKey(), no.DataValue())
+	bt.Set(no.MetaKey(), no.MetaValue())
+
+	fw := &Forward{DB: db, Op: "BitOp", Args: args}
+	return int64(len(no.Value)), s.commit(bt, fw)
 }

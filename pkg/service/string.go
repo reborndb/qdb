@@ -176,11 +176,41 @@ func StrlenCmd(s Session, args [][]byte) (redis.Resp, error) {
 	}
 }
 
+// GETBIT key offset value
+func GetBitCmd(s Session, args [][]byte) (redis.Resp, error) {
+	if x, err := s.Store().GetBit(s.DB(), args); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(x), nil
+	}
+}
+
+// BITCOUNT key [beg end]
+func BitCountCmd(s Session, args [][]byte) (redis.Resp, error) {
+	if x, err := s.Store().BitCount(s.DB(), args); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(x), nil
+	}
+}
+
+// BITOP op destkey key [key ...]
+func BitOpCmd(s Session, args [][]byte) (redis.Resp, error) {
+	if x, err := s.Store().BitOp(s.DB(), args); err != nil {
+		return toRespError(err)
+	} else {
+		return redis.NewInt(x), nil
+	}
+}
+
 func init() {
 	Register("append", AppendCmd, CmdWrite)
+	Register("bitcount", BitCountCmd, CmdReadonly)
+	Register("bitop", BitOpCmd, CmdWrite)
 	Register("decr", DecrCmd, CmdWrite)
 	Register("decrby", DecrByCmd, CmdWrite)
 	Register("get", GetCmd, CmdReadonly)
+	Register("getbit", GetBitCmd, CmdReadonly)
 	Register("getset", GetSetCmd, CmdWrite)
 	Register("incr", IncrCmd, CmdWrite)
 	Register("incrby", IncrByCmd, CmdWrite)
