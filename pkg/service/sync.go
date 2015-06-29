@@ -100,7 +100,7 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 		return err
 	}
 
-	ncpu := runtime.GOMAXPROCS(0)
+	ncpu := runtime.GOMAXPROCS(runtime.NumCPU() / 2)
 	cron := time.Millisecond * time.Duration(100)
 	for {
 		objs, more, err := sp.LoadObjCron(cron, ncpu, 1024)
@@ -505,7 +505,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 		return err
 	}
 
-	ncpu := runtime.GOMAXPROCS(0)
+	ncpu := runtime.GOMAXPROCS(runtime.NumCPU() / 2)
 	errs := make(chan error, ncpu)
 
 	var lock sync.Mutex
