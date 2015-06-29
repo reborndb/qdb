@@ -16,34 +16,25 @@ const (
 	MaxExpireAt = 1e15
 )
 
-func (s *Store) loadStoreRow(db uint32, key []byte, deleteIfExpired bool) (storeRow, error) {
-	// will refactor deleteIfExpired later, because the argument deleteIfExpired is true for nearly all operations
-
+func (s *Store) loadStoreRow(db uint32, key []byte) (storeRow, error) {
 	o, err := loadStoreRow(s, db, key)
 	if err != nil || o == nil {
 		return nil, err
 	}
 
-	if deleteIfExpired && o.IsExpired() {
-		if s.needDeleteIfExpired() {
-			bt := engine.NewBatch()
-			if err := o.deleteObject(s, bt); err != nil {
-				return nil, err
-			}
-			fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
-			return nil, s.commit(bt, fw)
-		} else {
-			// sometimes, we will not delete expired key automatically and let outer use Del command to delete it.
-			// here is very dangerous if you disable delete expired key but do some other write operations except Del
-			// we will return the expired data, for slave redis, we can still get an expired data if it is not deleted from master.
-			return o, nil
+	if s.needDeleteIfExpired() && o.IsExpired() {
+		bt := engine.NewBatch()
+		if err := o.deleteObject(s, bt); err != nil {
+			return nil, err
 		}
+		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
+		return nil, s.commit(bt, fw)
 	}
 	return o, nil
 }
 
 func (s *Store) deleteIfExists(bt *engine.Batch, db uint32, key []byte) (bool, error) {
-	o, err := s.loadStoreRow(db, key, false)
+	o, err := loadStoreRow(s, db, key)
 	if err != nil || o == nil {
 		return false, err
 	}
@@ -95,7 +86,7 @@ func (s *Store) Dump(db uint32, args [][]byte) (interface{}, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStoreRow(db, key, true)
+	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
 		return nil, err
 	} else {
@@ -120,7 +111,7 @@ func (s *Store) Type(db uint32, args [][]byte) (ObjectCode, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStoreRow(db, key, true)
+	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -140,7 +131,7 @@ func (s *Store) Exists(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStoreRow(db, key, true)
+	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
 		return 0, err
 	} else {
@@ -185,7 +176,7 @@ func (s *Store) PTTL(db uint32, args [][]byte) (int64, error) {
 }
 
 func (s *Store) getExpireTTLms(db uint32, key []byte) (int64, error) {
-	o, err := s.loadStoreRow(db, key, true)
+	o, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -198,7 +189,7 @@ func (s *Store) getExpireTTLms(db uint32, key []byte) (int64, error) {
 }
 
 func (s *Store) setExpireAt(db uint32, key []byte, expireat int64) (int64, error) {
-	o, err := s.loadStoreRow(db, key, true)
+	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -231,7 +222,7 @@ func (s *Store) Persist(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStoreRow(db, key, true)
+	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
 		return 0, err
 	}
