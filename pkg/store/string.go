@@ -112,8 +112,8 @@ func (o *stringRow) loadObjectValue(r storeReader) (interface{}, error) {
 	return rdb.String(o.Value), nil
 }
 
-func (s *Store) loadStringRow(db uint32, key []byte, deleteIfExpired bool) (*stringRow, error) {
-	o, err := s.loadStoreRow(db, key, deleteIfExpired)
+func (s *Store) loadStringRow(db uint32, key []byte) (*stringRow, error) {
+	o, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -139,7 +139,7 @@ func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil || o == nil {
 		return nil, err
 	} else {
@@ -166,7 +166,7 @@ func (s *Store) Append(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -256,7 +256,7 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 
 	bt := engine.NewBatch()
 
-	if o, err := s.loadStoreRow(db, key, false); err != nil {
+	if o, err := loadStoreRow(s, db, key); err != nil {
 		return err
 	} else {
 		// handle NX and XX flag
@@ -351,7 +351,7 @@ func (s *Store) GetSet(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +380,7 @@ func (s *Store) GetSet(db uint32, args [][]byte) ([]byte, error) {
 }
 
 func (s *Store) incrInt(db uint32, key []byte, delta int64) (int64, error) {
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -409,7 +409,7 @@ func (s *Store) incrInt(db uint32, key []byte, delta int64) (int64, error) {
 }
 
 func (s *Store) incrFloat(db uint32, key []byte, delta float64) (float64, error) {
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -562,7 +562,7 @@ func (s *Store) SetBit(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -626,7 +626,7 @@ func (s *Store) SetRange(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -697,7 +697,7 @@ func (s *Store) MSetNX(db uint32, args [][]byte) (int64, error) {
 	defer s.release()
 
 	for i := 0; i < len(args); i += 2 {
-		o, err := s.loadStoreRow(db, args[i], true)
+		o, err := s.loadStoreRow(db, args[i])
 		if err != nil || o != nil {
 			return 0, err
 		}
@@ -733,16 +733,9 @@ func (s *Store) MGet(db uint32, args [][]byte) ([][]byte, error) {
 	}
 	defer s.release()
 
-	for _, key := range keys {
-		_, err := s.loadStoreRow(db, key, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	values := make([][]byte, len(keys))
 	for i, key := range keys {
-		o, err := s.loadStringRow(db, key, false)
+		o, err := s.loadStringRow(db, key)
 		if err != nil {
 			return nil, err
 		}
@@ -780,7 +773,7 @@ func (s *Store) GetBit(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -825,7 +818,7 @@ func (s *Store) GetRange(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return nil, err
 	}
@@ -860,7 +853,7 @@ func (s *Store) Strlen(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -904,7 +897,7 @@ func (s *Store) BitCount(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadStringRow(db, key, true)
+	o, err := s.loadStringRow(db, key)
 	if err != nil {
 		return 0, err
 	}
@@ -959,7 +952,7 @@ func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
 	defer s.release()
 
 	var value []byte
-	o, err := s.loadStringRow(db, srcKeys[0], true)
+	o, err := s.loadStringRow(db, srcKeys[0])
 	if err != nil {
 		return 0, err
 	}
@@ -980,7 +973,7 @@ func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
 	}
 
 	for i := 1; i < len(srcKeys); i++ {
-		ro, err := s.loadStringRow(db, srcKeys[i], true)
+		ro, err := s.loadStringRow(db, srcKeys[i])
 		if err != nil {
 			return 0, err
 		}
