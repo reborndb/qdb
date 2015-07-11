@@ -4,6 +4,7 @@
 package service
 
 import (
+	"github.com/reborndb/go/errors2"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/qdb/pkg/store"
 )
@@ -28,9 +29,9 @@ func AppendCmd(s Session, args [][]byte) (redis.Resp, error) {
 
 // SET key value [EX seconds] [PX milliseconds] [NX|XX]
 func SetCmd(s Session, args [][]byte) (redis.Resp, error) {
-	if err := s.Store().Set(s.DB(), args); err != nil && err != store.ErrSetAborted {
+	if err := s.Store().Set(s.DB(), args); err != nil && errors2.ErrorNotEqual(err, store.ErrSetAborted) {
 		return toRespError(err)
-	} else if err == store.ErrSetAborted {
+	} else if errors2.ErrorEqual(err, store.ErrSetAborted) {
 		return redis.NewBulkBytes(nil), nil
 	} else {
 		return redis.NewString("OK"), nil

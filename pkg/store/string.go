@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/juju/errors"
+	"github.com/reborndb/go/errors2"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
@@ -327,7 +328,7 @@ func (s *Store) SetNX(db uint32, args [][]byte) (int64, error) {
 
 	if err != nil {
 		// key exists
-		if err == ErrSetAborted {
+		if errors2.ErrorEqual(err, ErrSetAborted) {
 			return 0, nil
 		} else {
 			return 0, err

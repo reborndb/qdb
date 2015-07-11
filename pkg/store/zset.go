@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/juju/errors"
+	"github.com/reborndb/go/errors2"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
@@ -563,7 +564,7 @@ func (o *zsetRow) travelInRange(s *Store, r *rangeSpec, f func(o *zsetRow) error
 		}
 
 		if r.InRange(o.Score) {
-			if err := f(o); err == errTravelBreak {
+			if err := f(o); errors2.ErrorEqual(err, errTravelBreak) {
 				return nil
 			} else if err != nil {
 				return errors.Trace(err)
@@ -614,7 +615,7 @@ func (o *zsetRow) reverseTravelInRange(s *Store, r *rangeSpec, f func(o *zsetRow
 		}
 
 		if r.InRange(o.Score) {
-			if err := f(o); err == errTravelBreak {
+			if err := f(o); errors2.ErrorEqual(err, errTravelBreak) {
 				return nil
 			} else if err != nil {
 				return errors.Trace(err)
@@ -819,7 +820,7 @@ func (o *zsetRow) travelInLexRange(s *Store, r *lexRangeSpec, f func(o *zsetRow)
 		}
 
 		if r.InRange(o.Member) {
-			if err := f(o); err == errTravelBreak {
+			if err := f(o); errors2.ErrorEqual(err, errTravelBreak) {
 				return nil
 			} else if err != nil {
 				return errors.Trace(err)
@@ -871,7 +872,7 @@ func (o *zsetRow) reverseTravelInLexRange(s *Store, r *lexRangeSpec, f func(o *z
 		}
 
 		if r.InRange(o.Member) {
-			if err := f(o); err == errTravelBreak {
+			if err := f(o); errors2.ErrorEqual(err, errTravelBreak) {
 				return nil
 			} else if err != nil {
 				return errors.Trace(err)
