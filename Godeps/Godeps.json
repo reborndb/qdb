@@ -20,10 +20,6 @@
 			"Rev": "854c423c810880e30b9fecdabb12d54f4a92f9bb"
 		},
 		{
-			"ImportPath": "github.com/google/go-snappy/snappy",
-			"Rev": "eaa750b9bf4dcb7cb20454be850613b66cda3273"
-		},
-		{
 			"ImportPath": "github.com/juju/errors",
 			"Rev": "4567a5e69fd3130ca0d89f69478e7ac025b67452"
 		},
@@ -33,47 +29,55 @@
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/atomic2",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/bytesize",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
+		},
+		{
+			"ImportPath": "github.com/reborndb/go/errors2",
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/gocheck2",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/io/ioutils",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/io/pipe",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/pools",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/redis/rdb",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/redis/resp",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/ring",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/reborndb/go/sync2",
-			"Rev": "d72445c23737e858502aa8ba0e4064ffeba53176"
+			"Rev": "71fc4e683fc26da0078de20fbedb7c7795257f5d"
 		},
 		{
 			"ImportPath": "github.com/syndtr/goleveldb/leveldb",
-			"Rev": "a06509502ca32565bdf74afc1e573050023f261c"
+			"Rev": "315fcfb05d4d46d4354b313d146ef688dda272a9"
+		},
+		{
+			"ImportPath": "github.com/syndtr/gosnappy/snappy",
+			"Rev": "156a073208e131d7d2e212cb749feae7c339e846"
 		},
 		{
 			"ImportPath": "gopkg.in/check.v1",

@@ -12,6 +12,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
 	"github.com/reborndb/go/atomic2"
+	"github.com/reborndb/go/errors2"
 	redis "github.com/reborndb/go/redis/resp"
 	"github.com/reborndb/go/ring"
 	"github.com/reborndb/go/sync2"
@@ -218,7 +219,7 @@ func (h *Handler) run() error {
 
 				log.Infof("new connection: %s", c)
 				if err := c.serve(h); err != nil {
-					if errors.Cause(err) == io.EOF {
+					if errors2.ErrorEqual(err, io.EOF) {
 						log.Infof("connection lost: %s [io.EOF]", c)
 					} else {
 						log.Warningf("connection lost: %s, err = %s", c, err)

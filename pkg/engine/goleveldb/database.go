@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/juju/errors"
+	"github.com/reborndb/go/errors2"
 	"github.com/reborndb/qdb/pkg/engine"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -115,7 +116,7 @@ func (db *GoLevelDB) NewSnapshot() engine.Snapshot {
 
 func (db *GoLevelDB) Get(key []byte) ([]byte, error) {
 	value, err := db.lvdb.Get(key, db.ropt)
-	if err == leveldb.ErrNotFound {
+	if errors2.ErrorEqual(err, leveldb.ErrNotFound) {
 		return nil, nil
 	}
 	return value, errors.Trace(err)

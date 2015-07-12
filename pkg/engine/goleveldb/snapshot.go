@@ -5,6 +5,7 @@ package goleveldb
 
 import (
 	"github.com/juju/errors"
+	"github.com/reborndb/go/errors2"
 	"github.com/reborndb/qdb/pkg/engine"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -37,7 +38,7 @@ func (sp *Snapshot) NewIterator() engine.Iterator {
 
 func (sp *Snapshot) Get(key []byte) ([]byte, error) {
 	value, err := sp.snap.Get(key, sp.ropt)
-	if err == leveldb.ErrNotFound {
+	if errors2.ErrorEqual(err, leveldb.ErrNotFound) {
 		return nil, nil
 	}
 
