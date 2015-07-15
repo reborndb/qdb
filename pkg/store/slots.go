@@ -9,6 +9,7 @@ import (
 	"hash/crc32"
 	"time"
 
+	"github.com/juju/errors"
 	"github.com/ngaut/log"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
@@ -66,14 +67,14 @@ func (s *Store) SlotsInfo(db uint32, args [][]byte) (map[uint32]int64, error) {
 	limit := start + count
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	m := make(map[uint32]int64)
 	for slot := uint32(start); slot < uint32(limit) && slot < MaxSlotNum; slot++ {
 		if key, err := firstKeyUnderSlot(s, db, slot); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		} else if key != nil {
 			m[slot] = 1
 		} else {
@@ -121,7 +122,7 @@ func (s *Store) SlotsRestore(db uint32, args [][]byte) error {
 	}
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
@@ -137,7 +138,7 @@ func (s *Store) SlotsRestore(db uint32, args [][]byte) error {
 		}
 		if err := s.restore(bt, e.DB, e.Key, int64(e.ExpireAt), e.Value); err != nil {
 			log.Warningf("restore object failed, db = %d, key = %v, err = %s", e.DB, e.Key, err)
-			return err
+			return errors.Trace(err)
 		}
 		ms.Set(e.Key)
 	}
@@ -175,7 +176,7 @@ func (s *Store) SlotsMgrtSlot(db uint32, args [][]byte) (int64, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -183,7 +184,7 @@ func (s *Store) SlotsMgrtSlot(db uint32, args [][]byte) (int64, error) {
 
 	key, err := firstKeyUnderSlot(s, db, uint32(slot))
 	if err != nil || key == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return s.migrateOne(addr, timeout, db, key)
 }
@@ -218,7 +219,7 @@ func (s *Store) SlotsMgrtTagSlot(db uint32, args [][]byte) (int64, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -226,7 +227,7 @@ func (s *Store) SlotsMgrtTagSlot(db uint32, args [][]byte) (int64, error) {
 
 	key, err := firstKeyUnderSlot(s, db, uint32(slot))
 	if err != nil || key == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if tag := HashTag(key); len(tag) == len(key) {
@@ -260,7 +261,7 @@ func (s *Store) SlotsMgrtOne(db uint32, args [][]byte) (int64, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -293,7 +294,7 @@ func (s *Store) SlotsMgrtTagOne(db uint32, args [][]byte) (int64, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -310,7 +311,7 @@ func (s *Store) migrateOne(addr string, timeout time.Duration, db uint32, key []
 	n, err := s.migrate(addr, timeout, db, key)
 	if err != nil {
 		log.Errorf("migrate one failed - %s", err)
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return n, nil
 }
@@ -318,12 +319,12 @@ func (s *Store) migrateOne(addr string, timeout time.Duration, db uint32, key []
 func (s *Store) migrateTag(addr string, timeout time.Duration, db uint32, tag []byte) (int64, error) {
 	keys, err := allKeysWithTag(s, db, tag)
 	if err != nil || len(keys) == 0 {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	n, err := s.migrate(addr, timeout, db, keys...)
 	if err != nil {
 		log.Errorf("migrate tag failed - %s", err)
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return n, nil
 }
@@ -335,7 +336,7 @@ func (s *Store) migrate(addr string, timeout time.Duration, db uint32, keys ...[
 	for i, key := range keys {
 		o, bin, err := loadBinEntry(s, db, key)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		if o == nil {
 			log.Debugf("[%d] missing, db = %d, key = %v", i, db, key)
@@ -353,7 +354,7 @@ func (s *Store) migrate(addr string, timeout time.Duration, db uint32, keys ...[
 
 	if len(bins) != 0 {
 		if err := doMigrate(addr, timeout, db, bins); err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	}
 
@@ -364,7 +365,7 @@ func (s *Store) migrate(addr string, timeout time.Duration, db uint32, keys ...[
 	bt := engine.NewBatch()
 	for _, o := range rows {
 		if err := o.deleteObject(s, bt); err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	}
 	fw := &Forward{DB: db, Op: "Del"}

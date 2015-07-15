@@ -35,34 +35,34 @@ type conn struct {
 
 func (c *conn) encodeResp(resp redis.Resp, timeout time.Duration) error {
 	if err := c.sock.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	if err := redis.Encode(c.w, resp); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	return errors.Trace(c.w.Flush())
 }
 
 func (c *conn) decodeResp(timeout time.Duration) (redis.Resp, error) {
 	if err := c.sock.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	return redis.Decode(c.r)
 }
 
 func (c *conn) Do(cmd *redis.Array, timeout time.Duration) (redis.Resp, error) {
 	if c.err != nil {
-		return nil, c.err
+		return nil, errors.Trace(c.err)
 	}
 	if err := c.encodeResp(cmd, timeout); err != nil {
 		c.err = err
 		log.Warningf("encode resp failed - %s", err)
-		return nil, c.err
+		return nil, errors.Trace(c.err)
 	}
 	if rsp, err := c.decodeResp(timeout); err != nil {
 		c.err = err
 		log.Warningf("decode resp failed - %s", err)
-		return nil, c.err
+		return nil, errors.Trace(c.err)
 	} else {
 		c.last = time.Now()
 		return rsp, nil
@@ -71,7 +71,7 @@ func (c *conn) Do(cmd *redis.Array, timeout time.Duration) (redis.Resp, error) {
 
 func (c *conn) DoMustOK(cmd *redis.Array, timeout time.Duration) error {
 	if rsp, err := c.Do(cmd, timeout); err != nil {
-		return err
+		return errors.Trace(err)
 	} else {
 		s, ok := rsp.(*redis.String)
 		if ok {
@@ -82,7 +82,7 @@ func (c *conn) DoMustOK(cmd *redis.Array, timeout time.Duration) error {
 		} else {
 			c.err = errors.Errorf("not string response, got %v", rsp.Type())
 		}
-		return c.err
+		return errors.Trace(c.err)
 	}
 }
 
@@ -162,7 +162,7 @@ func doMigrate(addr string, timeout time.Duration, db uint32, bins []*rdb.BinEnt
 	c, err := getSockConn(addr, timeout)
 	if err != nil {
 		log.Warningf("connect to %s failed, timeout = %d, err = %s", addr, timeout, err)
-		return err
+		return errors.Trace(err)
 	}
 	defer putSockConn(addr, c)
 
@@ -172,7 +172,7 @@ func doMigrate(addr string, timeout time.Duration, db uint32, bins []*rdb.BinEnt
 
 	if err := c.DoMustOK(cmd1, timeout); err != nil {
 		log.Warningf("command select failed, addr = %s, db = %d, err = %s", addr, db, err)
-		return err
+		return errors.Trace(err)
 	}
 	log.Debugf("command select ok, addr = %s, db = %d, err = %s", addr, db, err)
 
@@ -194,7 +194,7 @@ func doMigrate(addr string, timeout time.Duration, db uint32, bins []*rdb.BinEnt
 
 	if err := c.DoMustOK(cmd2, timeout); err != nil {
 		log.Warningf("command restore failed, addr = %s, db = %d, len(bins) = %d, err = %s", addr, db, len(bins), err)
-		return err
+		return errors.Trace(err)
 	} else {
 		log.Debugf("command restore ok, addr = %s, db = %d, len(bins) = %d", addr, db, len(bins))
 		return nil

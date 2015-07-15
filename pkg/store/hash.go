@@ -83,15 +83,15 @@ func (o *hashRow) loadObjectValue(r storeReader) (interface{}, error) {
 		}
 		sfx := key[len(pfx):]
 		if err := o.ParseDataKeySuffix(sfx); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if err := o.ParseDataValue(it.Value()); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		hash = append(hash, &rdb.HashElement{Field: o.Field, Value: o.Value})
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if o.Size == 0 || int64(len(hash)) != o.Size {
 		return nil, errors.Errorf("len(hash) = %d, hash.size = %d", len(hash), o.Size)
@@ -110,7 +110,7 @@ func (o *hashRow) getAllFields(r storeReader) ([][]byte, error) {
 		}
 		sfx := key[len(pfx):]
 		if err := o.ParseDataKeySuffix(sfx); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if len(o.Field) == 0 {
 			return nil, errors.Errorf("len(field) = %d", len(o.Field))
@@ -118,7 +118,7 @@ func (o *hashRow) getAllFields(r storeReader) ([][]byte, error) {
 		fields = append(fields, o.Field)
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if len(fields) == 0 || int64(len(fields)) != o.Size {
 		return nil, errors.Errorf("len(fields) = %d, hash.size = %d", len(fields), o.Size)
@@ -136,7 +136,7 @@ func (o *hashRow) getAllValues(r storeReader) ([][]byte, error) {
 			break
 		}
 		if err := o.ParseDataValue(it.Value()); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if len(o.Value) == 0 {
 			return nil, errors.Errorf("len(value) = %d", len(o.Value))
@@ -144,7 +144,7 @@ func (o *hashRow) getAllValues(r storeReader) ([][]byte, error) {
 		values = append(values, o.Value)
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if len(values) == 0 || int64(len(values)) != o.Size {
 		return nil, errors.Errorf("len(values) = %d, hash.size = %d", len(values), o.Size)
@@ -155,7 +155,7 @@ func (o *hashRow) getAllValues(r storeReader) ([][]byte, error) {
 func (s *Store) loadHashRow(db uint32, key []byte) (*hashRow, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else if o != nil {
 		x, ok := o.(*hashRow)
 		if ok {
@@ -175,18 +175,18 @@ func (s *Store) HGetAll(db uint32, args [][]byte) ([][]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	x, err := o.loadObjectValue(s)
 	if err != nil || x == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	eles := x.(rdb.Hash)
@@ -207,13 +207,13 @@ func (s *Store) HDel(db uint32, args [][]byte) (int64, error) {
 	fields := args[1:]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	ms := &markSet{}
@@ -222,7 +222,7 @@ func (s *Store) HDel(db uint32, args [][]byte) (int64, error) {
 		if !ms.Has(o.Field) {
 			exists, err := o.TestDataValue(s)
 			if err != nil {
-				return 0, err
+				return 0, errors.Trace(err)
 			}
 			if exists {
 				bt.Del(o.DataKey())
@@ -253,19 +253,19 @@ func (s *Store) HExists(db uint32, args [][]byte) (int64, error) {
 	field := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	o.Field = field
 	exists, err := o.TestDataValue(s)
 	if err != nil || !exists {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else {
 		return 1, nil
 	}
@@ -281,19 +281,19 @@ func (s *Store) HGet(db uint32, args [][]byte) ([]byte, error) {
 	field := args[1]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	o.Field = field
 	exists, err := o.LoadDataValue(s)
 	if err != nil || !exists {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		return o.Value, nil
 	}
@@ -308,13 +308,13 @@ func (s *Store) HLen(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return o.Size, nil
 }
@@ -333,13 +333,13 @@ func (s *Store) HIncrBy(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var exists bool = false
@@ -347,7 +347,7 @@ func (s *Store) HIncrBy(db uint32, args [][]byte) (int64, error) {
 		o.Field = field
 		exists, err = o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	} else {
 		o = newHashRow(db, key)
@@ -358,7 +358,7 @@ func (s *Store) HIncrBy(db uint32, args [][]byte) (int64, error) {
 	if exists {
 		v, err := ParseInt(o.Value)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		delta += v
 	} else {
@@ -385,13 +385,13 @@ func (s *Store) HIncrByFloat(db uint32, args [][]byte) (float64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var exists bool = false
@@ -399,7 +399,7 @@ func (s *Store) HIncrByFloat(db uint32, args [][]byte) (float64, error) {
 		o.Field = field
 		exists, err = o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	} else {
 		o = newHashRow(db, key)
@@ -410,7 +410,7 @@ func (s *Store) HIncrByFloat(db uint32, args [][]byte) (float64, error) {
 	if exists {
 		v, err := ParseFloat(o.Value)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		delta += v
 	} else {
@@ -419,7 +419,7 @@ func (s *Store) HIncrByFloat(db uint32, args [][]byte) (float64, error) {
 	}
 
 	if math.IsNaN(delta) || math.IsInf(delta, 0) {
-		return 0, errors.Errorf("increment would produce NaN or Infinity")
+		return 0, errors.New("increment would produce NaN or Infinity")
 	}
 
 	o.Value = FormatFloat(delta)
@@ -437,13 +437,13 @@ func (s *Store) HKeys(db uint32, args [][]byte) ([][]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	return o.getAllFields(s)
 }
@@ -457,13 +457,13 @@ func (s *Store) HVals(db uint32, args [][]byte) ([][]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	return o.getAllValues(s)
 }
@@ -479,13 +479,13 @@ func (s *Store) HSet(db uint32, args [][]byte) (int64, error) {
 	value := args[2]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var exists bool = false
@@ -493,7 +493,7 @@ func (s *Store) HSet(db uint32, args [][]byte) (int64, error) {
 		o.Field = field
 		exists, err = o.TestDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	} else {
 		o = newHashRow(db, key)
@@ -527,13 +527,13 @@ func (s *Store) HSetNX(db uint32, args [][]byte) (int64, error) {
 	value := args[2]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var exists bool = false
@@ -541,7 +541,7 @@ func (s *Store) HSetNX(db uint32, args [][]byte) (int64, error) {
 		o.Field = field
 		exists, err = o.TestDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		if exists {
 			return 0, nil
@@ -577,13 +577,13 @@ func (s *Store) HMSet(db uint32, args [][]byte) error {
 	}
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	if o == nil {
@@ -596,7 +596,7 @@ func (s *Store) HMSet(db uint32, args [][]byte) error {
 		o.Field, o.Value = e.Field, e.Value
 		exists, err := o.TestDataValue(s)
 		if err != nil {
-			return err
+			return errors.Trace(err)
 		}
 		if !exists {
 			ms.Set(o.Field)
@@ -625,13 +625,13 @@ func (s *Store) HMGet(db uint32, args [][]byte) ([][]byte, error) {
 	var values = make([][]byte, len(fields))
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadHashRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if o != nil {
@@ -639,7 +639,7 @@ func (s *Store) HMGet(db uint32, args [][]byte) ([][]byte, error) {
 			o.Field = field
 			exists, err := o.LoadDataValue(s)
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 			if exists {
 				values[i] = o.Value

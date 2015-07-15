@@ -145,7 +145,7 @@ func testCreateConnPool(port int) *testConnPool {
 	f := func() (pools.Resource, error) {
 		nc, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 		if err != nil {
-			return nil, err
+			return nil, jerrors.Trace(err)
 		}
 		return &testPoolConn{Conn: nc, closed: false, p: nil}, nil
 	}

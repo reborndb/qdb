@@ -36,7 +36,7 @@ func (r *BufReader) ReadByte() (byte, error) {
 func (r *BufReader) ReadBytes(n int) ([]byte, error) {
 	p := make([]byte, n)
 	_, err := ioutils.ReadFull(r.r, p)
-	return p, err
+	return p, errors.Trace(err)
 }
 
 func (r *BufReader) ReadVarint() (int64, error) {
@@ -52,7 +52,7 @@ func (r *BufReader) ReadUvarint() (uint64, error) {
 func (r *BufReader) ReadVarbytes() ([]byte, error) {
 	n, err := r.ReadUvarint()
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if n < 0 || n > maxVarbytesLen {
 		return nil, errors.Trace(ErrVarbytesLen)
@@ -65,7 +65,7 @@ func (r *BufReader) ReadVarbytes() ([]byte, error) {
 func (r *BufReader) ReadFloat64() (float64, error) {
 	p, err := r.ReadBytes(8)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	bits := binary.BigEndian.Uint64(p)
 	return uint64ToFloat64(bits), nil
@@ -74,7 +74,7 @@ func (r *BufReader) ReadFloat64() (float64, error) {
 func (r *BufReader) ReadInt64() (int64, error) {
 	p, err := r.ReadBytes(8)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return int64(binary.BigEndian.Uint64(p)), nil
 }
@@ -82,7 +82,7 @@ func (r *BufReader) ReadInt64() (int64, error) {
 func (r *BufReader) ReadUint64() (uint64, error) {
 	p, err := r.ReadBytes(8)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return uint64(binary.BigEndian.Uint64(p)), nil
 }
@@ -110,31 +110,31 @@ func (w *BufWriter) WriteByte(b byte) error {
 
 func (w *BufWriter) WriteBytes(p []byte) error {
 	_, err := ioutils.WriteFull(w.w, p)
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) WriteVarint(v int64) error {
 	p := make([]byte, binary.MaxVarintLen64)
 	n := binary.PutVarint(p, v)
 	_, err := ioutils.WriteFull(w.w, p[:n])
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) WriteUvarint(v uint64) error {
 	p := make([]byte, binary.MaxVarintLen64)
 	n := binary.PutUvarint(p, v)
 	_, err := ioutils.WriteFull(w.w, p[:n])
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) WriteVarbytes(p []byte) error {
 	if n := uint64(len(p)); n > maxVarbytesLen {
 		return errors.Trace(ErrVarbytesLen)
 	} else if err := w.WriteUvarint(n); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	_, err := ioutils.WriteFull(w.w, p)
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) WriteFloat64(f float64) error {
@@ -142,21 +142,21 @@ func (w *BufWriter) WriteFloat64(f float64) error {
 	bits := float64ToUint64(f)
 	binary.BigEndian.PutUint64(p, bits)
 	_, err := ioutils.WriteFull(w.w, p)
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) WriteInt64(s int64) error {
 	p := make([]byte, 8)
 	binary.BigEndian.PutUint64(p, uint64(s))
 	_, err := ioutils.WriteFull(w.w, p)
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) WriteUint64(s uint64) error {
 	p := make([]byte, 8)
 	binary.BigEndian.PutUint64(p, uint64(s))
 	_, err := ioutils.WriteFull(w.w, p)
-	return err
+	return errors.Trace(err)
 }
 
 func (w *BufWriter) Len() int {

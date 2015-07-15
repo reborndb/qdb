@@ -118,7 +118,7 @@ func (s *snapshotReader) cleanup() {
 
 func (s *StoreSnapshot) LoadObjCron(wait time.Duration, ncpu, step int) ([]*rdb.ObjEntry, bool, error) {
 	if err := s.acquire(); err != nil {
-		return nil, false, err
+		return nil, false, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -149,7 +149,7 @@ func (s *StoreSnapshot) LoadObjCron(wait time.Duration, ncpu, step int) ([]*rdb.
 				rets.more = true
 			}
 			if rets.err == nil && err != nil {
-				rets.err = err
+				rets.err = errors.Trace(err)
 			}
 			rets.Unlock()
 		}()
@@ -203,7 +203,7 @@ func (s *StoreSnapshot) loadObjCron(ctrl <-chan int, exit chan<- int) (objs []*r
 		}
 		metaKey, err := s.scanMetaKey()
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Trace(err)
 		}
 		if metaKey == nil {
 			return objs, more, nil
@@ -212,11 +212,11 @@ func (s *StoreSnapshot) loadObjCron(ctrl <-chan int, exit chan<- int) (objs []*r
 
 		db, key, err := DecodeMetaKey(metaKey)
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Trace(err)
 		}
 		_, obj, err := loadObjEntry(r, db, key)
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Trace(err)
 		}
 		if obj != nil {
 			objs = append(objs, obj)
@@ -236,7 +236,7 @@ func (s *StoreSnapshot) loadRowCron(ctrl <-chan int, exit chan<- int) (rows []st
 		}
 		metaKey, err := s.scanMetaKey()
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Trace(err)
 		}
 		if metaKey == nil {
 			return rows, more, nil
@@ -245,11 +245,11 @@ func (s *StoreSnapshot) loadRowCron(ctrl <-chan int, exit chan<- int) (rows []st
 
 		db, key, err := DecodeMetaKey(metaKey)
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Trace(err)
 		}
 		o, err := loadStoreRow(r, db, key)
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Trace(err)
 		}
 		if o != nil {
 			rows = append(rows, o)

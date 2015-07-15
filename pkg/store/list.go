@@ -79,7 +79,7 @@ func (o *listRow) loadObjectValue(r storeReader) (interface{}, error) {
 	for o.Index = o.Lindex; o.Index < o.Rindex; o.Index++ {
 		_, err := o.LoadDataValue(r)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		list = append(list, o.Value)
 	}
@@ -89,7 +89,7 @@ func (o *listRow) loadObjectValue(r storeReader) (interface{}, error) {
 func (s *Store) loadListRow(db uint32, key []byte) (*listRow, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else if o != nil {
 		x, ok := o.(*listRow)
 		if ok {
@@ -114,14 +114,14 @@ func (s *Store) LIndex(db uint32, args [][]byte) ([]byte, error) {
 
 	o, err := s.loadListRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	o.Index = adjustIndex(index, o.Lindex, o.Rindex)
 	if o.Index >= o.Lindex && o.Index < o.Rindex {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		return o.Value, nil
 	} else {
@@ -138,13 +138,13 @@ func (s *Store) LLen(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadListRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return o.Rindex - o.Lindex, nil
 }
@@ -166,13 +166,13 @@ func (s *Store) LRange(db uint32, args [][]byte) ([][]byte, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadListRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	beg = maxIntValue(adjustIndex(beg, o.Lindex, o.Rindex), o.Lindex)
@@ -182,7 +182,7 @@ func (s *Store) LRange(db uint32, args [][]byte) ([][]byte, error) {
 		for o.Index = beg; o.Index <= end; o.Index++ {
 			_, err := o.LoadDataValue(s)
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 			values = append(values, o.Value)
 		}
@@ -206,13 +206,13 @@ func (s *Store) LSet(db uint32, args [][]byte) error {
 	value := args[2]
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadListRow(db, key)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	if o == nil {
@@ -248,13 +248,13 @@ func (s *Store) LTrim(db uint32, args [][]byte) error {
 	}
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadListRow(db, key)
 	if err != nil || o == nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	beg = maxIntValue(adjustIndex(beg, o.Lindex, o.Rindex), o.Lindex)
@@ -292,18 +292,18 @@ func (s *Store) LPop(db uint32, args [][]byte) ([]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadListRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	o.Index = o.Lindex
 	if _, err := o.LoadDataValue(s); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		bt := engine.NewBatch()
 		bt.Del(o.DataKey())
@@ -326,18 +326,18 @@ func (s *Store) RPop(db uint32, args [][]byte) ([]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadListRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	o.Index = o.Rindex - 1
 	if _, err := o.LoadDataValue(s); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		bt := engine.NewBatch()
 		bt.Del(o.DataKey())
@@ -361,7 +361,7 @@ func (s *Store) LPush(db uint32, args [][]byte) (int64, error) {
 	values := args[1:]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -378,7 +378,7 @@ func (s *Store) LPushX(db uint32, args [][]byte) (int64, error) {
 	value := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -395,7 +395,7 @@ func (s *Store) RPush(db uint32, args [][]byte) (int64, error) {
 	values := args[1:]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -412,7 +412,7 @@ func (s *Store) RPushX(db uint32, args [][]byte) (int64, error) {
 	value := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -422,7 +422,7 @@ func (s *Store) RPushX(db uint32, args [][]byte) (int64, error) {
 func (s *Store) lpush(db uint32, key []byte, create bool, values ...[]byte) (int64, error) {
 	o, err := s.loadListRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if o == nil {
@@ -447,7 +447,7 @@ func (s *Store) lpush(db uint32, key []byte, create bool, values ...[]byte) (int
 func (s *Store) rpush(db uint32, key []byte, create bool, values ...[]byte) (int64, error) {
 	o, err := s.loadListRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if o == nil {

@@ -120,7 +120,7 @@ func loadStoreRow(r storeReader, db uint32, key []byte) (storeRow, error) {
 	metaKey := EncodeMetaKey(db, key)
 	p, err := r.getRowValue(metaKey)
 	if err != nil || p == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if len(p) == 0 {
 		return nil, errors.Trace(ErrObjectCode)
@@ -219,7 +219,7 @@ func (o *storeRowHelper) ParseDataValue(p []byte) (err error) {
 func (o *storeRowHelper) LoadDataValue(r storeReader) (bool, error) {
 	p, err := r.getRowValue(o.DataKey())
 	if err != nil || p == nil {
-		return false, err
+		return false, errors.Trace(err)
 	}
 	return true, o.ParseDataValue(p)
 }
@@ -227,7 +227,7 @@ func (o *storeRowHelper) LoadDataValue(r storeReader) (bool, error) {
 func (o *storeRowHelper) TestDataValue(r storeReader) (bool, error) {
 	p, err := r.getRowValue(o.DataKey())
 	if err != nil || p == nil {
-		return false, err
+		return false, errors.Trace(err)
 	}
 	return true, nil
 }
@@ -316,7 +316,7 @@ func encodeRawBytes(w *BufWriter, refs ...interface{}) {
 
 func decodeRawBytes(r *BufReader, err error, refs ...interface{}) error {
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	if len(refs) == 0 {
 		if r.Len() != 0 {
@@ -328,56 +328,56 @@ func decodeRawBytes(r *BufReader, err error, refs ...interface{}) error {
 		switch x := i.(type) {
 		case byte:
 			if v, err := r.ReadByte(); err != nil {
-				return err
+				return errors.Trace(err)
 			} else if v != x {
 				return errors.Errorf("read byte %d, expect %d", v, x)
 			}
 		case ObjectCode:
 			if v, err := r.ReadByte(); err != nil {
-				return err
+				return errors.Trace(err)
 			} else if v != byte(x) {
 				return errors.Errorf("read code [%s], expect [%s]", ObjectCode(v), x)
 			}
 		case *[]byte:
 			p, err := r.ReadVarbytes()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = p
 		case *uint32:
 			v, err := r.ReadUvarint()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = uint32(v)
 		case *uint64:
 			v, err := r.ReadUvarint()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = v
 		case *int64:
 			v, err := r.ReadVarint()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = v
 		case *float64:
 			v, err := r.ReadFloat64()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = v
 		case *scoreInt:
 			v, err := r.ReadUint64()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = scoreInt(v)
 		case *byte:
 			v, err := r.ReadByte()
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			*x = v
 		default:

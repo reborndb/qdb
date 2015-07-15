@@ -6,6 +6,7 @@ package store
 import (
 	"bytes"
 
+	"github.com/juju/errors"
 	"github.com/reborndb/go/redis/rdb"
 	"github.com/reborndb/qdb/pkg/engine"
 )
@@ -24,13 +25,13 @@ type storeReader interface {
 func loadObjEntry(r storeReader, db uint32, key []byte) (storeRow, *rdb.ObjEntry, error) {
 	o, err := loadStoreRow(r, db, key)
 	if err != nil || o == nil {
-		return o, nil, err
+		return o, nil, errors.Trace(err)
 	}
 	if o.IsExpired() {
 		return o, nil, nil
 	}
 	if val, err := o.loadObjectValue(r); err != nil {
-		return o, nil, err
+		return o, nil, errors.Trace(err)
 	} else {
 		obj := &rdb.ObjEntry{
 			DB:       db,
@@ -45,10 +46,10 @@ func loadObjEntry(r storeReader, db uint32, key []byte) (storeRow, *rdb.ObjEntry
 func loadBinEntry(r storeReader, db uint32, key []byte) (storeRow, *rdb.BinEntry, error) {
 	o, obj, err := loadObjEntry(r, db, key)
 	if err != nil || obj == nil {
-		return o, nil, err
+		return o, nil, errors.Trace(err)
 	}
 	if bin, err := obj.BinEntry(); err != nil {
-		return o, nil, err
+		return o, nil, errors.Trace(err)
 	} else {
 		return o, bin, nil
 	}
@@ -65,7 +66,7 @@ func firstKeyUnderSlot(r storeReader, db uint32, slot uint32) ([]byte, error) {
 		}
 		_, key, err := DecodeMetaKey(metaKey)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		return key, it.Error()
 	}
@@ -84,12 +85,12 @@ func allKeysWithTag(r storeReader, db uint32, tag []byte) ([][]byte, error) {
 		}
 		_, key, err := DecodeMetaKey(metaKey)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		keys = append(keys, key)
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	return keys, nil
 }
