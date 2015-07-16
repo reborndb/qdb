@@ -132,6 +132,20 @@ func (s *Store) loadStringRow(db uint32, key []byte) (*stringRow, error) {
 	return nil, errors.Trace(ErrNotString)
 }
 
+func (s *Store) get(db uint32, key []byte) ([]byte, error) {
+	o, err := s.loadStringRow(db, key)
+	if err != nil || o == nil {
+		return nil, err
+	}
+
+	_, err = o.LoadDataValue(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return o.Value, nil
+}
+
 // GET key
 func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 	if len(args) != 1 {
@@ -149,6 +163,9 @@ func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 		s.releaseRead()
 		return nil, err
 	}
+
+	// if the key has been expired, we should delete it
+	// release read lock and try to get write lock
 	if expired {
 		s.releaseRead()
 
@@ -157,10 +174,10 @@ func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 		}
 		defer s.release()
 
-		return nil, errors.Trace(s.delete(db, key, o))
+		return s.get(db, key)
 	}
 
-	s.releaseRead()
+	defer s.releaseRead()
 
 	x, ok := o.(*stringRow)
 	if !ok {

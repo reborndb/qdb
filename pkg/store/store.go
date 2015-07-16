@@ -37,8 +37,6 @@ func New(db engine.Database) *Store {
 	s.preCommitHandlers = make([]ForwardHandler, 0)
 	s.postCommitHandlers = make([]ForwardHandler, 0)
 
-	s.deleteIfExpired.Set(1)
-
 	return s
 }
 
