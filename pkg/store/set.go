@@ -126,17 +126,23 @@ func (o *setRow) getMembers(r storeReader, count int64) ([][]byte, error) {
 }
 
 func (s *Store) loadSetRow(db uint32, key []byte) (*setRow, error) {
-	o, err := s.loadStoreRow(db, key)
+	o, expired, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return nil, err
-	} else if o != nil {
-		x, ok := o.(*setRow)
-		if ok {
-			return x, nil
-		}
-		return nil, errors.Trace(ErrNotSet)
 	}
-	return nil, nil
+	if o == nil {
+		return nil, nil
+	}
+	if expired {
+		return nil, errors.Trace(s.delete(db, key, o))
+	}
+
+	x, ok := o.(*setRow)
+	if ok {
+		return x, nil
+	}
+
+	return nil, errors.Trace(ErrNotSet)
 }
 
 // SADD key member [member ...]

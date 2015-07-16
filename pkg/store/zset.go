@@ -197,17 +197,22 @@ func (o *zsetRow) loadObjectValue(r storeReader) (interface{}, error) {
 }
 
 func (s *Store) loadZSetRow(db uint32, key []byte) (*zsetRow, error) {
-	o, err := s.loadStoreRow(db, key)
+	o, expired, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return nil, err
-	} else if o != nil {
-		x, ok := o.(*zsetRow)
-		if ok {
-			return x, nil
-		}
-		return nil, errors.Trace(ErrNotZSet)
 	}
-	return nil, nil
+	if o == nil {
+		return nil, nil
+	}
+	if expired {
+		return nil, s.delete(db, key, o)
+	}
+
+	x, ok := o.(*zsetRow)
+	if ok {
+		return x, nil
+	}
+	return nil, errors.Trace(ErrNotZSet)
 }
 
 // ZGETALL key
