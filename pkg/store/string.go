@@ -114,17 +114,36 @@ func (o *stringRow) loadObjectValue(r storeReader) (interface{}, error) {
 }
 
 func (s *Store) loadStringRow(db uint32, key []byte) (*stringRow, error) {
-	o, err := s.loadStoreRow(db, key)
+	o, expired, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return nil, err
-	} else if o != nil {
-		x, ok := o.(*stringRow)
-		if ok {
-			return x, nil
-		}
-		return nil, errors.Trace(ErrNotString)
 	}
-	return nil, nil
+	if o == nil {
+		return nil, nil
+	}
+	if expired {
+		return nil, errors.Trace(s.delete(db, key, o))
+	}
+
+	x, ok := o.(*stringRow)
+	if ok {
+		return x, nil
+	}
+	return nil, errors.Trace(ErrNotString)
+}
+
+func (s *Store) get(db uint32, key []byte) ([]byte, error) {
+	o, err := s.loadStringRow(db, key)
+	if err != nil || o == nil {
+		return nil, err
+	}
+
+	_, err = o.LoadDataValue(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return o.Value, nil
 }
 
 // GET key
@@ -135,22 +154,42 @@ func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
 
-	o, err := s.loadStringRow(db, key)
+	o, expired, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
+		s.releaseRead()
 		return nil, err
-	} else {
-		_, err := o.LoadDataValue(s)
-		if err != nil {
+	}
+
+	// if the key has been expired, we should delete it
+	// release read lock and try to get write lock
+	if expired {
+		s.releaseRead()
+
+		if err := s.acquire(); err != nil {
 			return nil, err
 		}
+		defer s.release()
 
-		return o.Value, nil
+		return s.get(db, key)
 	}
+
+	defer s.releaseRead()
+
+	x, ok := o.(*stringRow)
+	if !ok {
+		return nil, errors.Trace(ErrNotString)
+	}
+
+	_, err = x.LoadDataValue(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return x.Value, nil
 }
 
 // APPEND key value
@@ -698,10 +737,25 @@ func (s *Store) MSetNX(db uint32, args [][]byte) (int64, error) {
 	defer s.release()
 
 	for i := 0; i < len(args); i += 2 {
-		o, err := s.loadStoreRow(db, args[i])
-		if err != nil || o != nil {
+		key := args[i]
+		o, expired, err := s.loadStoreRow(db, key)
+		if err != nil {
 			return 0, err
 		}
+
+		if o == nil {
+			continue
+		}
+
+		if expired {
+			err = s.delete(db, key, o)
+			if err != nil {
+				return 0, err
+			}
+			continue
+		}
+
+		return 0, nil
 	}
 
 	ms := &markSet{}

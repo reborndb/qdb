@@ -18,7 +18,7 @@ var (
 )
 
 type Store struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 	db engine.Database
 
 	splist list.List
@@ -36,8 +36,6 @@ func New(db engine.Database) *Store {
 
 	s.preCommitHandlers = make([]ForwardHandler, 0)
 	s.postCommitHandlers = make([]ForwardHandler, 0)
-
-	s.deleteIfExpired.Set(1)
 
 	return s
 }
@@ -61,6 +59,19 @@ func (s *Store) acquire() error {
 
 func (s *Store) release() {
 	s.mu.Unlock()
+}
+
+func (s *Store) acquireRead() error {
+	s.mu.RLock()
+	if s.db != nil {
+		return nil
+	}
+	s.mu.RUnlock()
+	return errors.Trace(ErrClosed)
+}
+
+func (s *Store) releaseRead() {
+	s.mu.RUnlock()
 }
 
 func (s *Store) commit(bt *engine.Batch, fw *Forward) error {

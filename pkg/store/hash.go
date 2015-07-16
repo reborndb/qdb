@@ -153,17 +153,22 @@ func (o *hashRow) getAllValues(r storeReader) ([][]byte, error) {
 }
 
 func (s *Store) loadHashRow(db uint32, key []byte) (*hashRow, error) {
-	o, err := s.loadStoreRow(db, key)
+	o, expired, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return nil, err
-	} else if o != nil {
-		x, ok := o.(*hashRow)
-		if ok {
-			return x, nil
-		}
-		return nil, errors.Trace(ErrNotHash)
 	}
-	return nil, nil
+	if o == nil {
+		return nil, nil
+	}
+	if expired {
+		return nil, errors.Trace(s.delete(db, key, o))
+	}
+
+	x, ok := o.(*hashRow)
+	if ok {
+		return x, nil
+	}
+	return nil, errors.Trace(ErrNotHash)
 }
 
 // HGETALL key

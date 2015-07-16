@@ -87,17 +87,22 @@ func (o *listRow) loadObjectValue(r storeReader) (interface{}, error) {
 }
 
 func (s *Store) loadListRow(db uint32, key []byte) (*listRow, error) {
-	o, err := s.loadStoreRow(db, key)
+	o, expired, err := s.loadStoreRow(db, key)
 	if err != nil {
 		return nil, err
-	} else if o != nil {
-		x, ok := o.(*listRow)
-		if ok {
-			return x, nil
-		}
-		return nil, errors.Trace(ErrNotList)
 	}
-	return nil, nil
+	if o == nil {
+		return nil, nil
+	}
+	if expired {
+		return nil, errors.Trace(s.delete(db, key, o))
+	}
+
+	x, ok := o.(*listRow)
+	if ok {
+		return x, nil
+	}
+	return nil, errors.Trace(ErrNotList)
 }
 
 // LINDEX key index
