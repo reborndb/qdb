@@ -86,8 +86,8 @@ func (o *listRow) loadObjectValue(r storeReader) (interface{}, error) {
 	return rdb.List(list), nil
 }
 
-func (s *Store) loadListRow(db uint32, key []byte) (*listRow, error) {
-	o, err := s.loadStoreRow(db, key)
+func (s *Store) loadListRow(db uint32, key []byte, delExp bool) (*listRow, error) {
+	o, err := s.loadStoreRow(db, key, delExp)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -112,7 +112,7 @@ func (s *Store) LIndex(db uint32, args [][]byte) ([]byte, error) {
 		return nil, errArguments("parse args failed - %s", err)
 	}
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (s *Store) LLen(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -170,7 +170,7 @@ func (s *Store) LRange(db uint32, args [][]byte) ([][]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (s *Store) LSet(db uint32, args [][]byte) error {
 	}
 	defer s.release()
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, true)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (s *Store) LTrim(db uint32, args [][]byte) error {
 	}
 	defer s.release()
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, true)
 	if err != nil || o == nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (s *Store) LPop(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -330,7 +330,7 @@ func (s *Store) RPop(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -420,7 +420,7 @@ func (s *Store) RPushX(db uint32, args [][]byte) (int64, error) {
 }
 
 func (s *Store) lpush(db uint32, key []byte, create bool, values ...[]byte) (int64, error) {
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -445,7 +445,7 @@ func (s *Store) lpush(db uint32, key []byte, create bool, values ...[]byte) (int
 }
 
 func (s *Store) rpush(db uint32, key []byte, create bool, values ...[]byte) (int64, error) {
-	o, err := s.loadListRow(db, key)
+	o, err := s.loadListRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}

@@ -152,8 +152,8 @@ func (o *hashRow) getAllValues(r storeReader) ([][]byte, error) {
 	return values, nil
 }
 
-func (s *Store) loadHashRow(db uint32, key []byte) (*hashRow, error) {
-	o, err := s.loadStoreRow(db, key)
+func (s *Store) loadHashRow(db uint32, key []byte, delExp bool) (*hashRow, error) {
+	o, err := s.loadStoreRow(db, key, delExp)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -179,7 +179,7 @@ func (s *Store) HGetAll(db uint32, args [][]byte) ([][]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (s *Store) HDel(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -257,7 +257,7 @@ func (s *Store) HExists(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -285,7 +285,7 @@ func (s *Store) HGet(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (s *Store) HLen(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -337,7 +337,7 @@ func (s *Store) HIncrBy(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -389,7 +389,7 @@ func (s *Store) HIncrByFloat(db uint32, args [][]byte) (float64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -441,7 +441,7 @@ func (s *Store) HKeys(db uint32, args [][]byte) ([][]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -461,7 +461,7 @@ func (s *Store) HVals(db uint32, args [][]byte) ([][]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -483,7 +483,7 @@ func (s *Store) HSet(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -531,7 +531,7 @@ func (s *Store) HSetNX(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -581,7 +581,7 @@ func (s *Store) HMSet(db uint32, args [][]byte) error {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, true)
 	if err != nil {
 		return err
 	}
@@ -629,7 +629,7 @@ func (s *Store) HMGet(db uint32, args [][]byte) ([][]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadHashRow(db, key)
+	o, err := s.loadHashRow(db, key, false)
 	if err != nil {
 		return nil, err
 	}
