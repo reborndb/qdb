@@ -135,10 +135,10 @@ func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStringRow(db, key, false)
 	if err != nil || o == nil {
@@ -730,10 +730,10 @@ func (s *Store) MGet(db uint32, args [][]byte) ([][]byte, error) {
 
 	keys := args
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	values := make([][]byte, len(keys))
 	for i, key := range keys {
@@ -770,10 +770,10 @@ func (s *Store) GetBit(db uint32, args [][]byte) (int64, error) {
 		return 0, errArguments("bit offset is not an integer or out of range, offset=%d", offset)
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStringRow(db, key, false)
 	if err != nil || o == nil {
@@ -815,10 +815,10 @@ func (s *Store) GetRange(db uint32, args [][]byte) ([]byte, error) {
 		return nil, errArguments("parse args failed - %s", err)
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStringRow(db, key, false)
 	if err != nil {
@@ -850,10 +850,10 @@ func (s *Store) Strlen(db uint32, args [][]byte) (int64, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStringRow(db, key, false)
 	if err != nil {
@@ -894,10 +894,10 @@ func (s *Store) BitCount(db uint32, args [][]byte) (int64, error) {
 		}
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStringRow(db, key, false)
 	if err != nil {
