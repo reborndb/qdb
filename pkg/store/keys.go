@@ -96,10 +96,10 @@ func (s *Store) Dump(db uint32, args [][]byte) (interface{}, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStoreRow(db, key, false)
 	if err != nil || o == nil {
@@ -121,10 +121,10 @@ func (s *Store) Type(db uint32, args [][]byte) (ObjectCode, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStoreRow(db, key, false)
 	if err != nil || o == nil {
@@ -141,10 +141,10 @@ func (s *Store) Exists(db uint32, args [][]byte) (int64, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	o, err := s.loadStoreRow(db, key, false)
 	if err != nil || o == nil {
@@ -162,10 +162,10 @@ func (s *Store) TTL(db uint32, args [][]byte) (int64, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	v, err := s.getExpireTTLms(db, key)
 	if err != nil || v < 0 {
@@ -182,10 +182,10 @@ func (s *Store) PTTL(db uint32, args [][]byte) (int64, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
 	return s.getExpireTTLms(db, key)
 }
