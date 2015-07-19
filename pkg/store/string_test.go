@@ -284,7 +284,6 @@ func (s *testStoreSuite) TestXRestore(c *C) {
 	s.xget(c, 0, "string", "test")
 	sleepms(200)
 	s.xget(c, 0, "string", "")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXSet(c *C) {
@@ -318,7 +317,6 @@ func (s *testStoreSuite) TestXSet(c *C) {
 	sleepms(2000)
 	s.kpttl(c, 0, "string", -2)
 
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXAppend(c *C) {
@@ -346,7 +344,6 @@ func (s *testStoreSuite) TestXAppend(c *C) {
 	}
 	s.xdump(c, 0, "string", expect)
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXSetEX(c *C) {
@@ -360,7 +357,6 @@ func (s *testStoreSuite) TestXSetEX(c *C) {
 	s.xget(c, 0, "string", "world")
 	s.kpttl(c, 0, "string", 100000)
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXPSetEX(c *C) {
@@ -369,7 +365,6 @@ func (s *testStoreSuite) TestXPSetEX(c *C) {
 	s.xpsetex(c, 0, "string", "world", 2000)
 	s.kpttl(c, 0, "string", 2000)
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXSetNX(c *C) {
@@ -382,7 +377,6 @@ func (s *testStoreSuite) TestXSetNX(c *C) {
 	s.xsetnx(c, 0, "string", "world", 1)
 	s.xdel(c, 0, "string", 1)
 	s.xdel(c, 0, "string", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXGetSet(c *C) {
@@ -395,7 +389,6 @@ func (s *testStoreSuite) TestXGetSet(c *C) {
 	s.kpttl(c, 0, "string", -1)
 
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXIncrDecr(c *C) {
@@ -410,7 +403,6 @@ func (s *testStoreSuite) TestXIncrDecr(c *C) {
 	}
 	s.xget(c, 0, "string", "0")
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXIncrBy(c *C) {
@@ -427,7 +419,6 @@ func (s *testStoreSuite) TestXIncrBy(c *C) {
 	}
 	s.xget(c, 0, "string", strconv.Itoa(int(sum)))
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 
 }
 
@@ -446,7 +437,6 @@ func (s *testStoreSuite) TestXIncrByFloat(c *C) {
 	c.Assert(err, NotNil)
 
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXSetBit(c *C) {
@@ -489,7 +479,6 @@ func (s *testStoreSuite) TestXSetBit(c *C) {
 	s.xsetbit(c, 0, "string", 16, 0, 0)
 	s.xget(c, 0, "string", "\x00\x00\x00")
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXSetRange(c *C) {
@@ -500,7 +489,6 @@ func (s *testStoreSuite) TestXSetRange(c *C) {
 	s.xsetrange(c, 0, "string", 2, "test1test2test3", 17)
 	s.xget(c, 0, "string", "\x00htest1test2test3")
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestGetBit(c *C) {
@@ -525,7 +513,6 @@ func (s *testStoreSuite) TestGetBit(c *C) {
 		s.xgetbit(c, 0, "string", uint(i), v)
 	}
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestGetRange(c *C) {
@@ -543,7 +530,6 @@ func (s *testStoreSuite) TestGetRange(c *C) {
 	s.xgetrange(c, 0, "string", -1, -1000, "")
 	s.xgetrange(c, 0, "string", -100, 100, "hello world!!")
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestXMSet(c *C) {
@@ -559,7 +545,6 @@ func (s *testStoreSuite) TestXMSet(c *C) {
 
 	s.xmset(c, 0, "a", "1", "a", "2", "a", "3", "b", "1", "b", "2")
 	s.kdel(c, 0, 3, "a", "b", "c")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestMSetNX(c *C) {
@@ -583,7 +568,6 @@ func (s *testStoreSuite) TestMSetNX(c *C) {
 	s.xmsetnx(c, 0, 1, "string", "hello", "string", "world")
 	s.xget(c, 0, "string", "world")
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestMGet(c *C) {
@@ -593,7 +577,6 @@ func (s *testStoreSuite) TestMGet(c *C) {
 
 	s.xmget(c, 0, "a", "", "b", "2", "c", "3", "d", "")
 	s.kdel(c, 0, 2, "a", "b", "c")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestBitCount(c *C) {
@@ -621,7 +604,6 @@ func (s *testStoreSuite) TestBitCount(c *C) {
 	s.xbitcount(c, 0, 4, "string", 0, -1)
 
 	s.xdel(c, 0, "string", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestBitOp(c *C) {
@@ -655,5 +637,4 @@ func (s *testStoreSuite) TestBitOp(c *C) {
 	s.xdel(c, 0, "a", 1)
 	s.xdel(c, 0, "b", 1)
 	s.xdel(c, 0, "c", 1)
-	s.checkEmpty(c)
 }

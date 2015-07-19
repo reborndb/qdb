@@ -125,8 +125,8 @@ func (o *setRow) getMembers(r storeReader, count int64) ([][]byte, error) {
 	return members, nil
 }
 
-func (s *Store) loadSetRow(db uint32, key []byte) (*setRow, error) {
-	o, err := s.loadStoreRow(db, key)
+func (s *Store) loadSetRow(db uint32, key []byte, delExp bool) (*setRow, error) {
+	o, err := s.loadStoreRow(db, key, delExp)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -153,7 +153,7 @@ func (s *Store) SAdd(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -192,12 +192,12 @@ func (s *Store) SCard(db uint32, args [][]byte) (int64, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -213,12 +213,12 @@ func (s *Store) SIsMember(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 	member := args[1]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -240,12 +240,12 @@ func (s *Store) SMembers(db uint32, args [][]byte) ([][]byte, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (s *Store) SPop(db uint32, args [][]byte) ([]byte, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -305,12 +305,12 @@ func (s *Store) SRandMember(db uint32, args [][]byte) ([][]byte, error) {
 		}
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -339,7 +339,7 @@ func (s *Store) SRem(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadSetRow(db, key)
+	o, err := s.loadSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}

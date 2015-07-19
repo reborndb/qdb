@@ -140,7 +140,6 @@ func (s *testStoreSuite) TestDel(c *C) {
 	s.kdel(c, 0, 2, "a", "b", "c", "d")
 	s.xset(c, 0, "a", "a")
 	s.kdel(c, 0, 1, "a", "a")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestExists(c *C) {
@@ -149,7 +148,6 @@ func (s *testStoreSuite) TestExists(c *C) {
 	s.kexists(c, 0, "a", 1)
 	s.kdel(c, 0, 1, "a")
 	s.kexists(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestTTL(c *C) {
@@ -172,7 +170,6 @@ func (s *testStoreSuite) TestTTL(c *C) {
 	sleepms(200)
 	s.kttl(c, 0, "a", -2)
 	s.kexists(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestPTTL(c *C) {
@@ -191,7 +188,6 @@ func (s *testStoreSuite) TestPTTL(c *C) {
 	sleepms(200)
 	s.kpttl(c, 0, "a", -2)
 	s.kexists(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestPersist(c *C) {
@@ -204,7 +200,6 @@ func (s *testStoreSuite) TestPersist(c *C) {
 	sleepms(200)
 	s.kpersist(c, 0, "a", 0)
 	s.kexists(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestExpire(c *C) {
@@ -219,7 +214,6 @@ func (s *testStoreSuite) TestExpire(c *C) {
 
 	s.kexpireat(c, 0, "a", 0, 1)
 	s.ktype(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestPExpire(c *C) {
@@ -232,7 +226,6 @@ func (s *testStoreSuite) TestPExpire(c *C) {
 	s.kpexpire(c, 0, "a", 100, 1)
 	sleepms(200)
 	s.ktype(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestExpireAt(c *C) {
@@ -247,7 +240,6 @@ func (s *testStoreSuite) TestExpireAt(c *C) {
 	s.xset(c, 0, "a", "a")
 	s.kexpireat(c, 0, "a", 0, 1)
 	s.kexists(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestPExpireAt(c *C) {
@@ -262,7 +254,6 @@ func (s *testStoreSuite) TestPExpireAt(c *C) {
 	s.xset(c, 0, "a", "a")
 	s.kpexpireat(c, 0, "a", 0, 1)
 	s.kexists(c, 0, "a", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestRestore(c *C) {
@@ -274,5 +265,4 @@ func (s *testStoreSuite) TestRestore(c *C) {
 	s.srestore(c, 0, "key", 10, "a", "b", "c", "d")
 	sleepms(30)
 	s.kexists(c, 0, "key", 0)
-	s.checkEmpty(c)
 }

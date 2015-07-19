@@ -196,8 +196,8 @@ func (o *zsetRow) loadObjectValue(r storeReader) (interface{}, error) {
 	return rdb.ZSet(zset), nil
 }
 
-func (s *Store) loadZSetRow(db uint32, key []byte) (*zsetRow, error) {
-	o, err := s.loadStoreRow(db, key)
+func (s *Store) loadZSetRow(db uint32, key []byte, delExp bool) (*zsetRow, error) {
+	o, err := s.loadStoreRow(db, key, delExp)
 	if err != nil {
 		return nil, err
 	} else if o != nil {
@@ -218,12 +218,12 @@ func (s *Store) ZGetAll(db uint32, args [][]byte) ([][]byte, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil || o == nil {
 		return nil, err
 	}
@@ -249,12 +249,12 @@ func (s *Store) ZCard(db uint32, args [][]byte) (int64, error) {
 
 	key := args[0]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -293,7 +293,7 @@ func (s *Store) ZAdd(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -346,7 +346,7 @@ func (s *Store) ZRem(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil || o == nil {
 		return 0, err
 	}
@@ -388,12 +388,12 @@ func (s *Store) ZScore(db uint32, args [][]byte) (float64, bool, error) {
 	key := args[0]
 	member := args[1]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, false, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil || o == nil {
 		return 0, false, err
 	}
@@ -425,7 +425,7 @@ func (s *Store) ZIncrBy(db uint32, args [][]byte) (float64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	}
@@ -646,12 +646,12 @@ func (s *Store) ZCount(db uint32, args [][]byte) (int64, error) {
 		return 0, errors.Trace(err)
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil {
 		return 0, err
 	}
@@ -903,12 +903,12 @@ func (s *Store) ZLexCount(db uint32, args [][]byte) (int64, error) {
 		return 0, errors.Trace(err)
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil {
 		return 0, err
 	}
@@ -949,12 +949,12 @@ func (s *Store) genericZRange(db uint32, args [][]byte, reverse bool) ([][]byte,
 		withScore = 2
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1063,12 +1063,12 @@ func (s *Store) genericZRangeBylex(db uint32, args [][]byte, reverse bool) ([][]
 		return nil, errors.Trace(err)
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1172,12 +1172,12 @@ func (s *Store) genericZRangeByScore(db uint32, args [][]byte, reverse bool) ([]
 		return nil
 	}
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return nil, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1209,12 +1209,12 @@ func (s *Store) genericZRank(db uint32, args [][]byte, reverse bool) (int64, err
 	key := args[0]
 	member := args[1]
 
-	if err := s.acquire(); err != nil {
+	if err := s.acquireRead(); err != nil {
 		return 0, err
 	}
-	defer s.release()
+	defer s.releaseRead()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, false)
 	if err != nil {
 		return 0, err
 	} else if o == nil {
@@ -1280,7 +1280,7 @@ func (s *Store) ZRemRangeByLex(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	} else if o == nil {
@@ -1336,7 +1336,7 @@ func (s *Store) ZRemRangeByRank(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	} else if o == nil {
@@ -1406,7 +1406,7 @@ func (s *Store) ZRemRangeByScore(db uint32, args [][]byte) (int64, error) {
 	}
 	defer s.release()
 
-	o, err := s.loadZSetRow(db, key)
+	o, err := s.loadZSetRow(db, key, true)
 	if err != nil {
 		return 0, err
 	} else if o == nil {

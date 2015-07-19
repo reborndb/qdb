@@ -236,7 +236,6 @@ func (s *testStoreSuite) TestZAdd(c *C) {
 	s.kpexpire(c, 0, "zset", 10, 1)
 	sleepms(20)
 	s.zdel(c, 0, "zset", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRem(c *C) {
@@ -249,7 +248,6 @@ func (s *testStoreSuite) TestZRem(c *C) {
 	}
 	s.zrem(c, 0, "zset", 32, append(m, m...)...)
 	s.zcard(c, 0, "zset", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZIncrBy(c *C) {
@@ -259,7 +257,6 @@ func (s *testStoreSuite) TestZIncrBy(c *C) {
 	s.zincrby(c, 0, "zset", "a", 1000, 1000)
 	s.zcard(c, 0, "zset", 1)
 	s.zdel(c, 0, "zset", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRestore(c *C) {
@@ -279,7 +276,6 @@ func (s *testStoreSuite) TestZRestore(c *C) {
 	sleepms(200)
 	s.kpttl(c, 0, "zset", -2)
 	s.zdel(c, 0, "zset", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZCount(c *C) {
@@ -307,7 +303,6 @@ func (s *testStoreSuite) TestZCount(c *C) {
 	s.zcount(c, 0, "zset", "-inf", "-inf", 0)
 
 	s.zdel(c, 0, "zset", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZLexCount(c *C) {
@@ -331,7 +326,6 @@ func (s *testStoreSuite) TestZLexCount(c *C) {
 	s.zlexcount(c, 0, "zset", "-", "-", 0)
 
 	s.zdel(c, 0, "zset", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRange(c *C) {
@@ -351,7 +345,6 @@ func (s *testStoreSuite) TestZRange(c *C) {
 
 	s.zdel(c, 0, "zset", 1)
 	s.zdel(c, 0, "zseu", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRangeByLex(c *C) {
@@ -374,7 +367,6 @@ func (s *testStoreSuite) TestZRangeByLex(c *C) {
 	s.zrangebylex(c, 0, "zset", "(g", "[aaa", 1, -1, true, "e", "d", "c", "b")
 
 	s.zdel(c, 0, "zset", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRangeByScore(c *C) {
@@ -397,7 +389,6 @@ func (s *testStoreSuite) TestZRangeByScore(c *C) {
 	s.zrangebyscore(c, 0, "zset", "(2.2", "(1.1", 0, -1, true)
 
 	s.zdel(c, 0, "zset", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRank(c *C) {
@@ -421,7 +412,6 @@ func (s *testStoreSuite) TestZRank(c *C) {
 	s.zrank(c, 0, "zset", "abc", true, -1)
 
 	s.zdel(c, 0, "zset", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRemRangeByLex(c *C) {
@@ -440,7 +430,6 @@ func (s *testStoreSuite) TestZRemRangeByLex(c *C) {
 	s.zcard(c, 0, "zset", 0)
 
 	s.zdel(c, 0, "zset", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRemRangeByRank(c *C) {
@@ -460,7 +449,6 @@ func (s *testStoreSuite) TestZRemRangeByRank(c *C) {
 	s.zcard(c, 0, "zset", 0)
 
 	s.zdel(c, 0, "zset", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestZRemRangeByScore(c *C) {
@@ -480,5 +468,4 @@ func (s *testStoreSuite) TestZRemRangeByScore(c *C) {
 	s.zcard(c, 0, "zset", 0)
 
 	s.zdel(c, 0, "zset", 0)
-	s.checkEmpty(c)
 }

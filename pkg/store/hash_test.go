@@ -279,7 +279,6 @@ func (s *testStoreSuite) TestHSet(c *C) {
 	s.hgetall(c, 0, "hash", ss...)
 	s.hdelall(c, 0, "hash", 1)
 	s.hgetall(c, 0, "hash")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestHDel(c *C) {
@@ -310,7 +309,6 @@ func (s *testStoreSuite) TestHDel(c *C) {
 		s.hdel(c, 0, "hash", 0, strconv.Itoa(i))
 	}
 	s.hgetall(c, 0, "hash")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestHRestore(c *C) {
@@ -335,7 +333,6 @@ func (s *testStoreSuite) TestHRestore(c *C) {
 	s.hlen(c, 0, "hash", 0)
 	s.kpttl(c, 0, "hash", -2)
 	s.hdelall(c, 0, "hash", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestHIncrBy(c *C) {
@@ -345,7 +342,6 @@ func (s *testStoreSuite) TestHIncrBy(c *C) {
 	s.hincrby(c, 0, "hash", "a", -1000, 0)
 	s.hgetall(c, 0, "hash", "a", "0")
 	s.hdelall(c, 0, "hash", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestHIncrFloat(c *C) {
@@ -362,7 +358,6 @@ func (s *testStoreSuite) TestHIncrFloat(c *C) {
 	c.Assert(err, NotNil)
 
 	s.hdelall(c, 0, "hash", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestHSetNX(c *C) {
@@ -400,7 +395,6 @@ func (s *testStoreSuite) TestHSetNX(c *C) {
 	s.hlen(c, 0, "hash", 3)
 	s.hmget(c, 0, "hash", "0", "x", "1", "c", "2", "a")
 	s.hdelall(c, 0, "hash", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestHMSet(c *C) {
@@ -412,5 +406,4 @@ func (s *testStoreSuite) TestHMSet(c *C) {
 	s.hgetall(c, 0, "hash", "b", "1", "c", "2")
 	s.hdelall(c, 0, "hash", 1)
 	s.hmget(c, 0, "hash", "a", "")
-	s.checkEmpty(c)
 }
