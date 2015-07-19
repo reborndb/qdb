@@ -157,7 +157,6 @@ func (s *testStoreSuite) TestSRestore(c *C) {
 	sleepms(200)
 	s.scard(c, 0, "set", 0)
 	s.kpttl(c, 0, "set", -2)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSAdd(c *C) {
@@ -176,7 +175,6 @@ func (s *testStoreSuite) TestSAdd(c *C) {
 	s.sadd(c, 0, "set", 0, "0", "1", "2", "3")
 	s.sdel(c, 0, "set", 1)
 	s.sdel(c, 0, "set", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSMembers(c *C) {
@@ -186,7 +184,6 @@ func (s *testStoreSuite) TestSMembers(c *C) {
 	sleepms(200)
 	s.smembers(c, 0, "set")
 	s.kpexpire(c, 0, "set", 10, 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSRem(c *C) {
@@ -199,7 +196,6 @@ func (s *testStoreSuite) TestSRem(c *C) {
 	s.srem(c, 0, "set", 2, "1", "2")
 	s.scard(c, 0, "set", 0)
 	s.kpttl(c, 0, "set", -2)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSPop(c *C) {
@@ -210,7 +206,6 @@ func (s *testStoreSuite) TestSPop(c *C) {
 		s.spop(c, 0, "set", 1)
 	}
 	s.spop(c, 0, "set", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSRandMember(c *C) {
@@ -225,5 +220,4 @@ func (s *testStoreSuite) TestSRandMember(c *C) {
 		s.srandpop(c, 0, "set", 1)
 	}
 	s.scard(c, 0, "set", 0)
-	s.checkEmpty(c)
 }

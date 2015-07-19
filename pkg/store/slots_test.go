@@ -269,7 +269,6 @@ func (s *testStoreSuite) TestSlotsRestore(c *C) {
 	s.slotsinfo(c, 0, 1)
 	s.xdel(c, 0, "key", 1)
 	s.slotsinfo(c, 0, 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSlotsMgrtSlot(c *C) {
@@ -295,7 +294,6 @@ func (s *testStoreSuite) TestSlotsMgrtSlot(c *C) {
 	s.checkSlotsMgrt(c, r, w, s.slotsmgrtslot(addr, 1, "key", 1), "key", 0, "world2")
 	s.slotsinfo(c, 1, 0)
 
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSlotsMgrtTagSlot(c *C) {
@@ -319,7 +317,6 @@ func (s *testStoreSuite) TestSlotsMgrtTagSlot(c *C) {
 	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagslot(addr, 0, "", 0))
 	s.slotsinfo(c, 0, 0)
 
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSlotsMgrtOne(c *C) {
@@ -342,7 +339,6 @@ func (s *testStoreSuite) TestSlotsMgrtOne(c *C) {
 	s.checkSlotsMgrt(c, r, w, s.slotsmgrtone(addr, 1, "key{tag}2", 1), "key{tag}2", 0, "world")
 	s.slotsinfo(c, 1, 0)
 
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestSlotsMgrtTagOne(c *C) {
@@ -373,5 +369,4 @@ func (s *testStoreSuite) TestSlotsMgrtTagOne(c *C) {
 	s.checkSlotsMgrt(c, r, w, s.slotsmgrttagone(addr, 2, "key{tag}3", 0))
 	s.xdel(c, 2, "key{tag3}", 0)
 
-	s.checkEmpty(c)
 }

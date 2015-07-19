@@ -178,7 +178,6 @@ func (s *testStoreSuite) TestLRestore(c *C) {
 	s.kpttl(c, 0, "list", -2)
 	s.llen(c, 0, "list", 0)
 	s.ldel(c, 0, "list", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestLIndex(c *C) {
@@ -204,7 +203,6 @@ func (s *testStoreSuite) TestLIndex(c *C) {
 	for i := -4; i <= 4; i++ {
 		s.lindex(c, 0, "list", i, "")
 	}
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestLRange(c *C) {
@@ -223,7 +221,6 @@ func (s *testStoreSuite) TestLRange(c *C) {
 	s.lrange(c, 0, "list", -1000, 1000, "a", "b", "c", "d")
 	s.llen(c, 0, "list", 4)
 	s.ldel(c, 0, "list", 1)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestRPush(c *C) {
@@ -249,7 +246,6 @@ func (s *testStoreSuite) TestRPush(c *C) {
 	s.rpushx(c, 0, "list", "world", 0)
 	s.llen(c, 0, "list", 0)
 	s.kexists(c, 0, "list", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestLPush(c *C) {
@@ -278,7 +274,6 @@ func (s *testStoreSuite) TestLPush(c *C) {
 	s.lpushx(c, 0, "list", "world", 0)
 	s.llen(c, 0, "list", 0)
 	s.kexists(c, 0, "list", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestLPop(c *C) {
@@ -291,7 +286,6 @@ func (s *testStoreSuite) TestLPop(c *C) {
 	s.lpop(c, 0, "list", "x")
 	s.lpop(c, 0, "list", "d")
 	s.lpop(c, 0, "list", "")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestRPop(c *C) {
@@ -304,7 +298,6 @@ func (s *testStoreSuite) TestRPop(c *C) {
 	s.rpop(c, 0, "list", "x")
 	s.rpop(c, 0, "list", "d")
 	s.rpop(c, 0, "list", "")
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestLSet(c *C) {
@@ -322,7 +315,6 @@ func (s *testStoreSuite) TestLSet(c *C) {
 	s.ldump(c, 0, "list", ss...)
 	s.ltrim(c, 0, "list", 1, 0)
 	s.ldel(c, 0, "list", 0)
-	s.checkEmpty(c)
 }
 
 func (s *testStoreSuite) TestLTrim(c *C) {
@@ -354,5 +346,4 @@ func (s *testStoreSuite) TestLTrim(c *C) {
 	s.ldump(c, 0, "list", ss...)
 	s.ltrim(c, 0, "list", 2, 1)
 	s.llen(c, 0, "list", 0)
-	s.checkEmpty(c)
 }
