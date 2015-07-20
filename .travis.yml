@@ -11,8 +11,8 @@ before_install:
   - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
   - cd $TRAVIS_BUILD_DIR/extern/rocksdb && make shared_lib
-  - sudo cp -rf $TRAVIS_BUILD_DIR/extern/rocksdb/include/rocksdb /usr/local/include 
-  - sudo cp -f $TRAVIS_BUILD_DIR/extern/rocksdb/librocksdb.so /usr/local/lib 
+  - sudo cp -rf $TRAVIS_BUILD_DIR/extern/rocksdb/include/rocksdb /usr/local/include
+  - sudo cp -f $TRAVIS_BUILD_DIR/extern/rocksdb/librocksdb.* /usr/local/lib
   - export CGO_LDFLAGS="-lsnappy"
   - cd $TRAVIS_BUILD_DIR/extern/gorocks && go install ./ && cd $TRAVIS_BUILD_DIR
   - export LD_LIBRARY_PATH=/usr/local/lib
