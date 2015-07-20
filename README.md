@@ -71,3 +71,6 @@ LRANGE_500 (first 450 elements): 414.38 requests per second
 LRANGE_600 (first 600 elements): 319.44 requests per second
 ```
 
+## FAQ
+
+See [FAQ](https://github.com/reborndb/qdb/wiki/FAQ) for more.
