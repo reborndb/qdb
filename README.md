@@ -42,7 +42,7 @@ We will use godep to build our application, the godep will be installed in `$GOP
 + `make`, it will install qdb-server in `./bin`.
 + run `qdb-server` with specifed config file
 ```
-    $ qdb-server -c conf/config.toml -n 4 --create
+    $ qdb-server -c conf/config.toml -n 4
 ```
 
 ## Benchmark
