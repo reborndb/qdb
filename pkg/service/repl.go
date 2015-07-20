@@ -455,13 +455,13 @@ func (h *Handler) replicationSlaveSyncBacklog(c *conn, buf []byte) (int, error) 
 		// we can not read data from this offset in backlog buffer
 		// lag behind too much, so a better way is to stop the replication and re-fullsync again
 
-		return 0, fmt.Errorf("slave %s has invalid sync offset %d, not in [%d, %d]", c, offset, start, end)
+		return 0, errors.Errorf("slave %s has invalid sync offset %d, not in [%d, %d]", c, offset, start, end)
 	}
 
 	// read data into buf
 	n, err := h.repl.backlogBuf.ReadAt(buf, offset-start)
 	if err != nil {
-		return 0, fmt.Errorf("slave %s read backlog data err %v", c, err)
+		return 0, errors.Errorf("slave %s read backlog data err %v", c, err)
 	}
 
 	if n == 0 {
@@ -473,7 +473,7 @@ func (h *Handler) replicationSlaveSyncBacklog(c *conn, buf []byte) (int, error) 
 	c.nc.SetWriteDeadline(time.Now().Add(5 * time.Second))
 
 	if err = c.writeRaw(buf[0:n]); err != nil {
-		return 0, fmt.Errorf("slave %s sync backlog data err %v", c, err)
+		return 0, errors.Errorf("slave %s sync backlog data err %v", c, err)
 	}
 
 	c.syncOffset.Add(int64(n))

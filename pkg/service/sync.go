@@ -96,7 +96,7 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 	enc := rdb.NewEncoder(buf)
 
 	if err := enc.EncodeHeader(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	ncpu := 1
@@ -104,11 +104,11 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 	for {
 		objs, more, err := sp.LoadObjCron(cron, ncpu, 1024)
 		if err != nil {
-			return err
+			return errors.Trace(err)
 		} else {
 			for _, obj := range objs {
 				if err := enc.EncodeObject(obj.DB, obj.Key, obj.ExpireAt, obj.Value); err != nil {
-					return err
+					return errors.Trace(err)
 				}
 			}
 		}
@@ -118,12 +118,13 @@ func (h *Handler) bgsaveTo(sp *store.StoreSnapshot, path string) error {
 	}
 
 	if err := enc.EncodeFooter(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	if err := errors.Trace(buf.Flush()); err != nil {
-		return err
+		return errors.Trace(err)
 	}
+
 	return errors.Trace(f.Close())
 }
 
@@ -501,7 +502,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 	r := ioutils.NewCountReader(c.r, nil)
 	l := rdb.NewLoader(r)
 	if err := l.Header(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	ncpu := 1
@@ -518,7 +519,7 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 		entry, err := l.NextBinEntry()
 		if err != nil || entry == nil {
 			flag.Set(1)
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		return entry, nil
 	}
@@ -559,8 +560,9 @@ func (h *Handler) doSyncRDB(c *conn, size int64) error {
 				}
 			}
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
+
 			return l.Footer()
 		}
 	}

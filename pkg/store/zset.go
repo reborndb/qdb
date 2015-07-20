@@ -103,7 +103,7 @@ func (o *zsetRow) ParseIndexValue(p []byte) (err error) {
 func (o *zsetRow) LoadIndexValue(r storeReader) (bool, error) {
 	p, err := r.getRowValue(o.IndexKey())
 	if err != nil || p == nil {
-		return false, err
+		return false, errors.Trace(err)
 	}
 	return true, o.ParseIndexValue(p)
 }
@@ -111,7 +111,7 @@ func (o *zsetRow) LoadIndexValue(r storeReader) (bool, error) {
 func (o *zsetRow) TestIndexValue(r storeReader) (bool, error) {
 	p, err := r.getRowValue(o.IndexKey())
 	if err != nil || p == nil {
-		return false, err
+		return false, errors.Trace(err)
 	}
 	return true, nil
 }
@@ -180,15 +180,15 @@ func (o *zsetRow) loadObjectValue(r storeReader) (interface{}, error) {
 		}
 		sfx := key[len(pfx):]
 		if err := o.ParseDataKeySuffix(sfx); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if err := o.ParseDataValue(it.Value()); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		zset = append(zset, &rdb.ZSetElement{Member: o.Member, Score: float64(o.Score)})
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if o.Size == 0 || int64(len(zset)) != o.Size {
 		return nil, errors.Errorf("len(zset) = %d, zset.size = %d", len(zset), o.Size)
@@ -199,7 +199,7 @@ func (o *zsetRow) loadObjectValue(r storeReader) (interface{}, error) {
 func (s *Store) loadZSetRow(db uint32, key []byte) (*zsetRow, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else if o != nil {
 		x, ok := o.(*zsetRow)
 		if ok {
@@ -219,18 +219,18 @@ func (s *Store) ZGetAll(db uint32, args [][]byte) ([][]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	x, err := o.loadObjectValue(s)
 	if err != nil || x == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	eles := x.(rdb.ZSet)
@@ -250,13 +250,13 @@ func (s *Store) ZCard(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return o.Size, nil
 }
@@ -289,13 +289,13 @@ func (s *Store) ZAdd(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if o == nil {
@@ -308,7 +308,7 @@ func (s *Store) ZAdd(db uint32, args [][]byte) (int64, error) {
 		o.Member = e.Member
 		exists, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		if !exists {
 			ms.Set(o.Member)
@@ -342,13 +342,13 @@ func (s *Store) ZRem(db uint32, args [][]byte) (int64, error) {
 	members := args[1:]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	ms := &markSet{}
@@ -357,7 +357,7 @@ func (s *Store) ZRem(db uint32, args [][]byte) (int64, error) {
 		if !ms.Has(o.Member) {
 			exists, err := o.LoadDataValue(s)
 			if err != nil {
-				return 0, err
+				return 0, errors.Trace(err)
 			}
 			if exists {
 				bt.Del(o.DataKey())
@@ -389,19 +389,19 @@ func (s *Store) ZScore(db uint32, args [][]byte) (float64, bool, error) {
 	member := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, false, err
+		return 0, false, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil || o == nil {
-		return 0, false, err
+		return 0, false, errors.Trace(err)
 	}
 
 	o.Member = member
 	exists, err := o.LoadDataValue(s)
 	if err != nil || !exists {
-		return 0, false, err
+		return 0, false, errors.Trace(err)
 	} else {
 		return o.Score, true, nil
 	}
@@ -421,13 +421,13 @@ func (s *Store) ZIncrBy(db uint32, args [][]byte) (float64, error) {
 	member := args[2]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
@@ -437,7 +437,7 @@ func (s *Store) ZIncrBy(db uint32, args [][]byte) (float64, error) {
 		o.Member = member
 		exists, err = o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		} else if exists {
 			bt.Del(o.IndexKey())
 		}
@@ -454,7 +454,7 @@ func (s *Store) ZIncrBy(db uint32, args [][]byte) (float64, error) {
 	}
 	o.Score = delta
 	if math.IsNaN(delta) {
-		return 0, errors.Errorf("invalid nan score")
+		return 0, errors.New("invalid nan score")
 	}
 
 	bt.Set(o.DataKey(), o.DataValue())
@@ -531,11 +531,11 @@ func parseRangeSpec(min []byte, max []byte) (*rangeSpec, error) {
 	var err error
 
 	if r.Min, r.MinEx, err = parseRangeScore(min); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if r.Max, r.MaxEx, err = parseRangeScore(max); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return &r, nil
@@ -647,13 +647,13 @@ func (s *Store) ZCount(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var count int64 = 0
@@ -786,12 +786,12 @@ func parseLexRangeSpec(min []byte, max []byte) (*lexRangeSpec, error) {
 
 	r.Min, r.MinEx, err = parseLexRangeItem(min)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	r.Max, r.MaxEx, err = parseLexRangeItem(max)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return &r, nil
@@ -904,13 +904,13 @@ func (s *Store) ZLexCount(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var count int64 = 0
@@ -950,13 +950,13 @@ func (s *Store) genericZRange(db uint32, args [][]byte, reverse bool) ([][]byte,
 	}
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	var rangeLen int64
@@ -979,7 +979,7 @@ func (s *Store) genericZRange(db uint32, args [][]byte, reverse bool) ([][]byte,
 
 			rangeLen--
 			if rangeLen <= 0 {
-				return errTravelBreak
+				return errors.Trace(errTravelBreak)
 			}
 
 		}
@@ -1064,13 +1064,13 @@ func (s *Store) genericZRangeBylex(db uint32, args [][]byte, reverse bool) ([][]
 	}
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	res := make([][]byte, 0, 4)
@@ -1078,7 +1078,7 @@ func (s *Store) genericZRangeBylex(db uint32, args [][]byte, reverse bool) ([][]
 	f := func(o *zsetRow) error {
 		if n >= offset {
 			if count == 0 {
-				return errTravelBreak
+				return errors.Trace(errTravelBreak)
 			}
 
 			res = append(res, o.Member)
@@ -1157,7 +1157,7 @@ func (s *Store) genericZRangeByScore(db uint32, args [][]byte, reverse bool) ([]
 	f := func(o *zsetRow) error {
 		if n >= offset {
 			if count == 0 {
-				return errTravelBreak
+				return errors.Trace(errTravelBreak)
 			}
 
 			res = append(res, o.Member)
@@ -1173,13 +1173,13 @@ func (s *Store) genericZRangeByScore(db uint32, args [][]byte, reverse bool) ([]
 	}
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if !reverse {
@@ -1210,13 +1210,13 @@ func (s *Store) genericZRank(db uint32, args [][]byte, reverse bool) (int64, err
 	member := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else if o == nil {
 		return -1, nil
 	}
@@ -1276,13 +1276,13 @@ func (s *Store) ZRemRangeByLex(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else if o == nil {
 		return 0, nil
 	}
@@ -1332,13 +1332,13 @@ func (s *Store) ZRemRangeByRank(db uint32, args [][]byte) (int64, error) {
 	r := &rangeSpec{Min: math.Inf(-1), Max: math.Inf(1), MinEx: true, MaxEx: true}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else if o == nil {
 		return 0, nil
 	}
@@ -1362,7 +1362,7 @@ func (s *Store) ZRemRangeByRank(db uint32, args [][]byte) (int64, error) {
 			n++
 			rangeLen--
 			if rangeLen <= 0 {
-				return errTravelBreak
+				return errors.Trace(errTravelBreak)
 			}
 
 		}
@@ -1402,13 +1402,13 @@ func (s *Store) ZRemRangeByScore(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadZSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else if o == nil {
 		return 0, nil
 	}

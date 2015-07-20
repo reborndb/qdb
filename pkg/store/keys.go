@@ -19,13 +19,13 @@ const (
 func (s *Store) loadStoreRow(db uint32, key []byte) (storeRow, error) {
 	o, err := loadStoreRow(s, db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if s.needDeleteIfExpired() && o.IsExpired() {
 		bt := engine.NewBatch()
 		if err := o.deleteObject(s, bt); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
 		return nil, s.commit(bt, fw)
@@ -36,7 +36,7 @@ func (s *Store) loadStoreRow(db uint32, key []byte) (storeRow, error) {
 func (s *Store) deleteIfExists(bt *engine.Batch, db uint32, key []byte) (bool, error) {
 	o, err := loadStoreRow(s, db, key)
 	if err != nil || o == nil {
-		return false, err
+		return false, errors.Trace(err)
 	}
 	// if key is already expired, we think it is not exists
 	exists := !o.IsExpired()
@@ -52,7 +52,7 @@ func (s *Store) Del(db uint32, args [][]byte) (int64, error) {
 	keys := args
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -62,7 +62,7 @@ func (s *Store) Del(db uint32, args [][]byte) (int64, error) {
 		if !ms.Has(key) {
 			exists, err := s.deleteIfExists(bt, db, key)
 			if err != nil {
-				return 0, err
+				return 0, errors.Trace(err)
 			}
 			if exists {
 				ms.Set(key)
@@ -82,17 +82,17 @@ func (s *Store) Dump(db uint32, args [][]byte) (interface{}, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		x, err := o.loadObjectValue(s)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		return x, nil
 	}
@@ -107,13 +107,13 @@ func (s *Store) Type(db uint32, args [][]byte) (ObjectCode, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return o.Code(), nil
 }
@@ -127,13 +127,13 @@ func (s *Store) Exists(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else {
 		return 1, nil
 	}
@@ -148,13 +148,13 @@ func (s *Store) TTL(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	v, err := s.getExpireTTLms(db, key)
 	if err != nil || v < 0 {
-		return v, err
+		return v, errors.Trace(err)
 	}
 	return v / 1e3, nil
 }
@@ -168,7 +168,7 @@ func (s *Store) PTTL(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -178,7 +178,7 @@ func (s *Store) PTTL(db uint32, args [][]byte) (int64, error) {
 func (s *Store) getExpireTTLms(db uint32, key []byte) (int64, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	if o == nil {
 		return -2, nil
@@ -191,7 +191,7 @@ func (s *Store) getExpireTTLms(db uint32, key []byte) (int64, error) {
 func (s *Store) setExpireAt(db uint32, key []byte, expireat int64) (int64, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	bt := engine.NewBatch()
 	if !IsExpired(expireat) {
@@ -202,7 +202,7 @@ func (s *Store) setExpireAt(db uint32, key []byte, expireat int64) (int64, error
 	} else {
 		_, err := s.deleteIfExists(bt, db, key)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		fw := &Forward{DB: db, Op: "Del", Args: [][]byte{key}}
 		return 1, s.commit(bt, fw)
@@ -218,13 +218,13 @@ func (s *Store) Persist(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStoreRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	if o.GetExpireAt() == 0 {
 		return 0, nil
@@ -257,7 +257,7 @@ func (s *Store) Expire(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -284,7 +284,7 @@ func (s *Store) PExpire(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -313,7 +313,7 @@ func (s *Store) ExpireAt(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -342,7 +342,7 @@ func (s *Store) PExpireAt(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -373,18 +373,18 @@ func (s *Store) Restore(db uint32, args [][]byte) error {
 
 	obj, err := rdb.DecodeDump(value)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
 	fw := &Forward{DB: db, Op: "Restore", Args: args}
 	bt := engine.NewBatch()
 	if err := s.restore(bt, db, key, expireat, obj); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	return s.commit(bt, fw)
 }
@@ -392,7 +392,7 @@ func (s *Store) Restore(db uint32, args [][]byte) error {
 func (s *Store) restore(bt *engine.Batch, db uint32, key []byte, expireat int64, obj interface{}) error {
 	_, err := s.deleteIfExists(bt, db, key)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 
 	if !IsExpired(expireat) {
@@ -420,15 +420,15 @@ func (s *Store) restore(bt *engine.Batch, db uint32, key []byte, expireat int64,
 
 func (s *Store) CompactAll() error {
 	if err := s.acquire(); err != nil {
-		return err
+		errors.Trace(err)
 	}
 	defer s.release()
 	log.Infof("store is compacting all...")
 	if err := s.compact([]byte{MetaCode}, []byte{MetaCode + 1}); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	if err := s.compact([]byte{DataCode}, []byte{DataCode + 1}); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	log.Infof("store is compacted")
 	return nil
@@ -436,7 +436,7 @@ func (s *Store) CompactAll() error {
 
 func (s *Store) Info() (string, error) {
 	if err := s.acquire(); err != nil {
-		return "", err
+		return "", errors.Trace(err)
 	}
 	defer s.release()
 

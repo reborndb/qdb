@@ -72,7 +72,7 @@ func (s *Store) commit(bt *engine.Batch, fw *Forward) error {
 
 	if err := s.db.Commit(bt); err != nil {
 		log.Warningf("store commit failed - %s", err)
-		return err
+		return errors.Trace(err)
 	}
 	for i := s.itlist.Len(); i != 0; i-- {
 		v := s.itlist.Remove(s.itlist.Front()).(*storeIterator)
@@ -135,7 +135,7 @@ func (s *Store) NewSnapshot() (*StoreSnapshot, error) {
 // New a snapshot and then call f if not nil
 func (s *Store) NewSnapshotFunc(f func()) (*StoreSnapshot, error) {
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 	sp := &StoreSnapshot{sp: s.db.NewSnapshot()}
@@ -166,7 +166,7 @@ func (s *Store) ReleaseSnapshot(sp *StoreSnapshot) {
 
 func (s *Store) Reset() error {
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 	log.Infof("store is reseting...")
@@ -182,7 +182,7 @@ func (s *Store) Reset() error {
 		s.db.Close()
 		s.db = nil
 		log.Errorf("store reset failed - %s", err)
-		return err
+		return errors.Trace(err)
 	} else {
 		s.serial++
 		log.Infof("store is reset")
@@ -209,7 +209,7 @@ func (s *Store) needDeleteIfExpired() bool {
 func (s *Store) compact(start, limit []byte) error {
 	if err := s.db.Compact(start, limit); err != nil {
 		log.Errorf("store compact failed - %s", err)
-		return err
+		return errors.Trace(err)
 	} else {
 		return nil
 	}
@@ -218,5 +218,5 @@ func (s *Store) compact(start, limit []byte) error {
 func errArguments(format string, v ...interface{}) error {
 	err := errors.Errorf(format, v...)
 	log.Warningf("call store function with invalid arguments - %s", err)
-	return err
+	return errors.Trace(err)
 }

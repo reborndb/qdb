@@ -78,15 +78,15 @@ func (o *setRow) loadObjectValue(r storeReader) (interface{}, error) {
 		}
 		sfx := key[len(pfx):]
 		if err := o.ParseDataKeySuffix(sfx); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if err := o.ParseDataValue(it.Value()); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		set = append(set, o.Member)
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if o.Size == 0 || int64(len(set)) != o.Size {
 		return nil, errors.Errorf("len(set) = %d, set.size = %d", len(set), o.Size)
@@ -105,10 +105,10 @@ func (o *setRow) getMembers(r storeReader, count int64) ([][]byte, error) {
 		}
 		sfx := key[len(pfx):]
 		if err := o.ParseDataKeySuffix(sfx); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if err := o.ParseDataValue(it.Value()); err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if len(o.Member) == 0 {
 			return nil, errors.Errorf("len(member) = %d", len(o.Member))
@@ -117,7 +117,7 @@ func (o *setRow) getMembers(r storeReader, count int64) ([][]byte, error) {
 		count--
 	}
 	if err := it.Error(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	if len(members) == 0 {
 		return nil, errors.Errorf("len(members) = %d, set.size = %d", len(members), o.Size)
@@ -128,7 +128,7 @@ func (o *setRow) getMembers(r storeReader, count int64) ([][]byte, error) {
 func (s *Store) loadSetRow(db uint32, key []byte) (*setRow, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else if o != nil {
 		x, ok := o.(*setRow)
 		if ok {
@@ -149,13 +149,13 @@ func (s *Store) SAdd(db uint32, args [][]byte) (int64, error) {
 	members := args[1:]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if o == nil {
@@ -167,7 +167,7 @@ func (s *Store) SAdd(db uint32, args [][]byte) (int64, error) {
 	for _, o.Member = range members {
 		exists, err := o.TestDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		if !exists {
 			ms.Set(o.Member)
@@ -193,13 +193,13 @@ func (s *Store) SCard(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	return o.Size, nil
 }
@@ -214,19 +214,19 @@ func (s *Store) SIsMember(db uint32, args [][]byte) (int64, error) {
 	member := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	o.Member = member
 	exists, err := o.TestDataValue(s)
 	if err != nil || !exists {
-		return 0, err
+		return 0, errors.Trace(err)
 	} else {
 		return 1, nil
 	}
@@ -241,13 +241,13 @@ func (s *Store) SMembers(db uint32, args [][]byte) ([][]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return o.getMembers(s, o.Size)
@@ -262,18 +262,18 @@ func (s *Store) SPop(db uint32, args [][]byte) ([]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	members, err := o.getMembers(s, 1)
 	if err != nil || len(members) == 0 {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	o.Member = members[0]
 
@@ -306,13 +306,13 @@ func (s *Store) SRandMember(db uint32, args [][]byte) ([][]byte, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if count < 0 {
@@ -335,13 +335,13 @@ func (s *Store) SRem(db uint32, args [][]byte) (int64, error) {
 	members := args[1:]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadSetRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	ms := &markSet{}
@@ -350,7 +350,7 @@ func (s *Store) SRem(db uint32, args [][]byte) (int64, error) {
 		if !ms.Has(o.Member) {
 			exists, err := o.TestDataValue(s)
 			if err != nil {
-				return 0, err
+				return 0, errors.Trace(err)
 			}
 			if exists {
 				bt.Del(o.DataKey())

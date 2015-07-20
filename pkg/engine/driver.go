@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/juju/errors"
 )
 
 type Driver interface {
@@ -34,7 +36,7 @@ func getDriver(name string) (Driver, error) {
 func Open(name string, path string, conf interface{}, repair bool) (Database, error) {
 	d, err := getDriver(name)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return d.Open(path, conf, repair)

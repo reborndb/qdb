@@ -5,7 +5,6 @@ package store
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 	"strings"
 
@@ -107,7 +106,7 @@ func (o *stringRow) storeObject(s *Store, bt *engine.Batch, expireat int64, obj 
 func (o *stringRow) loadObjectValue(r storeReader) (interface{}, error) {
 	_, err := o.LoadDataValue(r)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	return rdb.String(o.Value), nil
@@ -116,7 +115,7 @@ func (o *stringRow) loadObjectValue(r storeReader) (interface{}, error) {
 func (s *Store) loadStringRow(db uint32, key []byte) (*stringRow, error) {
 	o, err := s.loadStoreRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else if o != nil {
 		x, ok := o.(*stringRow)
 		if ok {
@@ -136,17 +135,17 @@ func (s *Store) Get(db uint32, args [][]byte) ([]byte, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil || o == nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	} else {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 
 		return o.Value, nil
@@ -163,20 +162,20 @@ func (s *Store) Append(db uint32, args [][]byte) (int64, error) {
 	value := args[1]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		o.Value = append(o.Value, value...)
 	} else {
@@ -251,14 +250,14 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 	}
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
 	bt := engine.NewBatch()
 
 	if o, err := loadStoreRow(s, db, key); err != nil {
-		return err
+		return errors.Trace(err)
 	} else {
 		// handle NX and XX flag
 		// NX: key is nil or expired
@@ -274,7 +273,7 @@ func (s *Store) Set(db uint32, args [][]byte) error {
 		// if not, we may delete it first
 		if o != nil && o.Code() != StringCode {
 			if err := o.deleteObject(s, bt); err != nil {
-				return err
+				return errors.Trace(err)
 			}
 		}
 	}
@@ -331,7 +330,7 @@ func (s *Store) SetNX(db uint32, args [][]byte) (int64, error) {
 		if errors2.ErrorEqual(err, ErrSetAborted) {
 			return 0, nil
 		} else {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	}
 
@@ -348,20 +347,20 @@ func (s *Store) GetSet(db uint32, args [][]byte) ([]byte, error) {
 	value := args[1]
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 
 		if o.ExpireAt != 0 {
@@ -383,18 +382,18 @@ func (s *Store) GetSet(db uint32, args [][]byte) ([]byte, error) {
 func (s *Store) incrInt(db uint32, key []byte, delta int64) (int64, error) {
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		v, err := ParseInt(o.Value)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		delta += v
 	} else {
@@ -412,18 +411,18 @@ func (s *Store) incrInt(db uint32, key []byte, delta int64) (int64, error) {
 func (s *Store) incrFloat(db uint32, key []byte, delta float64) (float64, error) {
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		v, err := ParseFloat(o.Value)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 		delta += v
 	} else {
@@ -432,7 +431,7 @@ func (s *Store) incrFloat(db uint32, key []byte, delta float64) (float64, error)
 	}
 
 	if math.IsNaN(delta) || math.IsInf(delta, 0) {
-		return 0, errors.Errorf("increment would produce NaN or Infinity")
+		return 0, errors.New("increment would produce NaN or Infinity")
 	}
 
 	o.Value = FormatFloat(delta)
@@ -451,7 +450,7 @@ func (s *Store) Incr(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -471,7 +470,7 @@ func (s *Store) IncrBy(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -487,7 +486,7 @@ func (s *Store) Decr(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -507,7 +506,7 @@ func (s *Store) DecrBy(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -527,7 +526,7 @@ func (s *Store) IncrByFloat(db uint32, args [][]byte) (float64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -559,20 +558,20 @@ func (s *Store) SetBit(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	} else {
 		o = newStringRow(db, key)
@@ -623,20 +622,20 @@ func (s *Store) SetRange(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	bt := engine.NewBatch()
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	} else {
 		o = newStringRow(db, key)
@@ -661,7 +660,7 @@ func (s *Store) MSet(db uint32, args [][]byte) error {
 	}
 
 	if err := s.acquire(); err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	defer s.release()
 
@@ -672,7 +671,7 @@ func (s *Store) MSet(db uint32, args [][]byte) error {
 		if !ms.Has(key) {
 			_, err := s.deleteIfExists(bt, db, key)
 			if err != nil {
-				return err
+				return errors.Trace(err)
 			}
 			o := newStringRow(db, key)
 			o.Value = value
@@ -693,14 +692,14 @@ func (s *Store) MSetNX(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	for i := 0; i < len(args); i += 2 {
 		o, err := s.loadStoreRow(db, args[i])
 		if err != nil || o != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 	}
 
@@ -730,7 +729,7 @@ func (s *Store) MGet(db uint32, args [][]byte) ([][]byte, error) {
 	keys := args
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
@@ -738,12 +737,12 @@ func (s *Store) MGet(db uint32, args [][]byte) ([][]byte, error) {
 	for i, key := range keys {
 		o, err := s.loadStringRow(db, key)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 		if o != nil {
 			_, err := o.LoadDataValue(s)
 			if err != nil {
-				return nil, err
+				return nil, errors.Trace(err)
 			}
 
 			values[i] = o.Value
@@ -770,17 +769,17 @@ func (s *Store) GetBit(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil || o == nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if _, err := o.LoadDataValue(s); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	byteOffset := uint32(offset) >> 3
@@ -815,19 +814,19 @@ func (s *Store) GetRange(db uint32, args [][]byte) ([]byte, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return nil, err
+			return nil, errors.Trace(err)
 		}
 
 		min, max := int64(0), int64(len(o.Value))
@@ -850,19 +849,19 @@ func (s *Store) Strlen(db uint32, args [][]byte) (int64, error) {
 	key := args[0]
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 
 		return int64(len(o.Value)), nil
@@ -894,13 +893,13 @@ func (s *Store) BitCount(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	o, err := s.loadStringRow(db, key)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	var n int64 = 0
@@ -908,7 +907,7 @@ func (s *Store) BitCount(db uint32, args [][]byte) (int64, error) {
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 
 		min, max := int64(0), int64(len(o.Value))
@@ -948,20 +947,20 @@ func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
 	}
 
 	if err := s.acquire(); err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 	defer s.release()
 
 	var value []byte
 	o, err := s.loadStringRow(db, srcKeys[0])
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	if o != nil {
 		_, err := o.LoadDataValue(s)
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 
 		if string(op) == BitNot {
@@ -976,13 +975,13 @@ func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
 	for i := 1; i < len(srcKeys); i++ {
 		ro, err := s.loadStringRow(db, srcKeys[i])
 		if err != nil {
-			return 0, err
+			return 0, errors.Trace(err)
 		}
 
 		if ro != nil {
 			_, err = ro.LoadDataValue(s)
 			if err != nil {
-				return 0, err
+				return 0, errors.Trace(err)
 			}
 		} else {
 			ro = newStringRow(db, srcKeys[i])
@@ -1001,7 +1000,7 @@ func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
 			case BitXOR:
 				value[j] ^= ro.Value[j]
 			default:
-				return 0, fmt.Errorf("invalid op type: %s", op)
+				return 0, errors.Errorf("invalid op type: %s", op)
 			}
 		}
 
@@ -1021,7 +1020,7 @@ func (s *Store) BitOp(db uint32, args [][]byte) (int64, error) {
 
 	_, err = s.deleteIfExists(bt, db, destKey)
 	if err != nil {
-		return 0, err
+		return 0, errors.Trace(err)
 	}
 
 	no := newStringRow(db, destKey)

@@ -29,7 +29,7 @@ func Open(path string, conf *Config, repair bool) (*GoLevelDB, error) {
 	db := &GoLevelDB{}
 	if err := db.init(path, conf, repair); err != nil {
 		db.Close()
-		return nil, err
+		return nil, errors.Trace(err)
 	}
 	return db, nil
 }

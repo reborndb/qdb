@@ -234,7 +234,7 @@ func (h *Handler) run() error {
 }
 
 func toRespError(err error) (redis.Resp, error) {
-	return redis.NewError(err), err
+	return redis.NewError(err), errors.Trace(err)
 }
 
 func toRespErrorf(format string, args ...interface{}) (redis.Resp, error) {
