@@ -458,6 +458,7 @@ func (h *Handler) startSyncFromMaster(c *conn, size int64) error {
 		h.masterConnState.Set(masterConnSync)
 		log.Infof("sync rdb file size = %d bytes\n", size)
 		if err := h.doSyncRDB(c, size); err != nil {
+			h.syncOffset.Set(-1) //we need fullsync when sync rdb faild
 			return errors.Trace(err)
 		}
 		log.Infof("sync rdb done")
